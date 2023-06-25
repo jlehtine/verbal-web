@@ -1,2 +1,2 @@
-# verbal-web
-Verbal web control based on large language models
+# Verbal Web
+Verbal web control using large language models
