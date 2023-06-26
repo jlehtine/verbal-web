@@ -15,16 +15,18 @@ const babelOptions = {
 
 module.exports = {
     mode: 'production',
-    entry: './src/main.tsx',
+    entry: {
+        frontend: './src/frontend/frontend.tsx',
+    },
     output: {
-        filename: 'verbal-web.js',
         path: path.resolve(__dirname, 'dist'),
+        filename: 'verbal-web-[name].js',
     },
     module: {
         rules: [
             // Typescript code
             {
-                test: /\.tsx?$/,
+                test: /src\/frontend\/.*\.tsx?$/,
                 exclude: /node_modules/,
                 use: [
                     {
@@ -39,7 +41,7 @@ module.exports = {
 
             // Source map loader for output files
             {
-                test: /\.js$/,
+                test: /dist\/verbal-web-frontend\.js$/,
                 exclude: /node_modules/,
                 use: 'source-map-loader',
             },

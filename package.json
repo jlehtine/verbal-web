@@ -24,7 +24,7 @@
     },
     "scripts": {
         "prepare": "husky install",
-        "build": "cd frontend && npm run build",
+        "build": "npx webpack",
         "format": "prettier --write . --ignore-path .gitignore",
         "format-staged": "pretty-quick --staged"
     }
