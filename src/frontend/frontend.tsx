@@ -1,1 +1,3 @@
-const i = 1;
+function initVerbalWeb(elementId) {}
+
+window.initVerbalWeb = initVerbalWeb;
