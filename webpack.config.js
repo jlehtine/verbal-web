@@ -26,7 +26,7 @@ module.exports = {
         rules: [
             // Typescript code
             {
-                test: /src\/frontend\/.*\.tsx?$/,
+                test: /src[/\\]frontend[/\\].*\.tsx?$/,
                 exclude: /node_modules/,
                 use: [
                     {
@@ -41,7 +41,7 @@ module.exports = {
 
             // Source map loader for output files
             {
-                test: /dist\/verbal-web-frontend\.js$/,
+                test: /dist[/\\]verbal-web-frontend\.js$/,
                 exclude: /node_modules/,
                 use: 'source-map-loader',
             },

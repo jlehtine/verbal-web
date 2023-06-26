@@ -1,3 +1,3 @@
-function initVerbalWeb(elementId) {}
+function initVerbalWeb(elementId: string) {}
 
 window.initVerbalWeb = initVerbalWeb;
