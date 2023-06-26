@@ -8,5 +8,5 @@
         "lib": ["ES2016", "DOM", "ES2021.String"],
         "types": ["react"]
     },
-    "include": ["src"]
+    "include": ["src/**/*"]
 }
