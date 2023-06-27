@@ -32,6 +32,7 @@
         "prepare": "husky install",
         "build": "npx webpack",
         "build-dev": "npx webpack --mode development --devtool eval-source-map",
+        "watch": "npx webpack watch --mode development --devtool eval-source-map",
         "format": "prettier --write . --ignore-path .gitignore",
         "format-staged": "pretty-quick --staged"
     }
