@@ -6,9 +6,6 @@
         "@babel/preset-env": "^7.22.2",
         "@babel/preset-react": "^7.22.5",
         "@trivago/prettier-plugin-sort-imports": "^4.1.1",
-        "@types/node": "^20.3.1",
-        "@types/react": "^18.2.14",
-        "@types/react-dom": "^18.2.6",
         "babel-loader": "^9.1.2",
         "husky": "^8.0.3",
         "prettier": "^2.8.8",
@@ -20,11 +17,21 @@
         "webpack-cli": "^5.1.4"
     },
     "dependencies": {
-        "core-js": "^3.31.0"
+        "@emotion/react": "^11.11.1",
+        "@emotion/styled": "^11.11.0",
+        "@mui/material": "^5.13.6",
+        "@mui/icons-material": "^5.11.16",
+        "@types/node": "^20.3.1",
+        "@types/react": "^18.2.14",
+        "@types/react-dom": "^18.2.6",
+        "core-js": "^3.31.0",
+        "react": "^18.2.0",
+        "react-dom": "^18.2.0"
     },
     "scripts": {
         "prepare": "husky install",
         "build": "npx webpack",
+        "build-dev": "npx webpack --mode development --devtool eval-source-map",
         "format": "prettier --write . --ignore-path .gitignore",
         "format-staged": "pretty-quick --staged"
     }

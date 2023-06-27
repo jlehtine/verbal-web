@@ -6,7 +6,10 @@
         "strict": true,
         "target": "ES6",
         "lib": ["ES2016", "DOM", "ES2021.String"],
-        "types": ["react"]
+        "types": ["react"],
+        "jsx": "preserve",
+        "moduleResolution": "node",
+        "allowSyntheticDefaultImports": true
     },
     "include": ["src/**/*"]
 }
