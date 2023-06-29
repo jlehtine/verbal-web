@@ -1,0 +1,13 @@
+{
+    "compilerOptions": {
+        "outDir": "../../dist",
+        "sourceMap": true,
+        "strict": true,
+        "target": "ES6",
+        "lib": ["ES2016", "DOM", "ES2021.String"],
+        "types": ["node"],
+        "moduleResolution": "node",
+        "allowSyntheticDefaultImports": true
+    },
+    "include": ["**/*"]
+}

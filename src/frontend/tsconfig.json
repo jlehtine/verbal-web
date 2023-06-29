@@ -1,7 +1,6 @@
 {
     "compilerOptions": {
-        "baseUrl": "src",
-        "outDir": "dist",
+        "outDir": "../../dist",
         "sourceMap": true,
         "strict": true,
         "target": "ES6",
@@ -11,5 +10,5 @@
         "moduleResolution": "node",
         "allowSyntheticDefaultImports": true
     },
-    "include": ["src/**/*"]
+    "include": ["**/*"]
 }
