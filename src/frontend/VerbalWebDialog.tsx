@@ -13,7 +13,7 @@ import {
     Tooltip,
     Typography,
 } from '@mui/material';
-import React from 'react';
+import React, { SyntheticEvent, useState } from 'react';
 
 interface VerbalWebDialogProps extends DialogProps {
     onClose: () => void;
@@ -27,6 +27,27 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
     const handleClose = props.onClose;
     const open = props.open;
 
+    // userInput stores value of textField
+    const [userInput, setUserInput] = useState('');
+
+    // Update value of userInput when value of textField is changed
+    const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setUserInput(event.target.value);
+    };
+
+    const handleSubmit = () => {
+        console.log(userInput);
+        setUserInput('');
+    };
+
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+        // Enter submits user input but enter+shift doesn't
+        if (event.which === 13 && !event.shiftKey) {
+            handleSubmit();
+            event.preventDefault();
+        }
+    };
+
     return (
         <Dialog {...props} fullWidth>
             <VerbalWebDialogTitle onClose={handleClose}>Verbal Web AI assistant</VerbalWebDialogTitle>
@@ -35,11 +56,14 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
                     fullWidth
                     multiline
                     label="Ask a question!"
+                    value={userInput} // Value stored in state userInput
+                    onChange={handleInputChange}
+                    onKeyDown={handleKeyDown}
                     InputProps={{
                         endAdornment: (
                             <InputAdornment position="end">
                                 <Tooltip title="Submit">
-                                    <IconButton color="primary" size="large">
+                                    <IconButton color="primary" size="large" onClick={handleSubmit}>
                                         <AssistantIcon />
                                     </IconButton>
                                 </Tooltip>
@@ -55,10 +79,8 @@ function VerbalWebDialogTitle(props: VerbalWebDialogTitleProps) {
     const { children, onClose, ...other } = props;
 
     return (
-        <DialogTitle>
-            <Typography sx={{ paddingRight: 4 }} variant="subtitle1">
-                {children}
-            </Typography>
+        <DialogTitle variant="subtitle1" sx={{ paddingRight: 4 }}>
+            {children}
             {onClose ? (
                 <IconButton
                     aria-label="close"
