@@ -1,4 +1,5 @@
 const path = require('path');
+const ESLintPlugin = require('eslint-webpack-plugin');
 
 const babelOptions = {
     presets: [
@@ -49,6 +50,7 @@ module.exports = [
         resolve: {
             extensions: ['.tsx', '.ts', '...'],
         },
+        plugins: [new ESLintPlugin()],
     },
     {
         mode: 'production',
@@ -75,5 +77,6 @@ module.exports = [
         resolve: {
             extensions: ['.tsx', '.ts', '...'],
         },
+        plugins: [new ESLintPlugin()],
     },
 ];
