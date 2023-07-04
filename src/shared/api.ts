@@ -9,3 +9,7 @@ export interface BackendResponse {
 export function isBackendRequest(value: unknown): value is BackendRequest {
     return typeof value === 'object' && value !== null && typeof (value as BackendRequest).query === 'string';
 }
+
+export function isBackendResponse(value: unknown): value is BackendResponse {
+    return typeof value === 'object' && value !== null && typeof (value as BackendResponse).response === 'string';
+}

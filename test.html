@@ -3,9 +3,11 @@
         <h1>Verbal Web Testing</h1>
         <p>This is a simple test page for Verbal Web.</p>
         <div id="verbal-web">Loading...</div>
-        <script src="dist/verbal-web-frontend.js"></script>
+        <script src="http://localhost:8080/verbal-web-frontend.js"></script>
         <script>
-            initVerbalWeb('verbal-web');
+            initVerbalWeb('verbal-web', {
+                backendURL: 'http://localhost:8080',
+            });
         </script>
     </body>
 </html>

@@ -11,12 +11,12 @@ import {
     InputAdornment,
     TextField,
     Tooltip,
-    Typography,
 } from '@mui/material';
-import React, { SyntheticEvent, useState } from 'react';
+import React, { useState } from 'react';
 
 interface VerbalWebDialogProps extends DialogProps {
     onClose: () => void;
+    onQuery: (query: string) => Promise<string>;
 }
 
 interface VerbalWebDialogTitleProps extends DialogTitleProps {
@@ -36,8 +36,11 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
     };
 
     const handleSubmit = () => {
-        console.log(userInput);
-        setUserInput('');
+        console.log('Query: ' + userInput);
+        props.onQuery(userInput).then((response) => {
+            console.log('Response: ' + response);
+            setUserInput('');
+        });
     };
 
     const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
