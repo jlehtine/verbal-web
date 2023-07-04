@@ -51,8 +51,9 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
         }
     };
 
+    const dialogProps = { ...props, onQuery: undefined };
     return (
-        <Dialog {...props} fullWidth>
+        <Dialog {...dialogProps} fullWidth>
             <VerbalWebDialogTitle onClose={handleClose}>Verbal Web AI assistant</VerbalWebDialogTitle>
             <DialogContent dividers>
                 <TextField
