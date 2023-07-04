@@ -40,8 +40,8 @@
         "build": "webpack",
         "build-dev": "webpack --mode development --devtool eval-source-map",
         "watch": "webpack watch --mode development --devtool eval-source-map",
-        "lint": "eslint 'src/**/*.{ts,tsx}'",
-        "lint-fix": "eslint --fix 'src/**/*.{ts,tsx}'",
+        "lint": "eslint src/**/*.{ts,tsx}",
+        "lint-fix": "eslint --fix src/**/*.{ts,tsx}",
         "format": "prettier --write . --ignore-path .gitignore",
         "format-staged": "pretty-quick --staged",
         "server": "cd dist && node verbal-web-backend.js"
