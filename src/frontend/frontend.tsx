@@ -3,7 +3,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 
 declare global {
-    var initVerbalWeb: (elementId: string, conf: VerbalWebConfiguration) => void;
+    var initVerbalWeb: (elementId: string, conf: VerbalWebConfiguration) => void; // eslint-disable-line
 }
 
 function initVerbalWeb(elementId: string, conf: VerbalWebConfiguration) {
