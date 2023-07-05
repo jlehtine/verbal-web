@@ -4,12 +4,12 @@ export interface ChatCompletionRequest {
 }
 
 export interface ChatCompletionResponse {
-    object: 'chat.completion';
+    object: "chat.completion";
     choices: ChatCompletionChoice[];
 }
 
 export interface ChatCompletionMessage {
-    role: 'system' | 'user' | 'assistant' | 'function';
+    role: "system" | "user" | "assistant" | "function";
     content?: string;
     name?: string;
 }
@@ -22,6 +22,6 @@ export interface ChatCompletionChoice {
 
 export function isChatCompletionResponse(value: unknown): value is ChatCompletionResponse {
     return (
-        typeof value === 'object' && value !== null && (value as ChatCompletionResponse).object === 'chat.completion'
+        typeof value === "object" && value !== null && (value as ChatCompletionResponse).object === "chat.completion"
     );
 }

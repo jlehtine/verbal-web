@@ -1,18 +1,18 @@
-import { BackendRequest, BackendResponse } from '../shared/api';
-import { ChatCompletionRequest, isChatCompletionResponse } from './openai';
+import { BackendRequest, BackendResponse } from "../shared/api";
+import { ChatCompletionRequest, isChatCompletionResponse } from "./openai";
 
 export function query(breq: BackendRequest): Promise<BackendResponse> {
     const data: ChatCompletionRequest = {
-        model: 'gpt-4',
-        messages: [{ role: 'user', content: breq.query }],
+        model: "gpt-4",
+        messages: [{ role: "user", content: breq.query }],
     };
 
-    return fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
+    return fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
         headers: {
-            Authorization: 'Bearer ' + process.env.OPENAI_API_KEY,
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
+            Authorization: "Bearer " + process.env.OPENAI_API_KEY,
+            "Content-Type": "application/json",
+            Accept: "application/json",
         },
         body: JSON.stringify(data),
     })
@@ -20,17 +20,17 @@ export function query(breq: BackendRequest): Promise<BackendResponse> {
             if (resp.ok) {
                 return resp.json();
             } else {
-                throw 'Query failed';
+                throw "Query failed";
             }
         })
         .then((data) => {
             if (isChatCompletionResponse(data)) {
                 const bresp: BackendResponse = {
-                    response: data.choices[0].message.content ?? '(No response)',
+                    response: data.choices[0].message.content ?? "(No response)",
                 };
                 return bresp;
             } else {
-                throw 'Bad response';
+                throw "Bad response";
             }
         });
 }

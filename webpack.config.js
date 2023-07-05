@@ -1,26 +1,26 @@
-const path = require('path');
-const ESLintPlugin = require('eslint-webpack-plugin');
+const path = require("path");
+const ESLintPlugin = require("eslint-webpack-plugin");
 
 const babelOptions = {
     presets: [
         [
-            '@babel/preset-env',
+            "@babel/preset-env",
             {
-                useBuiltIns: 'usage',
-                corejs: '3.31',
+                useBuiltIns: "usage",
+                corejs: "3.31",
             },
         ],
-        '@babel/preset-react',
+        "@babel/preset-react",
     ],
 };
 
 module.exports = [
     {
-        mode: 'production',
-        entry: './src/frontend/frontend.tsx',
+        mode: "production",
+        entry: "./src/frontend/frontend.tsx",
         output: {
-            path: path.resolve(__dirname, 'dist'),
-            filename: 'verbal-web-frontend.js',
+            path: path.resolve(__dirname, "dist"),
+            filename: "verbal-web-frontend.js",
         },
         module: {
             rules: [
@@ -30,11 +30,11 @@ module.exports = [
                     exclude: /node_modules/,
                     use: [
                         {
-                            loader: 'babel-loader',
+                            loader: "babel-loader",
                             options: babelOptions,
                         },
                         {
-                            loader: 'ts-loader',
+                            loader: "ts-loader",
                         },
                     ],
                 },
@@ -43,22 +43,22 @@ module.exports = [
                 {
                     test: /dist[/\\]verbal-web-frontend\.js$/,
                     exclude: /node_modules/,
-                    use: 'source-map-loader',
+                    use: "source-map-loader",
                 },
             ],
         },
         resolve: {
-            extensions: ['.tsx', '.ts', '...'],
+            extensions: [".tsx", ".ts", "..."],
         },
         plugins: [new ESLintPlugin()],
     },
     {
-        mode: 'production',
-        target: 'node',
-        entry: './src/backend/backend.ts',
+        mode: "production",
+        target: "node",
+        entry: "./src/backend/backend.ts",
         output: {
-            path: path.resolve(__dirname, 'dist'),
-            filename: 'verbal-web-backend.js',
+            path: path.resolve(__dirname, "dist"),
+            filename: "verbal-web-backend.js",
         },
         module: {
             rules: [
@@ -68,14 +68,14 @@ module.exports = [
                     exclude: /node_modules/,
                     use: [
                         {
-                            loader: 'ts-loader',
+                            loader: "ts-loader",
                         },
                     ],
                 },
             ],
         },
         resolve: {
-            extensions: ['.tsx', '.ts', '...'],
+            extensions: [".tsx", ".ts", "..."],
         },
         plugins: [new ESLintPlugin()],
     },

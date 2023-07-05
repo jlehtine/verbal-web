@@ -1,5 +1,5 @@
-import AssistantIcon from '@mui/icons-material/Assistant';
-import CloseIcon from '@mui/icons-material/Close';
+import AssistantIcon from "@mui/icons-material/Assistant";
+import CloseIcon from "@mui/icons-material/Close";
 import {
     Box,
     Dialog,
@@ -11,8 +11,8 @@ import {
     InputAdornment,
     TextField,
     Tooltip,
-} from '@mui/material';
-import React, { useState } from 'react';
+} from "@mui/material";
+import React, { useState } from "react";
 
 interface VerbalWebDialogProps extends DialogProps {
     onClose: () => void;
@@ -28,7 +28,7 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
     const open = props.open;
 
     // userInput stores value of textField
-    const [userInput, setUserInput] = useState('');
+    const [userInput, setUserInput] = useState("");
 
     // Update value of userInput when value of textField is changed
     const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -36,10 +36,10 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
     };
 
     const handleSubmit = () => {
-        console.log('Query: ' + userInput);
+        console.log("Query: " + userInput);
         props.onQuery(userInput).then((response) => {
-            console.log('Response: ' + response);
-            setUserInput('');
+            console.log("Response: " + response);
+            setUserInput("");
         });
     };
 
@@ -73,7 +73,8 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
                                 </Tooltip>
                             </InputAdornment>
                         ),
-                    }}></TextField>
+                    }}
+                ></TextField>
             </DialogContent>
         </Dialog>
     );
@@ -90,11 +91,12 @@ function VerbalWebDialogTitle(props: VerbalWebDialogTitleProps) {
                     aria-label="close"
                     onClick={onClose}
                     sx={{
-                        position: 'absolute',
+                        position: "absolute",
                         right: 8,
                         top: 8,
                         color: (theme) => theme.palette.grey[500],
-                    }}>
+                    }}
+                >
                     <CloseIcon />
                 </IconButton>
             ) : null}

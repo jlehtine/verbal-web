@@ -1,8 +1,8 @@
-import { BackendRequest, isBackendResponse } from '../shared/api';
-import VerbalWebDialog from './VerbalWebDialog';
-import AssistantIcon from '@mui/icons-material/Assistant';
-import { Box, IconButton, Tooltip } from '@mui/material';
-import React, { useState } from 'react';
+import { BackendRequest, isBackendResponse } from "../shared/api";
+import VerbalWebDialog from "./VerbalWebDialog";
+import AssistantIcon from "@mui/icons-material/Assistant";
+import { Box, IconButton, Tooltip } from "@mui/material";
+import React, { useState } from "react";
 
 export interface VerbalWebConfiguration {
     backendURL: string;
@@ -18,11 +18,11 @@ export default function VerbalWebUI({ conf }: VerbalWebUIProps) {
     function handleQuery(query: string): Promise<string> {
         const data: BackendRequest = { query: query };
 
-        return fetch(conf.backendURL + '/query', {
-            method: 'POST',
+        return fetch(conf.backendURL + "/query", {
+            method: "POST",
             headers: {
-                'Content-Type': 'application/json',
-                Accept: 'application/json',
+                "Content-Type": "application/json",
+                Accept: "application/json",
             },
             body: JSON.stringify(data),
         })
@@ -30,14 +30,14 @@ export default function VerbalWebUI({ conf }: VerbalWebUIProps) {
                 if (resp.ok) {
                     return resp.json();
                 } else {
-                    throw 'Query failed';
+                    throw "Query failed";
                 }
             })
             .then((data) => {
                 if (isBackendResponse(data)) {
                     return data.response;
                 } else {
-                    throw 'Bad response';
+                    throw "Bad response";
                 }
             });
     }
@@ -50,7 +50,8 @@ export default function VerbalWebUI({ conf }: VerbalWebUIProps) {
                     size="large"
                     onClick={() => {
                         setOpen(true);
-                    }}>
+                    }}
+                >
                     <AssistantIcon />
                 </IconButton>
             </Tooltip>
