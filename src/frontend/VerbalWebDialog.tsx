@@ -1,9 +1,9 @@
+import { Message } from "../shared/api";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import AssistantIcon from "@mui/icons-material/Assistant";
 import CloseIcon from "@mui/icons-material/Close";
 import {
     Avatar,
-    Box,
     Dialog,
     DialogContent,
     DialogProps,
@@ -30,39 +30,41 @@ interface VerbalWebDialogTitleProps extends DialogTitleProps {
 }
 
 interface VerbalWebMessageListProps {
-    // TODO: Change to interfaceMessage objects
-    messages: string[];
+    messages: Message[];
 }
 
-/*
-function generateListItem(value: string): React.ReactElement {
-    if (value.startsWith("Query: ")) {
+function createListItem(m: Message, id: number): React.JSX.Element {
+    // pr = padding-right, pl = padding-left
+    if (m.role === "user") {
         return (
-            <ListItem>
+            <ListItem key={id} sx={{ pl: 14 }}>
+                <ListItemText
+                    primary={m.content}
+                    sx={{ whiteSpace: "pre-wrap", border: 2, padding: 2, marginRight: 2, borderRadius: 2 }}
+                />
                 <ListItemAvatar>
                     <Avatar>
                         <AccountCircleIcon />
                     </Avatar>
                 </ListItemAvatar>
-                <ListItemText primary={value.replace("Query: ", "")} />
             </ListItem>
         );
-    } else if (value.startsWith("Response: ")) {
+    } else {
         return (
-            <ListItem>
+            <ListItem key={id} sx={{ pr: 14 }}>
                 <ListItemAvatar>
                     <Avatar>
                         <AssistantIcon />
                     </Avatar>
                 </ListItemAvatar>
-                <ListItemText primary={value.replace("Response: ", "")} />
+                <ListItemText
+                    primary={m.content}
+                    sx={{ whiteSpace: "pre-wrap", border: 2, padding: 2, borderRadius: 2 }}
+                />
             </ListItem>
         );
-    } else {
-        throw "Message type not Query or Response";
     }
 }
-*/
 
 export default function VerbalWebDialog(props: VerbalWebDialogProps) {
     const handleClose = props.onClose;
@@ -71,10 +73,9 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
     // userInput stores value of textField
     const [userInput, setUserInput] = useState("");
     // messages stores previous queries and their responses
-    // TODO: Change to message objects
-    const [messages, setMessages] = useState<Array<string>>([]);
+    const [messages, setMessages] = useState<Array<Message>>([]);
 
-    function addMessage(newMessage: string) {
+    function addMessage(newMessage: Message) {
         setMessages((messages) => [...messages, newMessage]);
     }
 
@@ -85,10 +86,10 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
 
     const handleSubmit = () => {
         // TODO: Only allow submit when textfield is not empty and response received from previous query
-        addMessage("Query: " + userInput);
+        addMessage({ role: "user", content: userInput });
         console.log("Query: " + userInput);
         props.onQuery(userInput).then((response) => {
-            addMessage("Response: " + response);
+            addMessage({ role: "assistant", content: response });
             console.log("Response: " + response);
             setUserInput("");
         });
@@ -160,17 +161,5 @@ function VerbalWebDialogTitle(props: VerbalWebDialogTitleProps) {
 
 function VerbalWebMessageList(props: VerbalWebMessageListProps) {
     const messages = props.messages;
-    const avatar = <AccountCircleIcon />;
-    return (
-        <List>
-            {messages.map((m) => (
-                <ListItem>
-                    <ListItemAvatar>
-                        <Avatar>{avatar}</Avatar>
-                    </ListItemAvatar>
-                    <ListItemText primary={m} />
-                </ListItem>
-            ))}
-        </List>
-    );
+    return <List>{messages.map((m, idx) => createListItem(m, idx))}</List>;
 }
