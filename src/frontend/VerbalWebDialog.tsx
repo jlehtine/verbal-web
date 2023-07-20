@@ -74,33 +74,46 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
     const [userInput, setUserInput] = useState("");
     // messages stores previous queries and their responses
     const [messages, setMessages] = useState<Array<Message>>([]);
+    // true if userInput longer than 5 chars, updated in handleInputChange
+    const [allowSubmit, setAllowSubmit] = useState(false);
 
     function addMessage(newMessage: Message) {
         setMessages((messages) => [...messages, newMessage]);
     }
 
     // Update value of userInput when value of textField is changed
+    // Update value of allowSubmit
     const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        setUserInput(event.target.value);
+        const text = event.target.value;
+        setUserInput(text);
+        if (text.trim().length < 5) {
+            setAllowSubmit(false);
+        } else {
+            setAllowSubmit(true);
+        }
     };
 
     const handleSubmit = () => {
-        // TODO: Only allow submit when textfield is not empty and response received from previous query
+        // Only allowed to submit when textfield is not empty and response received from previous query
+        // Submit button disabled if allowSubmit = false
         addMessage({ role: "user", content: userInput });
         console.log("Query: " + userInput);
         props.onQuery(userInput).then((response) => {
             addMessage({ role: "assistant", content: response });
             console.log("Response: " + response);
             setUserInput("");
+            setAllowSubmit(false);
         });
     };
 
     const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
         // Enter submits user input but enter+shift doesn't
         if (event.which === 13 && !event.shiftKey) {
-            // TODO: handleSubmit if userInput.trim().length >= 5
-            handleSubmit();
-            // TODO: if userInput too short, show info alert to user
+            if (allowSubmit) {
+                handleSubmit();
+            } else {
+                // TODO: Info Alert to user: Query must be atleast 5 characters
+            }
             event.preventDefault();
         }
     };
@@ -122,7 +135,12 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
                         endAdornment: (
                             <InputAdornment position="end">
                                 <Tooltip title="Submit">
-                                    <IconButton color="primary" size="large" onClick={handleSubmit}>
+                                    <IconButton
+                                        color="primary"
+                                        size="large"
+                                        onClick={handleSubmit}
+                                        disabled={!allowSubmit}
+                                    >
                                         <AssistantIcon />
                                     </IconButton>
                                 </Tooltip>
