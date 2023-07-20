@@ -1,6 +1,8 @@
+import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import AssistantIcon from "@mui/icons-material/Assistant";
 import CloseIcon from "@mui/icons-material/Close";
 import {
+    Avatar,
     Box,
     Dialog,
     DialogContent,
@@ -9,6 +11,10 @@ import {
     DialogTitleProps,
     IconButton,
     InputAdornment,
+    List,
+    ListItem,
+    ListItemAvatar,
+    ListItemText,
     TextField,
     Tooltip,
 } from "@mui/material";
@@ -23,12 +29,54 @@ interface VerbalWebDialogTitleProps extends DialogTitleProps {
     onClose: () => void;
 }
 
+interface VerbalWebMessageListProps {
+    // TODO: Change to interfaceMessage objects
+    messages: string[];
+}
+
+/*
+function generateListItem(value: string): React.ReactElement {
+    if (value.startsWith("Query: ")) {
+        return (
+            <ListItem>
+                <ListItemAvatar>
+                    <Avatar>
+                        <AccountCircleIcon />
+                    </Avatar>
+                </ListItemAvatar>
+                <ListItemText primary={value.replace("Query: ", "")} />
+            </ListItem>
+        );
+    } else if (value.startsWith("Response: ")) {
+        return (
+            <ListItem>
+                <ListItemAvatar>
+                    <Avatar>
+                        <AssistantIcon />
+                    </Avatar>
+                </ListItemAvatar>
+                <ListItemText primary={value.replace("Response: ", "")} />
+            </ListItem>
+        );
+    } else {
+        throw "Message type not Query or Response";
+    }
+}
+*/
+
 export default function VerbalWebDialog(props: VerbalWebDialogProps) {
     const handleClose = props.onClose;
     const open = props.open;
 
     // userInput stores value of textField
     const [userInput, setUserInput] = useState("");
+    // messages stores previous queries and their responses
+    // TODO: Change to message objects
+    const [messages, setMessages] = useState<Array<string>>([]);
+
+    function addMessage(newMessage: string) {
+        setMessages((messages) => [...messages, newMessage]);
+    }
 
     // Update value of userInput when value of textField is changed
     const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -36,8 +84,11 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
     };
 
     const handleSubmit = () => {
+        // TODO: Only allow submit when textfield is not empty and response received from previous query
+        addMessage("Query: " + userInput);
         console.log("Query: " + userInput);
         props.onQuery(userInput).then((response) => {
+            addMessage("Response: " + response);
             console.log("Response: " + response);
             setUserInput("");
         });
@@ -46,7 +97,9 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
     const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
         // Enter submits user input but enter+shift doesn't
         if (event.which === 13 && !event.shiftKey) {
+            // TODO: handleSubmit if userInput.trim().length >= 5
             handleSubmit();
+            // TODO: if userInput too short, show info alert to user
             event.preventDefault();
         }
     };
@@ -56,6 +109,7 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
         <Dialog {...dialogProps} fullWidth>
             <VerbalWebDialogTitle onClose={handleClose}>Verbal Web AI assistant</VerbalWebDialogTitle>
             <DialogContent dividers>
+                <VerbalWebMessageList messages={messages}></VerbalWebMessageList>
                 <TextField
                     fullWidth
                     multiline
@@ -101,5 +155,22 @@ function VerbalWebDialogTitle(props: VerbalWebDialogTitleProps) {
                 </IconButton>
             ) : null}
         </DialogTitle>
+    );
+}
+
+function VerbalWebMessageList(props: VerbalWebMessageListProps) {
+    const messages = props.messages;
+    const avatar = <AccountCircleIcon />;
+    return (
+        <List>
+            {messages.map((m) => (
+                <ListItem>
+                    <ListItemAvatar>
+                        <Avatar>{avatar}</Avatar>
+                    </ListItemAvatar>
+                    <ListItemText primary={m} />
+                </ListItem>
+            ))}
+        </List>
     );
 }
