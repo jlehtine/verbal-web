@@ -5,6 +5,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import {
     Alert,
     Avatar,
+    CircularProgress,
     Dialog,
     DialogContent,
     DialogProps,
@@ -82,6 +83,8 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
     const [showError, setShowError] = useState(false);
     // text shown under input textField
     const [textFieldHelperText, setTextFieldHelperText] = useState("");
+    // true when waiting for response from backend, used to disable submit-button and display progress circle
+    const [waitingForResponse, setWaitingForResponse] = useState(false);
 
     function addMessage(newMessage: Message) {
         setMessages((messages) => [...messages, newMessage]);
@@ -107,7 +110,9 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
             const queryMessage: Message = { role: "user", content: userInput };
 
             console.log("Query: " + userInput);
+            setWaitingForResponse(true);
             props.onQuery([...messages, queryMessage]).then((response) => {
+                setWaitingForResponse(false);
                 addMessage(queryMessage);
                 addMessage({ role: "assistant", content: response });
                 console.log("Response: " + response);
@@ -147,10 +152,23 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
                         endAdornment: (
                             <InputAdornment position="end">
                                 <Tooltip title="Submit">
-                                    <IconButton color="primary" size="large" onClick={handleSubmit}>
+                                    <IconButton
+                                        color="primary"
+                                        size="large"
+                                        onClick={handleSubmit}
+                                        disabled={waitingForResponse}
+                                    >
                                         <AssistantIcon />
                                     </IconButton>
                                 </Tooltip>
+                                {waitingForResponse && (
+                                    <CircularProgress
+                                        sx={{
+                                            position: "absolute",
+                                            right: "3%",
+                                        }}
+                                    />
+                                )}
                             </InputAdornment>
                         ),
                     }}
