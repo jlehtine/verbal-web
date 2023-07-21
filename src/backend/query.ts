@@ -1,10 +1,15 @@
 import { BackendRequest, BackendResponse } from "../shared/api";
-import { ChatCompletionRequest, isChatCompletionResponse } from "./openai";
+import { ChatCompletionMessage, ChatCompletionRequest, isChatCompletionResponse } from "./openai";
 
 export function query(breq: BackendRequest): Promise<BackendResponse> {
+    const chatCompletionMessages: ChatCompletionMessage[] = breq.query.map((m) => ({
+        role: m.role,
+        content: m.content,
+    }));
+
     const data: ChatCompletionRequest = {
         model: "gpt-4",
-        messages: [{ role: "user", content: breq.query }],
+        messages: chatCompletionMessages,
     };
 
     return fetch("https://api.openai.com/v1/chat/completions", {

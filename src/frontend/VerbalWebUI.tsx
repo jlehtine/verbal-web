@@ -1,4 +1,4 @@
-import { BackendRequest, isBackendResponse } from "../shared/api";
+import { BackendRequest, Message, isBackendResponse } from "../shared/api";
 import VerbalWebDialog from "./VerbalWebDialog";
 import AssistantIcon from "@mui/icons-material/Assistant";
 import { Box, IconButton, Tooltip } from "@mui/material";
@@ -15,7 +15,7 @@ interface VerbalWebUIProps {
 export default function VerbalWebUI({ conf }: VerbalWebUIProps) {
     const [open, setOpen] = useState(false);
 
-    function handleQuery(query: string): Promise<string> {
+    function handleQuery(query: Message[]): Promise<string> {
         const data: BackendRequest = { query: query };
 
         return fetch(conf.backendURL + "/query", {

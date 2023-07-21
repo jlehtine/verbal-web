@@ -24,7 +24,7 @@ import React, { useState } from "react";
 
 interface VerbalWebDialogProps extends DialogProps {
     onClose: () => void;
-    onQuery: (query: string) => Promise<string>;
+    onQuery: (query: Message[]) => Promise<string>;
 }
 
 interface VerbalWebDialogTitleProps extends DialogTitleProps {
@@ -98,9 +98,11 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
     const handleSubmit = () => {
         // Only allowed to submit when textfield is not empty and response received from previous query
         // Submit button disabled if allowSubmit = false
-        addMessage({ role: "user", content: userInput });
+        const queryMessage: Message = { role: "user", content: userInput };
+
         console.log("Query: " + userInput);
-        props.onQuery(userInput).then((response) => {
+        props.onQuery([...messages, queryMessage]).then((response) => {
+            addMessage(queryMessage);
             addMessage({ role: "assistant", content: response });
             console.log("Response: " + response);
             setUserInput("");

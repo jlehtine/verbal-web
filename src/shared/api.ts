@@ -1,5 +1,5 @@
 export interface BackendRequest {
-    query: string;
+    query: Message[];
 }
 
 export interface BackendResponse {
@@ -12,7 +12,7 @@ export interface Message {
 }
 
 export function isBackendRequest(value: unknown): value is BackendRequest {
-    return typeof value === "object" && value !== null && typeof (value as BackendRequest).query === "string";
+    return typeof value === "object" && value !== null && Array.isArray((value as BackendRequest).query);
 }
 
 export function isBackendResponse(value: unknown): value is BackendResponse {
