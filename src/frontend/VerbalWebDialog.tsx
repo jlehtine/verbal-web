@@ -3,6 +3,7 @@ import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import AssistantIcon from "@mui/icons-material/Assistant";
 import CloseIcon from "@mui/icons-material/Close";
 import {
+    Alert,
     Avatar,
     Dialog,
     DialogContent,
@@ -18,6 +19,7 @@ import {
     TextField,
     Tooltip,
 } from "@mui/material";
+import { blue } from "@mui/material/colors";
 import React, { useState } from "react";
 
 interface VerbalWebDialogProps extends DialogProps {
@@ -37,13 +39,13 @@ function createListItem(m: Message, id: number): React.JSX.Element {
     // pr = padding-right, pl = padding-left
     if (m.role === "user") {
         return (
-            <ListItem key={id} sx={{ pl: 14 }}>
+            <ListItem key={id} sx={{ pl: 14, pr: 0 }}>
                 <ListItemText
                     primary={m.content}
                     sx={{ whiteSpace: "pre-wrap", border: 2, padding: 2, marginRight: 2, borderRadius: 2 }}
                 />
-                <ListItemAvatar>
-                    <Avatar>
+                <ListItemAvatar sx={{ marginRight: -2 }}>
+                    <Avatar sx={{ bgcolor: blue[500] }}>
                         <AccountCircleIcon />
                     </Avatar>
                 </ListItemAvatar>
@@ -51,9 +53,9 @@ function createListItem(m: Message, id: number): React.JSX.Element {
         );
     } else {
         return (
-            <ListItem key={id} sx={{ pr: 14 }}>
+            <ListItem key={id} sx={{ pr: 14, pl: 0 }}>
                 <ListItemAvatar>
-                    <Avatar>
+                    <Avatar sx={{ bgcolor: blue[500] }}>
                         <AssistantIcon />
                     </Avatar>
                 </ListItemAvatar>
@@ -112,7 +114,7 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
             if (allowSubmit) {
                 handleSubmit();
             } else {
-                // TODO: Info Alert to user: Query must be atleast 5 characters
+                // TODO: Better alert to user if input too short?
             }
             event.preventDefault();
         }
@@ -148,6 +150,7 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
                         ),
                     }}
                 ></TextField>
+                {!allowSubmit && <Alert severity="info">Message must be longer than 5 characters!</Alert>}
             </DialogContent>
         </Dialog>
     );
