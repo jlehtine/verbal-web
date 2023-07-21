@@ -78,6 +78,10 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
     const [messages, setMessages] = useState<Array<Message>>([]);
     // true if userInput longer than 5 chars, updated in handleInputChange
     const [allowSubmit, setAllowSubmit] = useState(false);
+    // true if trying to submit too short message
+    const [showError, setShowError] = useState(false);
+    // text shown under input textField
+    const [textFieldHelperText, setTextFieldHelperText] = useState("");
 
     function addMessage(newMessage: Message) {
         setMessages((messages) => [...messages, newMessage]);
@@ -92,32 +96,34 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
             setAllowSubmit(false);
         } else {
             setAllowSubmit(true);
+            setShowError(false);
+            setTextFieldHelperText("");
         }
     };
 
     const handleSubmit = () => {
         // Only allowed to submit when textfield is not empty and response received from previous query
-        // Submit button disabled if allowSubmit = false
-        const queryMessage: Message = { role: "user", content: userInput };
+        if (allowSubmit) {
+            const queryMessage: Message = { role: "user", content: userInput };
 
-        console.log("Query: " + userInput);
-        props.onQuery([...messages, queryMessage]).then((response) => {
-            addMessage(queryMessage);
-            addMessage({ role: "assistant", content: response });
-            console.log("Response: " + response);
-            setUserInput("");
-            setAllowSubmit(false);
-        });
+            console.log("Query: " + userInput);
+            props.onQuery([...messages, queryMessage]).then((response) => {
+                addMessage(queryMessage);
+                addMessage({ role: "assistant", content: response });
+                console.log("Response: " + response);
+                setUserInput("");
+                setAllowSubmit(false);
+            });
+        } else {
+            setShowError(true);
+            setTextFieldHelperText("Message must be longer than 5 characters!");
+        }
     };
 
     const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
         // Enter submits user input but enter+shift doesn't
         if (event.which === 13 && !event.shiftKey) {
-            if (allowSubmit) {
-                handleSubmit();
-            } else {
-                // TODO: Better alert to user if input too short?
-            }
+            handleSubmit();
             event.preventDefault();
         }
     };
@@ -129,9 +135,11 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
             <DialogContent dividers>
                 <VerbalWebMessageList messages={messages}></VerbalWebMessageList>
                 <TextField
+                    error={showError}
                     fullWidth
                     multiline
                     label="Ask a question!"
+                    helperText={textFieldHelperText}
                     value={userInput} // Value stored in state userInput
                     onChange={handleInputChange}
                     onKeyDown={handleKeyDown}
@@ -139,12 +147,7 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
                         endAdornment: (
                             <InputAdornment position="end">
                                 <Tooltip title="Submit">
-                                    <IconButton
-                                        color="primary"
-                                        size="large"
-                                        onClick={handleSubmit}
-                                        disabled={!allowSubmit}
-                                    >
+                                    <IconButton color="primary" size="large" onClick={handleSubmit}>
                                         <AssistantIcon />
                                     </IconButton>
                                 </Tooltip>
@@ -152,7 +155,6 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
                         ),
                     }}
                 ></TextField>
-                {!allowSubmit && <Alert severity="info">Message must be longer than 5 characters!</Alert>}
             </DialogContent>
         </Dialog>
     );
