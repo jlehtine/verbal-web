@@ -21,7 +21,7 @@ import {
     Tooltip,
 } from "@mui/material";
 import { blue } from "@mui/material/colors";
-import React, { useState } from "react";
+import React, { MutableRefObject, useEffect, useRef, useState } from "react";
 
 interface VerbalWebDialogProps extends DialogProps {
     onClose: () => void;
@@ -72,6 +72,7 @@ function createListItem(m: Message, id: number): React.JSX.Element {
 export default function VerbalWebDialog(props: VerbalWebDialogProps) {
     const handleClose = props.onClose;
     const open = props.open;
+    const inputRef = useRef<HTMLDivElement>(null);
 
     // userInput stores value of textField
     const [userInput, setUserInput] = useState("");
@@ -137,6 +138,14 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
     };
 
     const dialogProps = { ...props, onQuery: undefined };
+
+    useEffect(() => {
+        inputRef.current?.scrollIntoView({
+            behavior: "smooth",
+            block: "end",
+        });
+    }, [messages, textFieldHelperText]);
+
     return (
         <Dialog {...dialogProps} fullWidth>
             <VerbalWebDialogTitle onClose={handleClose}>Verbal Web AI assistant</VerbalWebDialogTitle>
@@ -152,6 +161,7 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
                     value={userInput} // Value stored in state userInput
                     onChange={handleInputChange}
                     onKeyDown={handleKeyDown}
+                    ref={inputRef}
                     InputProps={{
                         endAdornment: (
                             <InputAdornment position="end">
