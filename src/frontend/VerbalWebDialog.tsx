@@ -78,7 +78,7 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
     // messages stores previous queries and their responses
     const [messages, setMessages] = useState<Array<Message>>([]);
     // true if userInput longer than 5 chars, updated in handleInputChange
-    const [allowSubmit, setAllowSubmit] = useState(false);
+    const [inputTooShort, setInputTooShort] = useState(false);
     // true if trying to submit too short message
     const [showError, setShowError] = useState(false);
     // text shown under input textField
@@ -96,9 +96,9 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
         const text = event.target.value;
         setUserInput(text);
         if (text.trim().length < 5) {
-            setAllowSubmit(false);
-        } else {
-            setAllowSubmit(true);
+            setInputTooShort(true);
+        } else if (!waitingForResponse) {
+            setInputTooShort(false);
             setShowError(false);
             setTextFieldHelperText("");
         }
@@ -106,18 +106,21 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
 
     const handleSubmit = () => {
         // Only allowed to submit when textfield is not empty and response received from previous query
-        if (allowSubmit) {
+        if (!inputTooShort && !waitingForResponse) {
             const queryMessage: Message = { role: "user", content: userInput };
 
             console.log("Query: " + userInput);
             setWaitingForResponse(true);
+            setTextFieldHelperText("Waiting for response to message!");
             props.onQuery([...messages, queryMessage]).then((response) => {
                 setWaitingForResponse(false);
                 addMessage(queryMessage);
                 addMessage({ role: "assistant", content: response });
                 console.log("Response: " + response);
                 setUserInput("");
-                setAllowSubmit(false);
+                setInputTooShort(true);
+                setShowError(false);
+                setTextFieldHelperText("");
             });
         } else {
             setShowError(true);
@@ -141,6 +144,7 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
                 <VerbalWebMessageList messages={messages}></VerbalWebMessageList>
                 <TextField
                     error={showError}
+                    disabled={waitingForResponse}
                     fullWidth
                     multiline
                     label="Ask a question!"
