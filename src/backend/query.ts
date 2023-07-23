@@ -12,7 +12,7 @@ export function query(breq: BackendRequest): Promise<BackendResponse> {
     });
 
     const data: ChatCompletionRequest = {
-        model: "gpt-4",
+        model: breq.model,
         messages: chatCompletionMessages,
     };
 

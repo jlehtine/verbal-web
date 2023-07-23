@@ -6,8 +6,9 @@ import React, { useState } from "react";
 
 export interface VerbalWebConfiguration {
     backendURL: string;
-    pageContentSelector: string;
-    initialInstruction: string;
+    pageContentSelector?: string;
+    initialInstruction?: string;
+    useModel?: string; // TODO: list of models?
 }
 
 interface VerbalWebUIProps {
@@ -19,11 +20,12 @@ export default function VerbalWebUI({ conf }: VerbalWebUIProps) {
     const defaultInitialInstruction =
         "Answer the user questions and requests based on the following HTML information:\n\n";
     const defaultPageContentSelector = "h1, h2, p";
+    const defaultModel = "gpt-4";
 
-    // Set default value if no defaultSystemInstruction string given as conf option
+    // Set default value if no value given as conf option
     const initialInstruction = conf.initialInstruction ?? defaultInitialInstruction;
-    // Set default value if no pageContentSelector string given as conf option
     const pageContentSelector = conf.pageContentSelector ?? defaultPageContentSelector;
+    const useModel = conf.useModel ?? defaultModel;
 
     const [open, setOpen] = useState(false);
 
@@ -39,7 +41,12 @@ export default function VerbalWebUI({ conf }: VerbalWebUIProps) {
         console.log("pageContentSelector: " + pageContentSelector);
         console.log("pageContent: " + pageContent);
 
-        const data: BackendRequest = { query: query, pageContent: pageContent, initialInstruction: initialInstruction };
+        const data: BackendRequest = {
+            query: query,
+            pageContent: pageContent,
+            initialInstruction: initialInstruction,
+            model: useModel,
+        };
 
         return fetch(conf.backendURL + "/query", {
             method: "POST",

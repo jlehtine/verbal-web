@@ -2,6 +2,7 @@ export interface BackendRequest {
     query: Message[];
     pageContent: string;
     initialInstruction: string;
+    model: string;
 }
 
 export interface BackendResponse {
@@ -19,7 +20,8 @@ export function isBackendRequest(value: unknown): value is BackendRequest {
         value !== null &&
         Array.isArray((value as BackendRequest).query) &&
         typeof (value as BackendRequest).pageContent === "string" &&
-        typeof (value as BackendRequest).pageContent === "string"
+        typeof (value as BackendRequest).initialInstruction === "string" &&
+        typeof (value as BackendRequest).model === "string"
     );
 }
 

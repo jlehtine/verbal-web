@@ -46,7 +46,9 @@ const server = createServer({}, (req, resp) => {
                     const breq = JSON.parse(data);
                     if (isBackendRequest(breq)) {
                         console.log(
-                            "Received query: \nSystem instruction: " +
+                            "Received query: \nUse model: " +
+                                breq.model +
+                                "\nSystem instruction: " +
                                 breq.initialInstruction +
                                 breq.pageContent +
                                 "\nMessages: " +
