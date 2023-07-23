@@ -7,6 +7,7 @@ import React, { useState } from "react";
 export interface VerbalWebConfiguration {
     backendURL: string;
     pageContentSelector: string;
+    initialInstruction: string;
 }
 
 interface VerbalWebUIProps {
@@ -14,15 +15,19 @@ interface VerbalWebUIProps {
 }
 
 export default function VerbalWebUI({ conf }: VerbalWebUIProps) {
-    // TODO: change default value
+    // TODO: Change default values to better ones
+    const defaultInitialInstruction =
+        "Answer the user questions and requests based on the following HTML information:\n\n";
     const defaultPageContentSelector = "h1, h2, p";
-    // Set default value if no pageContentSelector string given as conf parameter
+
+    // Set default value if no defaultSystemInstruction string given as conf option
+    const initialInstruction = conf.initialInstruction ?? defaultInitialInstruction;
+    // Set default value if no pageContentSelector string given as conf option
     const pageContentSelector = conf.pageContentSelector ?? defaultPageContentSelector;
 
     const [open, setOpen] = useState(false);
 
     function handleQuery(query: Message[]): Promise<string> {
-        const data: BackendRequest = { query: query };
         // Read page content
         // TODO: only read text, not all html
         const nodeList = document.querySelectorAll(pageContentSelector);
@@ -31,10 +36,10 @@ export default function VerbalWebUI({ conf }: VerbalWebUIProps) {
         nodeList.forEach((node) => {
             pageContent = pageContent + node.outerHTML;
         });
-        console.log("nodeList(0): " + nodeList.item(0));
-        console.log("nodeList length: " + nodeList.length);
         console.log("pageContentSelector: " + pageContentSelector);
         console.log("pageContent: " + pageContent);
+
+        const data: BackendRequest = { query: query, pageContent: pageContent, initialInstruction: initialInstruction };
 
         return fetch(conf.backendURL + "/query", {
             method: "POST",

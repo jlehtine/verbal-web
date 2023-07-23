@@ -2,10 +2,14 @@ import { BackendRequest, BackendResponse } from "../shared/api";
 import { ChatCompletionMessage, ChatCompletionRequest, isChatCompletionResponse } from "./openai";
 
 export function query(breq: BackendRequest): Promise<BackendResponse> {
-    const chatCompletionMessages: ChatCompletionMessage[] = breq.query.map((m) => ({
-        role: m.role,
-        content: m.content,
-    }));
+    const systemInstruction: ChatCompletionMessage = {
+        role: "system",
+        content: breq.initialInstruction + breq.pageContent,
+    };
+    const chatCompletionMessages: ChatCompletionMessage[] = [systemInstruction];
+    breq.query.forEach((m) => {
+        chatCompletionMessages.push({ role: m.role, content: m.content });
+    });
 
     const data: ChatCompletionRequest = {
         model: "gpt-4",

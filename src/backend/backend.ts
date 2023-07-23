@@ -45,7 +45,13 @@ const server = createServer({}, (req, resp) => {
                 req.on("end", () => {
                     const breq = JSON.parse(data);
                     if (isBackendRequest(breq)) {
-                        console.log("Received query: " + breq.query);
+                        console.log(
+                            "Received query: \nSystem instruction: " +
+                                breq.initialInstruction +
+                                breq.pageContent +
+                                "\nMessages: " +
+                                breq.query
+                        );
                         query(breq).then((bresp) => {
                             console.log("Response is: " + bresp.response);
                             resp.statusCode = StatusCodes.OK;
