@@ -54,13 +54,19 @@ const server = createServer({}, (req, resp) => {
                                 "\nMessages: " +
                                 breq.query
                         );
-                        query(breq).then((bresp) => {
-                            console.log("Response is: " + bresp.response);
-                            resp.statusCode = StatusCodes.OK;
-                            resp.setHeader("content-type", "application/json");
-                            resp.write(JSON.stringify(bresp));
-                            resp.end();
-                        });
+                        query(breq)
+                            .then((bresp) => {
+                                console.log("Response is: " + bresp.response);
+                                resp.statusCode = StatusCodes.OK;
+                                resp.setHeader("content-type", "application/json");
+                                resp.write(JSON.stringify(bresp));
+                                resp.end();
+                            })
+                            .catch((err) => {
+                                console.error("ERROR: " + err);
+                                resp.statusCode = StatusCodes.INTERNAL_SERVER_ERROR;
+                                resp.end();
+                            });
                     } else {
                         resp.statusCode = StatusCodes.BAD_REQUEST;
                         resp.setHeader("content-type", "text/plain");
@@ -73,10 +79,12 @@ const server = createServer({}, (req, resp) => {
                 resp.end();
             }
         } else {
-            throw "Unknown request";
+            console.error("ERROR: Unknown request, URL:" + req.url);
+            resp.statusCode = StatusCodes.NOT_FOUND;
+            resp.end();
         }
     } catch (err) {
-        console.error("Error occurred: " + err);
+        console.error("ERROR: " + err);
     }
 });
 
