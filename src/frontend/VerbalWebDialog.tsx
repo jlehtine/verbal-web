@@ -127,10 +127,10 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
                     setTextFieldHelperText("");
                 })
                 .catch((err) => {
+                    console.error(err);
                     setWaitingForResponse(false);
                     setShowError(true);
                     setTextFieldHelperText("ERROR: " + err);
-                    console.error(textFieldHelperText);
                 });
         } else {
             setShowError(true);
