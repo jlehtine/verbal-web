@@ -1,12 +1,12 @@
 import { BackendResponse, isBackendRequest } from "../shared/api";
 import { query } from "./query";
 import { readFile } from "fs/promises";
-import { createServer } from "http";
+import { ServerResponse, createServer } from "http";
 import { ReasonPhrases, StatusCodes } from "http-status-codes";
 
 const server = createServer({}, (req, resp) => {
-    // const allowOrigin = process.env.VW_ALLOW_ORIGIN ?? "*"; // "*" is default value
-    const allowOrigin = "https://google.com"; // for testing purposes
+    const allowOrigin = process.env.VW_ALLOW_ORIGIN ?? "*"; // "*" is default value
+    // const allowOrigin = "https://google.com"; // for testing purposes
 
     try {
         console.log("URL=" + req.url);
@@ -66,9 +66,7 @@ const server = createServer({}, (req, resp) => {
                                 resp.end();
                             })
                             .catch((err) => {
-                                console.error("ERROR: " + err);
-                                resp.statusCode = StatusCodes.INTERNAL_SERVER_ERROR;
-                                resp.end();
+                                serverError(err, StatusCodes.INTERNAL_SERVER_ERROR, resp);
                             });
                     } else {
                         resp.statusCode = StatusCodes.BAD_REQUEST;
@@ -82,13 +80,18 @@ const server = createServer({}, (req, resp) => {
                 resp.end();
             }
         } else {
-            console.error("ERROR: Unknown request, URL: " + req.url);
-            resp.statusCode = StatusCodes.NOT_FOUND;
-            resp.end();
+            serverError("Unknown request, URL" + req.url, StatusCodes.NOT_FOUND, resp);
         }
     } catch (err) {
         console.error("ERROR: " + err);
     }
 });
+
+// msg=error message, code=HTML status code
+function serverError(msg: string, code: number, resp: ServerResponse) {
+    console.error("ERROR: " + msg);
+    resp.statusCode = code;
+    resp.end();
+}
 
 server.listen(8080);
