@@ -5,12 +5,15 @@ import { createServer } from "http";
 import { ReasonPhrases, StatusCodes } from "http-status-codes";
 
 const server = createServer({}, (req, resp) => {
+    // const allowOrigin = process.env.VW_ALLOW_ORIGIN ?? "*"; // "*" is default value
+    const allowOrigin = "https://google.com"; // for testing purposes
+
     try {
         console.log("URL=" + req.url);
         console.log("Method=" + req.method);
         console.log("Content-type=" + req.headers["content-type"]);
         if (req.url === "/verbal-web-frontend.js") {
-            resp.setHeader("Access-Control-Allow-Origin", "*");
+            resp.setHeader("Access-Control-Allow-Origin", allowOrigin);
             resp.setHeader("Access-Control-Request-Method", "*");
             resp.setHeader("Access-Control-Allow-Methods", "OPTIONS, GET");
             resp.setHeader("Access-Control-Allow-Headers", "*");
@@ -29,7 +32,7 @@ const server = createServer({}, (req, resp) => {
                 resp.end();
             }
         } else if (req.url === "/query") {
-            resp.setHeader("Access-Control-Allow-Origin", "*");
+            resp.setHeader("Access-Control-Allow-Origin", allowOrigin);
             resp.setHeader("Access-Control-Request-Method", "*");
             resp.setHeader("Access-Control-Allow-Methods", "OPTIONS, POST");
             resp.setHeader("Access-Control-Allow-Headers", "*");
