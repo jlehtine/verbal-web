@@ -79,7 +79,7 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
     // messages stores previous queries and their responses
     const [messages, setMessages] = useState<Array<Message>>([]);
     // true if userInput longer than 5 chars, updated in handleInputChange
-    const [inputTooShort, setInputTooShort] = useState(false);
+    const [inputTooShort, setInputTooShort] = useState(true);
     // true if trying to submit too short message
     const [showError, setShowError] = useState(false);
     // text shown under input textField
