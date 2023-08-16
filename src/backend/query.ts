@@ -20,6 +20,7 @@ export function query(breq: BackendRequest): Promise<BackendResponse> {
         method: "POST",
         headers: {
             Authorization: "Bearer " + process.env.OPENAI_API_KEY,
+            // Authorization: "Bearer " + 123, // test wrong API-key
             "Content-Type": "application/json",
             Accept: "application/json",
         },

@@ -79,7 +79,7 @@ const server = createServer({}, (req, resp) => {
                 resp.end();
             }
         } else {
-            console.error("ERROR: Unknown request, URL:" + req.url);
+            console.error("ERROR: Unknown request, URL: " + req.url);
             resp.statusCode = StatusCodes.NOT_FOUND;
             resp.end();
         }

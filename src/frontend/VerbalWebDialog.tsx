@@ -108,21 +108,29 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
     const handleSubmit = () => {
         // Only allowed to submit when textfield is not empty and response received from previous query
         if (!inputTooShort && !waitingForResponse) {
+            setShowError(false);
             const queryMessage: Message = { role: "user", content: userInput };
 
             console.log("Query: " + userInput);
             setWaitingForResponse(true);
             setTextFieldHelperText("Waiting for response to message!");
-            props.onQuery([...messages, queryMessage]).then((response) => {
-                setWaitingForResponse(false);
-                addMessage(queryMessage);
-                addMessage({ role: "assistant", content: response });
-                console.log("Response: " + response);
-                setUserInput("");
-                setInputTooShort(true);
-                setShowError(false);
-                setTextFieldHelperText("");
-            });
+            props
+                .onQuery([...messages, queryMessage])
+                .then((response) => {
+                    setWaitingForResponse(false);
+                    addMessage(queryMessage);
+                    addMessage({ role: "assistant", content: response });
+                    console.log("Response: " + response);
+                    setUserInput("");
+                    setInputTooShort(true);
+                    setShowError(false);
+                    setTextFieldHelperText("");
+                })
+                .catch((err) => {
+                    setWaitingForResponse(false);
+                    setShowError(true);
+                    setTextFieldHelperText("ERROR: " + err);
+                });
         } else {
             setShowError(true);
             setTextFieldHelperText("Message must be longer than 5 characters!");
