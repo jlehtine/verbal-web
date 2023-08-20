@@ -31,6 +31,25 @@ const server = createServer({}, (req, resp) => {
                 resp.statusCode = StatusCodes.METHOD_NOT_ALLOWED;
                 resp.end();
             }
+        } else if (req.url === "/test.html") {
+            resp.setHeader("Access-Control-Allow-Origin", allowOrigin);
+            resp.setHeader("Access-Control-Request-Method", "*");
+            resp.setHeader("Access-Control-Allow-Methods", "OPTIONS, GET");
+            resp.setHeader("Access-Control-Allow-Headers", "*");
+            if (req.method === "OPTIONS") {
+                resp.end();
+            } else if (req.method === "GET") {
+                resp.statusCode = StatusCodes.OK;
+                resp.setHeader("content-type", "text/html");
+                readFile("../test.html").then((data) => {
+                    resp.setHeader("content-length", data.byteLength);
+                    resp.write(data);
+                    resp.end();
+                });
+            } else {
+                resp.statusCode = StatusCodes.METHOD_NOT_ALLOWED;
+                resp.end();
+            }
         } else if (req.url === "/query") {
             resp.setHeader("Access-Control-Allow-Origin", allowOrigin);
             resp.setHeader("Access-Control-Request-Method", "*");
