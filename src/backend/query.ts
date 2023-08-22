@@ -9,6 +9,16 @@ export function query(breq: BackendRequest): Promise<BackendResponse> {
             (process.env.VW_INITIAL_INSTRUCTION ?? breq.initialInstruction) +
             (process.env.VW_PAGE_CONTENT ?? breq.pageContent),
     };
+    if (process.env.VW_INITIAL_INSTRUCTION !== undefined) {
+        console.log(
+            "Initial instruction overridden by env variable VW_INITIAL_INSTRUCTION:\n" +
+                process.env.VW_INITIAL_INSTRUCTION +
+                "\n"
+        );
+    }
+    if (process.env.VW_PAGE_CONTENT !== undefined) {
+        console.log("Page content overridden by env variable VW_PAGE_CONTENT:\n" + process.env.VW_PAGE_CONTENT + "\n");
+    }
     const chatCompletionMessages: ChatCompletionMessage[] = [systemInstruction];
     breq.query.forEach((m) => {
         chatCompletionMessages.push({ role: m.role, content: m.content });
