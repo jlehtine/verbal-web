@@ -4,7 +4,10 @@ import { ChatCompletionMessage, ChatCompletionRequest, isChatCompletionResponse 
 export function query(breq: BackendRequest): Promise<BackendResponse> {
     const systemInstruction: ChatCompletionMessage = {
         role: "system",
-        content: breq.initialInstruction + breq.pageContent,
+        content:
+            // initial instruction and page content can be overridden by environment variables VW_INITIAL_INSTRUCTION and VW_PAGE_CONTENT
+            (process.env.VW_INITIAL_INSTRUCTION ?? breq.initialInstruction) +
+            (process.env.VW_PAGE_CONTENT ?? breq.pageContent),
     };
     const chatCompletionMessages: ChatCompletionMessage[] = [systemInstruction];
     breq.query.forEach((m) => {
