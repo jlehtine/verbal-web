@@ -34,7 +34,7 @@ properties.
 
 # Environment variables
 
-Verbal Web uses the following environment valiables.
+Verbal Web uses the following environment variables.
 
 - 'OPENAI_API_KEY' (REQUIRED)  
   Secret API key that the OpenAI API uses for authentication.
