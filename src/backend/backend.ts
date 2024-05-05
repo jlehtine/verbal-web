@@ -4,6 +4,17 @@ import { query } from "./query";
 import { readFile } from "fs/promises";
 import { IncomingMessage, ServerResponse, createServer } from "http";
 import { ReasonPhrases, StatusCodes } from "http-status-codes";
+import { OpenAI } from "openai";
+
+// Initialize OpenAI API
+console.log("Initializing OpenAI API");
+const apiKey = process.env.OPENAI_API_KEY;
+if (!apiKey) {
+    throw new Error("API key not configured");
+}
+const openai = new OpenAI({
+    apiKey: apiKey,
+});
 
 const server = createServer({}, (req, resp) => {
     const allowOrigin = process.env.VW_ALLOW_ORIGIN ?? "*"; // "*" is default value
@@ -84,7 +95,7 @@ const server = createServer({}, (req, resp) => {
                                 "\nMessages: " +
                                 JSON.stringify(breq.query),
                         );
-                        query(breq)
+                        query(breq, openai)
                             .then((bresp) => {
                                 console.log("Response is: " + bresp.response);
                                 resp.statusCode = StatusCodes.OK;
@@ -133,4 +144,5 @@ function logRequest(req: IncomingMessage) {
     }
 }
 
+console.log("Start listening for requests");
 server.listen(8080);
