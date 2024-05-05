@@ -3,7 +3,6 @@ import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import AssistantIcon from "@mui/icons-material/Assistant";
 import CloseIcon from "@mui/icons-material/Close";
 import {
-    Alert,
     Avatar,
     CircularProgress,
     Dialog,
@@ -21,7 +20,7 @@ import {
     Tooltip,
 } from "@mui/material";
 import { blue } from "@mui/material/colors";
-import React, { MutableRefObject, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 interface VerbalWebDialogProps extends DialogProps {
     onClose: () => void;
@@ -29,7 +28,7 @@ interface VerbalWebDialogProps extends DialogProps {
 }
 
 interface VerbalWebDialogTitleProps extends DialogTitleProps {
-    onClose: () => void;
+    onClose?: () => void;
 }
 
 interface VerbalWebMessageListProps {
@@ -71,13 +70,12 @@ function createListItem(m: Message, id: number): React.JSX.Element {
 
 export default function VerbalWebDialog(props: VerbalWebDialogProps) {
     const handleClose = props.onClose;
-    const open = props.open;
     const inputRef = useRef<HTMLDivElement>(null);
 
     // userInput stores value of textField
     const [userInput, setUserInput] = useState("");
     // messages stores previous queries and their responses
-    const [messages, setMessages] = useState<Array<Message>>([]);
+    const [messages, setMessages] = useState<Message[]>([]);
     // true if userInput longer than 5 chars, updated in handleInputChange
     const [inputTooShort, setInputTooShort] = useState(true);
     // true if trying to submit too short message
@@ -126,11 +124,11 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
                     setShowError(false);
                     setTextFieldHelperText("");
                 })
-                .catch((err) => {
+                .catch((err: unknown) => {
                     console.error(err);
                     setWaitingForResponse(false);
                     setShowError(true);
-                    setTextFieldHelperText("ERROR: " + err);
+                    setTextFieldHelperText(describeError(err));
                 });
         } else {
             setShowError(true);
@@ -202,7 +200,7 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
 }
 
 function VerbalWebDialogTitle(props: VerbalWebDialogTitleProps) {
-    const { children, onClose, ...other } = props;
+    const { children, onClose } = props;
 
     return (
         <DialogTitle variant="subtitle1" sx={{ paddingRight: 4 }}>
@@ -228,4 +226,14 @@ function VerbalWebDialogTitle(props: VerbalWebDialogTitleProps) {
 function VerbalWebMessageList(props: VerbalWebMessageListProps) {
     const messages = props.messages;
     return <List>{messages.map((m, idx) => createListItem(m, idx))}</List>;
+}
+
+function describeError(err: unknown): string {
+    let details = undefined;
+    if (err instanceof Error) {
+        details = err.message;
+    } else if (typeof err === "string") {
+        details = err;
+    }
+    return "ERROR" + (details !== undefined ? ": " + details : "");
 }

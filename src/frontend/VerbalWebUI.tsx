@@ -60,14 +60,14 @@ export default function VerbalWebUI({ conf }: VerbalWebUIProps) {
                 if (resp.ok) {
                     return resp.json();
                 } else {
-                    throw "Query failed";
+                    throw new Error("Query failed");
                 }
             })
             .then((data) => {
                 if (isBackendResponse(data)) {
                     return data.response;
                 } else {
-                    throw "Bad response";
+                    throw new Error("Bad response");
                 }
             });
     }
