@@ -13,7 +13,7 @@ export function query(breq: BackendRequest): Promise<BackendResponse> {
         console.log(
             "Initial instruction overridden by env variable VW_INITIAL_INSTRUCTION:\n" +
                 process.env.VW_INITIAL_INSTRUCTION +
-                "\n"
+                "\n",
         );
     }
     if (process.env.VW_PAGE_CONTENT !== undefined) {

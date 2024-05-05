@@ -74,7 +74,7 @@ const server = createServer({}, (req, resp) => {
                                 breq.initialInstruction +
                                 breq.pageContent +
                                 "\nMessages: " +
-                                breq.query
+                                breq.query,
                         );
                         query(breq)
                             .then((bresp) => {
