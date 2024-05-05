@@ -1,7 +1,15 @@
 import { BackendRequest, BackendResponse } from "../shared/api";
+import { checkModeration, checkModerations } from "./moderation";
 import { OpenAI } from "openai";
 
 export function query(breq: BackendRequest, openai: OpenAI): Promise<BackendResponse> {
+    return checkModerations(
+        breq.query.map((m) => m.content),
+        openai,
+    ).then(() => doQuery(breq, openai));
+}
+
+function doQuery(breq: BackendRequest, openai: OpenAI): Promise<BackendResponse> {
     if (process.env.VW_INITIAL_INSTRUCTION !== undefined) {
         console.log(
             "Initial instruction overridden by env variable VW_INITIAL_INSTRUCTION:\n" +
@@ -35,8 +43,12 @@ export function query(breq: BackendRequest, openai: OpenAI): Promise<BackendResp
     };
 
     return openai.chat.completions.create(params).then((chatCompletions) => {
-        return {
-            response: chatCompletions.choices[0].message.content ?? "(No response)",
-        };
+        const response = chatCompletions.choices[0].message.content;
+        const bresp = { response: response ?? "(No response)" };
+        if (response) {
+            return checkModeration(response, openai).then(() => bresp);
+        } else {
+            return bresp;
+        }
     });
 }
