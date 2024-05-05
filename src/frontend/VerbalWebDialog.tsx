@@ -1,4 +1,5 @@
 import { Message } from "../shared/api";
+import { describeError } from "../shared/error";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import AssistantIcon from "@mui/icons-material/Assistant";
 import CloseIcon from "@mui/icons-material/Close";
@@ -128,7 +129,7 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
                     console.error(err);
                     setWaitingForResponse(false);
                     setShowError(true);
-                    setTextFieldHelperText(describeError(err));
+                    setTextFieldHelperText(describeError(err, false, "An error occurred"));
                 });
         } else {
             setShowError(true);
@@ -226,14 +227,4 @@ function VerbalWebDialogTitle(props: VerbalWebDialogTitleProps) {
 function VerbalWebMessageList(props: VerbalWebMessageListProps) {
     const messages = props.messages;
     return <List>{messages.map((m, idx) => createListItem(m, idx))}</List>;
-}
-
-function describeError(err: unknown): string {
-    let details = undefined;
-    if (err instanceof Error) {
-        details = err.message;
-    } else if (typeof err === "string") {
-        details = err;
-    }
-    return "ERROR" + (details !== undefined ? ": " + details : "");
 }
