@@ -9,7 +9,8 @@
 export function describeError(err: unknown, includeStack = false, baseMsg?: string): string {
     let details;
     if (err instanceof Error) {
-        details = `${err.name}: ${err.message}` + (includeStack && err.stack ? `\n${err.stack}` : "");
+        details =
+            err.name + (err.message ? ": " + err.message : "") + (includeStack && err.stack ? `\n${err.stack}` : "");
     } else if (typeof err === "string") {
         details = err;
     } else if (typeof err === "object" && err !== null) {
