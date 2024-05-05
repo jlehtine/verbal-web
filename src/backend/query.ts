@@ -2,24 +2,29 @@ import { BackendRequest, BackendResponse } from "../shared/api";
 import { OpenAI } from "openai";
 
 export function query(breq: BackendRequest, openai: OpenAI): Promise<BackendResponse> {
-    const systemInstruction: OpenAI.Chat.ChatCompletionMessageParam = {
-        role: "system",
-        content:
-            // initial instruction and page content can be overridden by environment variables VW_INITIAL_INSTRUCTION and VW_PAGE_CONTENT
-            (process.env.VW_INITIAL_INSTRUCTION ?? breq.initialInstruction) +
-            (process.env.VW_PAGE_CONTENT ?? breq.pageContent),
-    };
     if (process.env.VW_INITIAL_INSTRUCTION !== undefined) {
         console.log(
             "Initial instruction overridden by env variable VW_INITIAL_INSTRUCTION:\n" +
-                process.env.VW_INITIAL_INSTRUCTION +
-                "\n",
+                process.env.VW_INITIAL_INSTRUCTION,
         );
     }
     if (process.env.VW_PAGE_CONTENT !== undefined) {
-        console.log("Page content overridden by env variable VW_PAGE_CONTENT:\n" + process.env.VW_PAGE_CONTENT + "\n");
+        console.log("Page content overridden by env variable VW_PAGE_CONTENT:\n" + process.env.VW_PAGE_CONTENT);
     }
-    const chatCompletionMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [systemInstruction];
+    const initialInstruction = process.env.VW_INITIAL_INSTRUCTION ?? breq.initialInstruction;
+    const pageContent = process.env.VW_PAGE_CONTENT ?? breq.pageContent;
+    const systemInstruction: OpenAI.Chat.ChatCompletionMessageParam | undefined = initialInstruction
+        ? {
+              role: "system",
+              content:
+                  // initial instruction and page content can be overridden by environment variables VW_INITIAL_INSTRUCTION and VW_PAGE_CONTENT
+                  initialInstruction + (pageContent ? "\n\n" + pageContent : ""),
+          }
+        : undefined;
+    const chatCompletionMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
+    if (systemInstruction) {
+        chatCompletionMessages.push(systemInstruction);
+    }
     breq.query.forEach((m) => {
         chatCompletionMessages.push({ role: m.role, content: m.content });
     });

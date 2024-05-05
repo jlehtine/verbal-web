@@ -17,8 +17,7 @@ interface VerbalWebUIProps {
 
 export default function VerbalWebUI({ conf }: VerbalWebUIProps) {
     // TODO: Change default values to better ones AND UPDATE README!!!
-    const defaultInitialInstruction =
-        "Answer the user questions and requests based on the following HTML information:\n\n";
+    const defaultInitialInstruction = "Answer the user questions and requests based on the following HTML information.";
     const defaultPageContentSelector = "h1, h2, p";
     const defaultModel = "gpt-4";
 
