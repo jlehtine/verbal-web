@@ -1,5 +1,6 @@
 import { isBackendRequest } from "../shared/api";
 import { describeError } from "../shared/error";
+import { HttpMethod } from "./httpmethods";
 import { query } from "./query";
 import { readFile } from "fs/promises";
 import { IncomingMessage, ServerResponse, createServer } from "http";
@@ -23,10 +24,7 @@ const server = createServer({}, (req, resp) => {
     try {
         logRequest(req);
         if (req.url === "/verbal-web-frontend.js") {
-            resp.setHeader("Access-Control-Allow-Origin", allowOrigin);
-            resp.setHeader("Access-Control-Request-Method", "*");
-            resp.setHeader("Access-Control-Allow-Methods", "OPTIONS, GET");
-            resp.setHeader("Access-Control-Allow-Headers", "*");
+            setCorsHeaders(resp, allowOrigin, ["GET"]);
             if (req.method === "OPTIONS") {
                 resp.end();
             } else if (req.method === "GET") {
@@ -44,10 +42,7 @@ const server = createServer({}, (req, resp) => {
                 resp.end();
             }
         } else if (req.url === "/test.html") {
-            resp.setHeader("Access-Control-Allow-Origin", allowOrigin);
-            resp.setHeader("Access-Control-Request-Method", "*");
-            resp.setHeader("Access-Control-Allow-Methods", "OPTIONS, GET");
-            resp.setHeader("Access-Control-Allow-Headers", "*");
+            setCorsHeaders(resp, allowOrigin, ["GET"]);
             if (req.method === "OPTIONS") {
                 resp.end();
             } else if (req.method === "GET") {
@@ -65,10 +60,7 @@ const server = createServer({}, (req, resp) => {
                 resp.end();
             }
         } else if (req.url === "/query") {
-            resp.setHeader("Access-Control-Allow-Origin", allowOrigin);
-            resp.setHeader("Access-Control-Request-Method", "*");
-            resp.setHeader("Access-Control-Allow-Methods", "OPTIONS, POST");
-            resp.setHeader("Access-Control-Allow-Headers", "*");
+            setCorsHeaders(resp, allowOrigin, ["POST"]);
             if (req.method === "OPTIONS") {
                 resp.end();
             } else if (req.method === "POST" && req.headers["content-type"] === "application/json") {
@@ -122,6 +114,12 @@ const server = createServer({}, (req, resp) => {
         catchUnexpectedFunc(resp)(err);
     }
 });
+
+function setCorsHeaders(resp: ServerResponse, allowOrigin: string, methods: HttpMethod[]) {
+    resp.setHeader("Access-Control-Allow-Origin", allowOrigin);
+    resp.setHeader("Access-Control-Allow-Methods", methods.join(", "));
+    resp.setHeader("Access-Control-Allow-Headers", "*");
+}
 
 // msg=error message, code=HTML status code
 function serverError(msg: string, code: number, resp: ServerResponse) {
