@@ -43,7 +43,7 @@ export function query(breq: BackendRequest): Promise<BackendResponse> {
             if (resp.ok) {
                 return resp.json();
             } else {
-                throw "Query failed";
+                throw "Query failed: " + resp.statusText;
             }
         })
         .then((data) => {
