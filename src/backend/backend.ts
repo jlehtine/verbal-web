@@ -1,7 +1,8 @@
-import { BackendResponse, isBackendRequest } from "../shared/api";
+import { isBackendRequest } from "../shared/api";
+import { describeError } from "../shared/error";
 import { query } from "./query";
 import { readFile } from "fs/promises";
-import { ServerResponse, createServer } from "http";
+import { IncomingMessage, ServerResponse, createServer } from "http";
 import { ReasonPhrases, StatusCodes } from "http-status-codes";
 
 const server = createServer({}, (req, resp) => {
@@ -9,9 +10,7 @@ const server = createServer({}, (req, resp) => {
     // const allowOrigin = "https://google.com"; // for testing purposes
 
     try {
-        console.log("URL=" + req.url);
-        console.log("Method=" + req.method);
-        console.log("Content-type=" + req.headers["content-type"]);
+        logRequest(req);
         if (req.url === "/verbal-web-frontend.js") {
             resp.setHeader("Access-Control-Allow-Origin", allowOrigin);
             resp.setHeader("Access-Control-Request-Method", "*");
@@ -22,11 +21,13 @@ const server = createServer({}, (req, resp) => {
             } else if (req.method === "GET") {
                 resp.statusCode = StatusCodes.OK;
                 resp.setHeader("content-type", "text/javascript");
-                readFile("verbal-web-frontend.js").then((data) => {
-                    resp.setHeader("content-length", data.byteLength);
-                    resp.write(data);
-                    resp.end();
-                });
+                readFile("verbal-web-frontend.js")
+                    .then((data) => {
+                        resp.setHeader("content-length", data.byteLength);
+                        resp.write(data);
+                        resp.end();
+                    })
+                    .catch(catchUnexpectedFunc(resp));
             } else {
                 resp.statusCode = StatusCodes.METHOD_NOT_ALLOWED;
                 resp.end();
@@ -41,11 +42,13 @@ const server = createServer({}, (req, resp) => {
             } else if (req.method === "GET") {
                 resp.statusCode = StatusCodes.OK;
                 resp.setHeader("content-type", "text/html");
-                readFile("../test.html").then((data) => {
-                    resp.setHeader("content-length", data.byteLength);
-                    resp.write(data);
-                    resp.end();
-                });
+                readFile("../test.html")
+                    .then((data) => {
+                        resp.setHeader("content-length", data.byteLength);
+                        resp.write(data);
+                        resp.end();
+                    })
+                    .catch(catchUnexpectedFunc(resp));
             } else {
                 resp.statusCode = StatusCodes.METHOD_NOT_ALLOWED;
                 resp.end();
@@ -58,14 +61,19 @@ const server = createServer({}, (req, resp) => {
             if (req.method === "OPTIONS") {
                 resp.end();
             } else if (req.method === "POST" && req.headers["content-type"] === "application/json") {
+                req.setEncoding("utf8");
                 // Read and process data
                 let data = "";
                 req.on("data", (chunk) => {
-                    data += chunk;
+                    if (typeof chunk === "string") {
+                        data += chunk;
+                    } else {
+                        throw new Error(`Received a chunk of unexpected type ${typeof chunk}`);
+                    }
                 });
                 console.log(data);
                 req.on("end", () => {
-                    const breq = JSON.parse(data);
+                    const breq: unknown = JSON.parse(data);
                     if (isBackendRequest(breq)) {
                         console.log(
                             "Received query: \nUse model: " +
@@ -74,7 +82,7 @@ const server = createServer({}, (req, resp) => {
                                 breq.initialInstruction +
                                 breq.pageContent +
                                 "\nMessages: " +
-                                breq.query,
+                                JSON.stringify(breq.query),
                         );
                         query(breq)
                             .then((bresp) => {
@@ -84,9 +92,7 @@ const server = createServer({}, (req, resp) => {
                                 resp.write(JSON.stringify(bresp));
                                 resp.end();
                             })
-                            .catch((err) => {
-                                serverError(err, StatusCodes.INTERNAL_SERVER_ERROR, resp);
-                            });
+                            .catch(catchUnexpectedFunc(resp));
                     } else {
                         resp.statusCode = StatusCodes.BAD_REQUEST;
                         resp.setHeader("content-type", "text/plain");
@@ -99,10 +105,10 @@ const server = createServer({}, (req, resp) => {
                 resp.end();
             }
         } else {
-            serverError("Unknown request, URL" + req.url, StatusCodes.NOT_FOUND, resp);
+            serverError("Not found: " + (req.url ?? ""), StatusCodes.NOT_FOUND, resp);
         }
     } catch (err) {
-        console.error("ERROR: " + err);
+        catchUnexpectedFunc(resp)(err);
     }
 });
 
@@ -111,6 +117,20 @@ function serverError(msg: string, code: number, resp: ServerResponse) {
     console.error("ERROR: " + msg);
     resp.statusCode = code;
     resp.end();
+}
+
+function catchUnexpectedFunc(resp: ServerResponse) {
+    return (err: unknown) => {
+        console.error(describeError(err, true, "ERROR"));
+        resp.statusCode = StatusCodes.INTERNAL_SERVER_ERROR;
+        resp.end();
+    };
+}
+
+function logRequest(req: IncomingMessage) {
+    if (req.method && req.url) {
+        console.log(`Processing request: ${req.method} ${req.url}`);
+    }
 }
 
 server.listen(8080);

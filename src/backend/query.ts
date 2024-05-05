@@ -2,6 +2,11 @@ import { BackendRequest, BackendResponse } from "../shared/api";
 import { ChatCompletionMessage, ChatCompletionRequest, isChatCompletionResponse } from "./openai";
 
 export function query(breq: BackendRequest): Promise<BackendResponse> {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+        throw new Error("API key not configured");
+    }
+
     const systemInstruction: ChatCompletionMessage = {
         role: "system",
         content:
@@ -32,7 +37,7 @@ export function query(breq: BackendRequest): Promise<BackendResponse> {
     return fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
-            Authorization: "Bearer " + process.env.OPENAI_API_KEY,
+            Authorization: "Bearer " + apiKey,
             // Authorization: "Bearer " + 123, // test wrong API-key
             "Content-Type": "application/json",
             Accept: "application/json",
@@ -43,7 +48,7 @@ export function query(breq: BackendRequest): Promise<BackendResponse> {
             if (resp.ok) {
                 return resp.json();
             } else {
-                throw "Query failed: " + resp.statusText;
+                throw new Error(`Query failed with status ${resp.statusText}`);
             }
         })
         .then((data) => {
@@ -53,7 +58,7 @@ export function query(breq: BackendRequest): Promise<BackendResponse> {
                 };
                 return bresp;
             } else {
-                throw "Bad response";
+                throw new Error("Unrecognized response");
             }
         });
 }

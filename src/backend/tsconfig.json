@@ -7,7 +7,9 @@
         "lib": ["ES2016", "DOM", "ES2021.String"],
         "types": ["node"],
         "moduleResolution": "node",
-        "allowSyntheticDefaultImports": true
+        "allowSyntheticDefaultImports": true,
+        "emitDecoratorMetadata": true,
+        "experimentalDecorators": true
     },
     "include": ["**/*"]
 }

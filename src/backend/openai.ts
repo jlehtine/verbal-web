@@ -21,7 +21,6 @@ export interface ChatCompletionChoice {
 }
 
 export function isChatCompletionResponse(value: unknown): value is ChatCompletionResponse {
-    return (
-        typeof value === "object" && value !== null && (value as ChatCompletionResponse).object === "chat.completion"
-    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any,@typescript-eslint/no-unsafe-member-access
+    return typeof value === "object" && value !== null && (value as any).object === "chat.completion";
 }
