@@ -1,6 +1,7 @@
 import { isBackendRequest } from "../shared/api";
 import { describeError } from "../shared/error";
 import { HttpMethod } from "./httpmethods";
+import { logInterfaceData } from "./log";
 import { query } from "./query";
 import { readFile } from "fs/promises";
 import { IncomingMessage, ServerResponse, createServer } from "http";
@@ -77,19 +78,11 @@ const server = createServer({}, (req, resp) => {
                 console.log(data);
                 req.on("end", () => {
                     const breq: unknown = JSON.parse(data);
+                    logInterfaceData("Received frontend request", breq);
                     if (isBackendRequest(breq)) {
-                        console.log(
-                            "Received query: \nUse model: " +
-                                breq.model +
-                                "\nSystem instruction: " +
-                                breq.initialInstruction +
-                                breq.pageContent +
-                                "\nMessages: " +
-                                JSON.stringify(breq.query),
-                        );
                         query(breq, openai)
                             .then((bresp) => {
-                                console.log("Response is: " + bresp.response);
+                                logInterfaceData("Returning frontend response", bresp);
                                 resp.statusCode = StatusCodes.OK;
                                 resp.setHeader("content-type", "application/json");
                                 resp.write(JSON.stringify(bresp));

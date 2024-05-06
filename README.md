@@ -7,29 +7,40 @@ Verbal web control using large language models
 The configuration object specified for `initVerbalWeb()` can contain the
 following properties.
 
-- `backendURL`  
-  Backend URL as a string.
+- `backendURL` (required)  
+  Backend base URL as a string.
 
-- `pageContentSelector`  
+  Example: `https://my-backend.example.org`
+
+- `initialInstruction` (optional)  
+  String containing the initial instruction or prompt given to the AI model
+  before user messages. However, if the backend has environment variable
+  `VW_INITIAL_INSTRUCTION` defined then it overrides any instruction supplied by
+  the frontend. Any selected page content will be added to the end of this
+  string.
+
+  Example: `"Use the following web content to answer user queries."`
+
+  Default value: (none)
+
+- `pageContentSelector` (optional)  
   CSS selector string which specifies which elements of the web page are sent to
-  the AI model.  
-  Example: `pageContentSelector: "h1, p"` will send all of the \<h1> and \<p>
-  elements.  
-  Default value: `"h1, h2, p"`
+  the AI model as background information. However, if the backend has
+  environment variable `VW_PAGE_CONTENT` defined then it overrides any content
+  supplied by the frontend.
 
-- `initialInstruction`  
-  String which contains a system instruction given to the AI model before user
-  messages. Page content will be added to the end of this string.  
-   Example: You can use this to give instructions to the AI on how to use the page
-  content.  
-   `initialInstruction: "Use the following HTML to answer the user questions: "`  
-   The AI will receive instruction: "Use the following HTML to answer the user questions:
-  "\<page content as a string>  
-  Default value: `"Answer the user questions and requests based on the following HTML information:\n\n"`
+  Example: `"h1, p"` will send content from all of the `<h1>` and `<p>`
+  elements.
 
-- `useModel`  
-  String which specifies which OpenAI model to use in the chat completion.
-  Example: `useModel: "gpt-3.5-turbo"`  
+  Default value: none
+
+- `useModel` (optional)  
+  String specifying the chat completion model to be used. However, if the
+  backend has environment variable `VW_CHAT_MODEL` defined then it overrides any
+  model supplied by the frontend.
+
+  Example: `"gpt-3.5-turbo"`
+
   Default value: `"gpt-4"`
 
 ## Environment variables
@@ -54,9 +65,14 @@ Verbal Web server uses the following environment variables.
   to the chat completion API.
 
 - `VW_PAGE_CONTENT` (optional)  
-  If this variable exitsts, the page content sent to the backend is overridden
-  and replaced by this value. Used if backend needs to override the content
-  included in the query before it is sent to the chat completion API.
+  If this variable exitsts, the page content sent from the frontend is
+  overridden and replaced by this value. Used if backend needs to override the
+  content included in the query before it is sent to the chat completion API.
+
+- `VW_CHAT_MODEL` (optional)  
+  If this variable exists, the language model specified in the configuration
+  object (see above) is overridden and replaced by this value. Used to enforce a
+  specific language model.
 
 - `VW_MODERATION_CACHE_EXPIRE_SECONDS` (optional)  
   Sets the moderation result cache expiration time in seconds.  

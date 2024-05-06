@@ -1,8 +1,8 @@
 export interface BackendRequest {
     query: Message[];
-    pageContent: string;
-    initialInstruction: string;
-    model: string;
+    pageContent?: string;
+    initialInstruction?: string;
+    model?: string;
 }
 
 export interface BackendResponse {
@@ -19,9 +19,9 @@ export function isBackendRequest(value: unknown): value is BackendRequest {
         typeof value === "object" &&
         value !== null &&
         Array.isArray((value as BackendRequest).query) &&
-        typeof (value as BackendRequest).pageContent === "string" &&
-        typeof (value as BackendRequest).initialInstruction === "string" &&
-        typeof (value as BackendRequest).model === "string"
+        ["string", "undefined"].includes(typeof (value as BackendRequest).pageContent) &&
+        ["string", "undefined"].includes(typeof (value as BackendRequest).initialInstruction) &&
+        ["string", "undefined"].includes(typeof (value as BackendRequest).model)
     );
 }
 

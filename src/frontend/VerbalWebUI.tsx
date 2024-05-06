@@ -16,35 +16,27 @@ interface VerbalWebUIProps {
 }
 
 export default function VerbalWebUI({ conf }: VerbalWebUIProps) {
-    // TODO: Change default values to better ones AND UPDATE README!!!
-    const defaultInitialInstruction = "Answer the user questions and requests based on the following HTML information.";
-    const defaultPageContentSelector = "h1, h2, p";
-    const defaultModel = "gpt-4";
-
-    // Set default value if no value given as conf option
-    const initialInstruction = conf.initialInstruction ?? defaultInitialInstruction;
-    const pageContentSelector = conf.pageContentSelector ?? defaultPageContentSelector;
-    const useModel = conf.useModel ?? defaultModel;
-
     const [open, setOpen] = useState(false);
 
     function handleQuery(query: Message[]): Promise<string> {
-        // Read page content
+        // Read page content, if so configured
         // TODO: only read text, not all html
-        const nodeList = document.querySelectorAll(pageContentSelector);
-        // Page content to be added to the query
-        let pageContent = "";
-        nodeList.forEach((node) => {
-            pageContent = pageContent + node.outerHTML;
-        });
-        console.log("pageContentSelector: " + pageContentSelector);
-        console.log("pageContent: " + pageContent);
+        let pageContent;
+        if (conf.pageContentSelector) {
+            const nodeList = document.querySelectorAll(conf.pageContentSelector);
+            // Page content to be added to the query
+            let pc = "";
+            nodeList.forEach((node) => {
+                pc += node.outerHTML;
+            });
+            pageContent = pc;
+        }
 
         const data: BackendRequest = {
             query: query,
             pageContent: pageContent,
-            initialInstruction: initialInstruction,
-            model: useModel,
+            initialInstruction: conf.initialInstruction,
+            model: conf.useModel,
         };
 
         return fetch(conf.backendURL + "/query", {

@@ -1,6 +1,9 @@
 import { BackendRequest, BackendResponse } from "../shared/api";
+import { logInterfaceData } from "./log";
 import { checkModeration, checkModerations } from "./moderation";
 import { OpenAI } from "openai";
+
+const DEFAULT_CHAT_MODEL = "gpt-4";
 
 export function query(breq: BackendRequest, openai: OpenAI): Promise<BackendResponse> {
     return checkModerations(
@@ -10,23 +13,13 @@ export function query(breq: BackendRequest, openai: OpenAI): Promise<BackendResp
 }
 
 function doQuery(breq: BackendRequest, openai: OpenAI): Promise<BackendResponse> {
-    if (process.env.VW_INITIAL_INSTRUCTION !== undefined) {
-        console.log(
-            "Initial instruction overridden by env variable VW_INITIAL_INSTRUCTION:\n" +
-                process.env.VW_INITIAL_INSTRUCTION,
-        );
-    }
-    if (process.env.VW_PAGE_CONTENT !== undefined) {
-        console.log("Page content overridden by env variable VW_PAGE_CONTENT:\n" + process.env.VW_PAGE_CONTENT);
-    }
     const initialInstruction = process.env.VW_INITIAL_INSTRUCTION ?? breq.initialInstruction;
     const pageContent = process.env.VW_PAGE_CONTENT ?? breq.pageContent;
+    const model = process.env.VW_CHAT_MODEL ?? breq.model ?? DEFAULT_CHAT_MODEL;
     const systemInstruction: OpenAI.Chat.ChatCompletionMessageParam | undefined = initialInstruction
         ? {
               role: "system",
-              content:
-                  // initial instruction and page content can be overridden by environment variables VW_INITIAL_INSTRUCTION and VW_PAGE_CONTENT
-                  initialInstruction + (pageContent ? "\n\n" + pageContent : ""),
+              content: initialInstruction + (pageContent ? "\n\n" + pageContent : ""),
           }
         : undefined;
     const chatCompletionMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
@@ -38,11 +31,13 @@ function doQuery(breq: BackendRequest, openai: OpenAI): Promise<BackendResponse>
     });
 
     const params: OpenAI.Chat.ChatCompletionCreateParams = {
-        model: breq.model,
+        model: model,
         messages: chatCompletionMessages,
     };
 
+    logInterfaceData("Sending chat completion request", params);
     return openai.chat.completions.create(params).then((chatCompletions) => {
+        logInterfaceData("Received chat completion response", chatCompletions);
         const response = chatCompletions.choices[0].message.content;
         const bresp = { response: response ?? "(No response)" };
         if (response) {

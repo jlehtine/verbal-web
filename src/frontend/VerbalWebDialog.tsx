@@ -110,7 +110,6 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
             setShowError(false);
             const queryMessage: Message = { role: "user", content: userInput };
 
-            console.log("Query: " + userInput);
             setWaitingForResponse(true);
             setTextFieldHelperText("Waiting for response to message!");
             props
@@ -119,7 +118,6 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
                     setWaitingForResponse(false);
                     addMessage(queryMessage);
                     addMessage({ role: "assistant", content: response });
-                    console.log("Response: " + response);
                     setUserInput("");
                     setInputTooShort(true);
                     setShowError(false);
