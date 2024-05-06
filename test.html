@@ -1,20 +1,85 @@
 <html>
     <body>
-        <div id="documentation">
-            <h1>Verbal Web Testing</h1>
-            <p>This is a simple test page for Verbal Web.</p>
-        </div>
+        <h1>Verbal Web Testing</h1>
+        <p>This is a simple test page for Verbal Web.</p>
+
+        <!-- Verbal Web assistant is installed here as an assistant icon -->
+        <p>Use the AI assistant to ask about the content of this page.</p>
         <div id="verbal-web">Loading...</div>
         <script src="http://localhost:8080/verbal-web-frontend.js"></script>
         <script>
             initVerbalWeb("verbal-web", {
-                // backendURL: "http://localhost:8080/foobar", // test wrong URL
                 backendURL: "http://localhost:8080",
-                pageContentSelector: "#documentation",
-                // initialInstruction: "Respond to every query by repeating the content of the following HTML:\n\n",
-                // initialInstruction: "Ignore the following HTML:\n\n",
-                // useModel: "gpt-3.5-turbo",
+                initialInstruction: "Use the following web content to answer user queries.",
+                pageContentSelector: "#content",
             });
         </script>
+
+        <div id="content">
+            <h2>Artificial intelligence</h2>
+
+            <p>
+                The following text has been copied from
+                <a href="https://en.wikipedia.org/wiki/Artificial_intelligence"
+                    >Wikipedia article "Artificial Intelligence"</a
+                >
+                on May 6th 2024 to test page content injection. It has been made available by Wikipedia under the
+                <a
+                    href="https://en.wikipedia.org/wiki/Wikipedia:Text_of_the_Creative_Commons_Attribution-ShareAlike_4.0_International_License"
+                    >Creative Commons Attribution-ShareAlike License 4.0</a
+                >.
+            </p>
+
+            <p>
+                Artificial intelligence (AI), in its broadest sense, is intelligence exhibited by machines, particularly
+                computer systems. It is a field of research in computer science that develops and studies methods and
+                software which enable machines to perceive their environment and uses learning and intelligence to take
+                actions that maximize their chances of achieving defined goals.[1] Such machines may be called AIs.
+            </p>
+
+            <p>
+                AI technology is widely used throughout industry, government, and science. Some high-profile
+                applications include advanced web search engines (e.g., Google Search); recommendation systems (used by
+                YouTube, Amazon, and Netflix); interacting via human speech (e.g., Google Assistant, Siri, and Alexa);
+                autonomous vehicles (e.g., Waymo); generative and creative tools (e.g., ChatGPT and AI art); and
+                superhuman play and analysis in strategy games (e.g., chess and Go).[2] However, many AI applications
+                are not perceived as AI: "A lot of cutting edge AI has filtered into general applications, often without
+                being called AI because once something becomes useful enough and common enough it's not labeled AI
+                anymore."[3][4]
+            </p>
+
+            <p>
+                Alan Turing was the first person to conduct substantial research in the field that he called machine
+                intelligence.[5] Artificial intelligence was founded as an academic discipline in 1956.[6] The field
+                went through multiple cycles of optimism,[7][8] followed by periods of disappointment and loss of
+                funding, known as AI winter.[9][10] Funding and interest vastly increased after 2012 when deep learning
+                surpassed all previous AI techniques,[11] and after 2017 with the transformer architecture.[12] This led
+                to the AI boom of the early 2020s, with companies, universities, and laboratories overwhelmingly based
+                in the United States pioneering significant advances in artificial intelligence.[13]
+            </p>
+
+            <p>
+                The growing use of artificial intelligence in the 21st century is influencing a societal and economic
+                shift towards increased automation, data-driven decision-making, and the integration of AI systems into
+                various economic sectors and areas of life, impacting job markets, healthcare, government, industry, and
+                education. This raises questions about the long-term effects, ethical implications, and risks of AI,
+                prompting discussions about regulatory policies to ensure the safety and benefits of the technology.
+            </p>
+
+            <p>
+                The various sub-fields of AI research are centered around particular goals and the use of particular
+                tools. The traditional goals of AI research include reasoning, knowledge representation, planning,
+                learning, natural language processing, perception, and support for robotics.[a] General intelligence—the
+                ability to complete any task performable by a human on an at least equal level—is among the field's
+                long-term goals.[14]
+            </p>
+
+            <p>
+                To reach these goals, AI researchers have adapted and integrated a wide range of techniques, including
+                search and mathematical optimization, formal logic, artificial neural networks, and methods based on
+                statistics, operations research, and economics.[b] AI also draws upon psychology, linguistics,
+                philosophy, neuroscience, and other fields.[15]
+            </p>
+        </div>
     </body>
 </html>
