@@ -9,15 +9,7 @@ export default tseslint.config(
     {
         languageOptions: {
             parserOptions: {
-                project: "./src/backend/tsconfig.json",
-            },
-        },
-    },
-    {
-        files: ["src/frontend/**"],
-        languageOptions: {
-            parserOptions: {
-                project: "./src/frontend/tsconfig.json",
+                project: true,
             },
         },
     },
