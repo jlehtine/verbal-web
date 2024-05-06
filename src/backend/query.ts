@@ -6,35 +6,38 @@ import { OpenAI } from "openai";
 const DEFAULT_CHAT_MODEL = "gpt-4";
 
 export function query(breq: BackendRequest, openai: OpenAI): Promise<BackendResponse> {
-    return checkModerations(
-        breq.query.map((m) => m.content),
-        openai,
-    ).then(() => doQuery(breq, openai));
-}
-
-function doQuery(breq: BackendRequest, openai: OpenAI): Promise<BackendResponse> {
     const initialInstruction = process.env.VW_INITIAL_INSTRUCTION ?? breq.initialInstruction;
     const pageContent = process.env.VW_PAGE_CONTENT ?? breq.pageContent;
     const model = process.env.VW_CHAT_MODEL ?? breq.model ?? DEFAULT_CHAT_MODEL;
-    const systemInstruction: OpenAI.Chat.ChatCompletionMessageParam | undefined = initialInstruction
-        ? {
-              role: "system",
-              content: initialInstruction + (pageContent ? "\n\n" + pageContent : ""),
-          }
+    const systemInstruction = initialInstruction
+        ? initialInstruction + (pageContent ? "\n\n" + pageContent : "")
         : undefined;
+
+    // Check moderation for all content (also page content)
+    const msgs: string[] = [...(systemInstruction ? [systemInstruction] : []), ...breq.query.map((m) => m.content)];
+    return checkModerations(msgs, openai).then(() => doQuery(systemInstruction, breq, model, openai));
+}
+
+function doQuery(
+    systemInstruction: string | undefined,
+    breq: BackendRequest,
+    model: string,
+    openai: OpenAI,
+): Promise<BackendResponse> {
+    // Construct a chat completion request
     const chatCompletionMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
     if (systemInstruction) {
-        chatCompletionMessages.push(systemInstruction);
+        chatCompletionMessages.push({ role: "system", content: systemInstruction });
     }
     breq.query.forEach((m) => {
         chatCompletionMessages.push({ role: m.role, content: m.content });
     });
-
     const params: OpenAI.Chat.ChatCompletionCreateParams = {
         model: model,
         messages: chatCompletionMessages,
     };
 
+    // Process chat completion
     logInterfaceData("Sending chat completion request", params);
     return openai.chat.completions.create(params).then((chatCompletions) => {
         logInterfaceData("Received chat completion response", chatCompletions);
