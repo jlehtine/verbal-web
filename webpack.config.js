@@ -18,7 +18,7 @@ const babelOptions = {
 module.exports = [
     {
         mode: "production",
-        entry: "./src/frontend/frontend.tsx",
+        entry: path.resolve(__dirname, "src", "frontend", "frontend.tsx"),
         output: {
             path: path.resolve(__dirname, "dist"),
             filename: "verbal-web-frontend.js",
@@ -42,7 +42,7 @@ module.exports = [
 
                 // Source map loader for output files
                 {
-                    test: /dist[/\\]verbal-web-frontend\.js$/,
+                    test: path.resolve(__dirname, "dist", "verbal-web-frontend.js"),
                     exclude: /node_modules/,
                     use: "source-map-loader",
                 },
@@ -56,7 +56,7 @@ module.exports = [
     {
         mode: "production",
         target: "node",
-        entry: "./src/backend/backend.ts",
+        entry: path.resolve(__dirname, "src", "backend", "backend.ts"),
         output: {
             path: path.resolve(__dirname, "dist"),
             filename: "verbal-web-backend.js",
@@ -81,7 +81,7 @@ module.exports = [
         plugins: [
             new ESLintPlugin(),
             new CopyWebpackPlugin({
-                patterns: [{ from: "static", to: path.resolve(__dirname, "dist", "static") }],
+                patterns: [{ from: path.resolve(__dirname, "static"), to: path.resolve(__dirname, "dist") }],
             }),
         ],
     },

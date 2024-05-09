@@ -7,6 +7,7 @@ import { readFile } from "fs/promises";
 import { IncomingMessage, ServerResponse, createServer } from "http";
 import { ReasonPhrases, StatusCodes } from "http-status-codes";
 import { OpenAI } from "openai";
+import path from "path";
 
 // Initialize OpenAI API
 console.log("Initializing OpenAI API");
@@ -43,7 +44,7 @@ const server = createServer({}, (req, resp) => {
                 resp.end();
             }
         } else if (req.url?.match(/^\/test\/\w+\.html$/)) {
-            const file = "static/" + req.url;
+            const file = path.join(...req.url.split("/").slice(1));
             setCorsHeaders(resp, allowOrigin, ["GET"]);
             if (req.method === "OPTIONS") {
                 resp.end();
