@@ -111,8 +111,7 @@ function extractPageContent(pageContentSelector: string): string {
         "." + VERBAL_WEB_ASSISTANT_CLASS_NAME + ", ." + VERBAL_WEB_ASSISTANT_DIALOG_CLASS_NAME,
     )) {
         if (elem instanceof HTMLElement && isContainedIn(elem, processedElems)) {
-            const rmtxt = elem.innerText;
-            pc = pc.replace(rmtxt, "");
+            pc = pc.replace(elem.innerText, "");
         }
     }
 
