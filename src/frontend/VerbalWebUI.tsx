@@ -9,7 +9,7 @@ export interface VerbalWebConfiguration {
     backendURL: string;
     pageContentSelector?: string;
     initialInstruction?: string;
-    useModel?: string; // TODO: list of models?
+    useModel?: string;
 }
 
 interface VerbalWebUIProps {
