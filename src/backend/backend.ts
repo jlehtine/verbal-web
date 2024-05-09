@@ -2,6 +2,7 @@ import { isBackendRequest } from "../shared/api";
 import { describeError } from "../shared/error";
 import { logInterfaceData } from "./log";
 import { query } from "./query";
+import bodyParser from "body-parser";
 import cors from "cors";
 import express, { Request, Response } from "express";
 import { StatusCodes } from "http-status-codes";
@@ -41,35 +42,19 @@ backend.get("/" + FRONTEND_JS, (req, res) => {
 });
 
 // Answer queries
-backend.post("/query", (req, res) => {
-    if (!hasJsonContent(req)) {
+backend.post("/query", bodyParser.json(), (req, res) => {
+    const breq = req.body;
+    logInterfaceData("Received frontend request", breq);
+    if (isBackendRequest(breq)) {
+        query(breq, openai)
+            .then((bresp) => {
+                logInterfaceData("Returning frontend response", bresp);
+                res.json(bresp);
+            })
+            .catch(catchUnexpectedFunc(res));
+    } else {
         res.sendStatus(StatusCodes.BAD_REQUEST);
-        return;
     }
-    req.setEncoding("utf8");
-    let data = "";
-    req.on("data", (chunk) => {
-        if (typeof chunk === "string") {
-            data += chunk;
-        } else {
-            throw new Error(`Received a chunk of unexpected type ${typeof chunk}`);
-        }
-    });
-    console.log(data);
-    req.on("end", () => {
-        const breq: unknown = JSON.parse(data);
-        logInterfaceData("Received frontend request", breq);
-        if (isBackendRequest(breq)) {
-            query(breq, openai)
-                .then((bresp) => {
-                    logInterfaceData("Returning frontend response", bresp);
-                    res.json(bresp);
-                })
-                .catch(catchUnexpectedFunc(res));
-        } else {
-            res.sendStatus(StatusCodes.BAD_REQUEST);
-        }
-    });
 });
 
 function catchUnexpectedFunc(resp: Response) {
@@ -83,11 +68,6 @@ function logRequest(req: Request) {
     if (req.method && req.url) {
         console.log(`Processing request: ${req.method} ${req.url}`);
     }
-}
-
-function hasJsonContent(req: Request): boolean {
-    const contentType = req.headers["content-type"];
-    return contentType ? contentType.split(";")[0].trim().toLowerCase() === "application/json" : false;
 }
 
 // Start listening for requests
