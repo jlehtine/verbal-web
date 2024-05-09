@@ -10,6 +10,12 @@
                 "proseWrap": "always",
                 "tabWidth": 2
             }
+        },
+        {
+            "files": "**/*.html",
+            "options": {
+                "trailingComma": "none"
+            }
         }
     ]
 }

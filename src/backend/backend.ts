@@ -42,14 +42,15 @@ const server = createServer({}, (req, resp) => {
                 resp.statusCode = StatusCodes.METHOD_NOT_ALLOWED;
                 resp.end();
             }
-        } else if (req.url === "/test.html") {
+        } else if (req.url?.match(/^\/test\/\w+\.html$/)) {
+            const file = "static/" + req.url;
             setCorsHeaders(resp, allowOrigin, ["GET"]);
             if (req.method === "OPTIONS") {
                 resp.end();
             } else if (req.method === "GET") {
                 resp.statusCode = StatusCodes.OK;
                 resp.setHeader("content-type", "text/html");
-                readFile("../test.html")
+                readFile(file)
                     .then((data) => {
                         resp.setHeader("content-length", data.byteLength);
                         resp.write(data);
