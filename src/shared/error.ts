@@ -1,3 +1,19 @@
+/** Generic base class for Verbal Web errors */
+export class VerbalWebError extends Error {
+    constructor(msg: string, options?: ErrorOptions) {
+        super(msg, options);
+        this.name = "VerbalWebError";
+    }
+}
+
+/** Signals a configuration issue */
+export class VerbalWebConfigurationError extends VerbalWebError {
+    constructor(msg: string, options?: ErrorOptions) {
+        super(msg, options);
+        this.name = "VerbalWebConfigurationError";
+    }
+}
+
 /**
  * Describes a catched error.
  *

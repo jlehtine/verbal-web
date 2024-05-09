@@ -1,5 +1,6 @@
 import { BackendRequest, Message, isBackendResponse } from "../shared/api";
-import VerbalWebDialog from "./VerbalWebDialog";
+import { VerbalWebConfigurationError } from "../shared/error";
+import VerbalWebDialog, { VERBAL_WEB_ASSISTANT_DIALOG_CLASS_NAME } from "./VerbalWebDialog";
 import AssistantIcon from "@mui/icons-material/Assistant";
 import { Box, IconButton, Tooltip } from "@mui/material";
 import React, { useState } from "react";
@@ -15,21 +16,17 @@ interface VerbalWebUIProps {
     conf: VerbalWebConfiguration;
 }
 
+/** HTML class name for the Verbal Web assistant */
+const VERBAL_WEB_ASSISTANT_CLASS_NAME = "verbal-web-assistant";
+
 export default function VerbalWebUI({ conf }: VerbalWebUIProps) {
     const [open, setOpen] = useState(false);
 
     function handleQuery(query: Message[]): Promise<string> {
         // Read page content, if so configured
-        // TODO: only read text, not all html
         let pageContent;
         if (conf.pageContentSelector) {
-            const nodeList = document.querySelectorAll(conf.pageContentSelector);
-            // Page content to be added to the query
-            let pc = "";
-            nodeList.forEach((node) => {
-                pc += node.outerHTML;
-            });
-            pageContent = pc;
+            pageContent = extractPageContent(conf.pageContentSelector);
         }
 
         const data: BackendRequest = {
@@ -64,7 +61,7 @@ export default function VerbalWebUI({ conf }: VerbalWebUIProps) {
     }
 
     return (
-        <Box className="verbal-web">
+        <Box className={VERBAL_WEB_ASSISTANT_CLASS_NAME}>
             <Tooltip title="Verbal Web AI assistant">
                 <IconButton
                     color="primary"
@@ -85,4 +82,62 @@ export default function VerbalWebUI({ conf }: VerbalWebUIProps) {
             />
         </Box>
     );
+}
+
+function extractPageContent(pageContentSelector: string): string {
+    // Get the node list
+    let elems;
+    try {
+        elems = document.querySelectorAll(pageContentSelector);
+    } catch (err) {
+        throw new VerbalWebConfigurationError("Invalid page content selector: " + pageContentSelector, { cause: err });
+    }
+
+    // Extract content from nodes
+    let pc = "";
+    const processedElems: Element[] = [];
+    for (const elem of elems) {
+        // Ignore if already contained in some other processed element
+        if (!isContainedIn(elem, processedElems)) {
+            // Include all rendered text
+            pc += extractPageContentForElement(elem);
+
+            processedElems.push(elem);
+        }
+    }
+
+    // Remove content from the assistant elements
+    for (const elem of document.querySelectorAll(
+        "." + VERBAL_WEB_ASSISTANT_CLASS_NAME + ", ." + VERBAL_WEB_ASSISTANT_DIALOG_CLASS_NAME,
+    )) {
+        if (elem instanceof HTMLElement && isContainedIn(elem, processedElems)) {
+            const rmtxt = elem.innerText;
+            pc = pc.replace(rmtxt, "");
+        }
+    }
+
+    return pc;
+}
+
+function isContainedIn(elem: Element, elems: Element[]): boolean {
+    let n: Element | null = elem;
+    while (n) {
+        if (elems.includes(n)) {
+            return true;
+        }
+        n = n.parentElement;
+    }
+    return false;
+}
+
+function extractPageContentForElement(elem: Element): string {
+    let pc = "";
+    if (elem instanceof HTMLElement) {
+        pc = elem.innerText;
+    } else {
+        for (const child of elem.children) {
+            pc += extractPageContentForElement(child);
+        }
+    }
+    return pc;
 }

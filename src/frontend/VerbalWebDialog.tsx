@@ -36,6 +36,9 @@ interface VerbalWebMessageListProps {
     messages: Message[];
 }
 
+/** HTML class name for the Verbal Web assistant dialog */
+export const VERBAL_WEB_ASSISTANT_DIALOG_CLASS_NAME = "verbal-web-assistant-dialog";
+
 function createListItem(m: Message, id: number): React.JSX.Element {
     // pr = padding-right, pl = padding-left
     if (m.role === "user") {
@@ -153,7 +156,7 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
     }, [messages, textFieldHelperText]);
 
     return (
-        <Dialog {...dialogProps} fullWidth>
+        <Dialog className={VERBAL_WEB_ASSISTANT_DIALOG_CLASS_NAME} {...dialogProps} fullWidth>
             <VerbalWebDialogTitle onClose={handleClose}>Verbal Web AI assistant</VerbalWebDialogTitle>
             <DialogContent dividers>
                 <VerbalWebMessageList messages={messages}></VerbalWebMessageList>
