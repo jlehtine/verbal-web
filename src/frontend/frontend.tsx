@@ -12,7 +12,7 @@ function initVerbalWeb(elementId: string, conf: VerbalWebConfiguration) {
         const root = createRoot(elem);
         root.render(<VerbalWebUI conf={conf} />);
     } else {
-        console.error("Verbal Web container element not fount: #" + elementId);
+        console.error("Verbal Web container element not fount: #%s", elementId);
     }
 }
 
