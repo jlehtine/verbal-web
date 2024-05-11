@@ -1,9 +1,8 @@
 import { BackendRequest, Message, isBackendResponse } from "../shared/api";
-import { VerbalWebConfigurationError } from "../shared/error";
-import VerbalWebDialog, { VERBAL_WEB_ASSISTANT_DIALOG_CLASS_NAME } from "./VerbalWebDialog";
+import { VerbalWebConfigurationError, describeError } from "../shared/error";
 import AssistantIcon from "@mui/icons-material/Assistant";
 import { Box, IconButton, Tooltip } from "@mui/material";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 export interface VerbalWebConfiguration {
     backendURL: string;
@@ -19,8 +18,36 @@ interface VerbalWebUIProps {
 /** HTML class name for the Verbal Web assistant */
 const VERBAL_WEB_ASSISTANT_CLASS_NAME = "verbal-web-assistant";
 
+/** HTML class name for the Verbal Web assistant dialog */
+const VERBAL_WEB_ASSISTANT_DIALOG_CLASS_NAME = "verbal-web-assistant-dialog";
+
 export default function VerbalWebUI({ conf }: VerbalWebUIProps) {
+    const [dialog, setDialog] = useState<React.JSX.Element | null>(null);
     const [open, setOpen] = useState(false);
+
+    // Load dialog component on demand when opened
+    useEffect(() => {
+        if (open && !dialog) {
+            import(/* webpackPrefetch: true */ "./VerbalWebDialog")
+                .then(({ default: VerbalWebDialog }) => {
+                    setDialog(
+                        <VerbalWebDialog
+                            open={open}
+                            onClose={() => {
+                                setOpen(false);
+                            }}
+                            onQuery={handleQuery}
+                            className={VERBAL_WEB_ASSISTANT_DIALOG_CLASS_NAME}
+                        />,
+                    );
+                })
+                .catch((err: unknown) => {
+                    console.error(describeError(err, false, "Failed to load modules"));
+                    setOpen(false);
+                });
+        }
+        return undefined;
+    }, [open]);
 
     function handleQuery(query: Message[]): Promise<string> {
         // Read page content, if so configured
@@ -73,13 +100,7 @@ export default function VerbalWebUI({ conf }: VerbalWebUIProps) {
                     <AssistantIcon />
                 </IconButton>
             </Tooltip>
-            <VerbalWebDialog
-                open={open}
-                onClose={() => {
-                    setOpen(false);
-                }}
-                onQuery={handleQuery}
-            />
+            {dialog}
         </Box>
     );
 }
