@@ -38,7 +38,7 @@ options:
 let port = process.env.VW_PORT ? parseInt(process.env.VW_PORT) : 8080;
 let chdir = process.env.VW_CHDIR;
 const staticContent: StaticContent[] = [];
-let logLevel = 0;
+let logLevel = process.env.VW_LOG_LEVEL ? parseInt(process.env.VW_LOG_LEVEL) : 0;
 for (let i = 2; i < process.argv.length; i++) {
     const a = process.argv[i];
     if (a === "-h" || a === "--help") {
