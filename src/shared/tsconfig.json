@@ -4,7 +4,8 @@
         "sourceMap": true,
         "strict": true,
         "target": "ES2022",
-        "moduleResolution": "node",
+        "module": "ESNext",
+        "moduleResolution": "Node",
         "allowSyntheticDefaultImports": true,
         "composite": true
     },

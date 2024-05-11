@@ -6,7 +6,8 @@
         "target": "ES2022",
         "types": ["react"],
         "jsx": "preserve",
-        "moduleResolution": "node",
+        "module": "ESNext",
+        "moduleResolution": "Node",
         "allowSyntheticDefaultImports": true
     },
     "include": ["**/*"],

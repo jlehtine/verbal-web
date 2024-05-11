@@ -5,7 +5,8 @@
         "strict": true,
         "target": "ES2022",
         "types": ["node"],
-        "moduleResolution": "node",
+        "module": "ESNext",
+        "moduleResolution": "Node",
         "allowSyntheticDefaultImports": true,
         "emitDecoratorMetadata": true,
         "experimentalDecorators": true

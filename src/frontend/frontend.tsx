@@ -1,6 +1,4 @@
-import VerbalWebUI, { VerbalWebConfiguration } from "./VerbalWebUI";
-import React from "react";
-import { createRoot } from "react-dom/client";
+import { VerbalWebConfiguration } from "./VerbalWebUI";
 
 declare global {
     var initVerbalWeb: (elementId: string, conf: VerbalWebConfiguration) => void; // eslint-disable-line
@@ -9,8 +7,14 @@ declare global {
 function initVerbalWeb(elementId: string, conf: VerbalWebConfiguration) {
     const elem = document.getElementById(elementId);
     if (elem !== null) {
-        const root = createRoot(elem);
-        root.render(<VerbalWebUI conf={conf} />);
+        Promise.all([
+            import(/* webpackPrefetch: true */ "react"),
+            import(/* webpackPrefetch: true */ "react-dom/client"),
+            import(/* webpackPrefetch: true */ "./VerbalWebUI"),
+        ]).then(([{ default: React }, { createRoot: createRoot }, { default: VerbalWebUI }]) => {
+            const root = createRoot(elem);
+            root.render(<VerbalWebUI conf={conf} />);
+        });
     } else {
         console.error("Verbal Web container element not fount: #%s", elementId);
     }
