@@ -1,6 +1,6 @@
 {
     "compilerOptions": {
-        "outDir": "../../dist",
+        "outDir": "../../dist/backend",
         "sourceMap": true,
         "strict": true,
         "target": "ES2022",
@@ -10,5 +10,6 @@
         "emitDecoratorMetadata": true,
         "experimentalDecorators": true
     },
-    "include": ["**/*"]
+    "include": ["**/*"],
+    "references": [{ "path": "../shared" }]
 }

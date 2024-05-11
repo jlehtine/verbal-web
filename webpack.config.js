@@ -17,10 +17,12 @@ const babelOptions = {
 module.exports = [
     {
         mode: "production",
-        entry: path.resolve(__dirname, "src", "frontend", "frontend.tsx"),
+        entry: {
+            frontend: path.resolve(__dirname, "src", "frontend", "frontend.tsx"),
+        },
         output: {
-            path: path.resolve(__dirname, "dist"),
-            filename: "verbal-web-frontend.js",
+            path: path.resolve(__dirname, "dist", "assets"),
+            filename: "[name].js",
         },
         module: {
             rules: [
@@ -55,10 +57,12 @@ module.exports = [
     {
         mode: "production",
         target: "node",
-        entry: path.resolve(__dirname, "src", "backend", "backend.ts"),
+        entry: {
+            backend: path.resolve(__dirname, "src", "backend", "backend.ts"),
+        },
         output: {
             path: path.resolve(__dirname, "dist"),
-            filename: "verbal-web-backend.js",
+            filename: "[name].js",
         },
         module: {
             rules: [

@@ -1,6 +1,6 @@
 {
     "compilerOptions": {
-        "outDir": "../../dist",
+        "outDir": "../../dist/frontend",
         "sourceMap": true,
         "strict": true,
         "target": "ES2022",
@@ -9,5 +9,6 @@
         "moduleResolution": "node",
         "allowSyntheticDefaultImports": true
     },
-    "include": ["**/*"]
+    "include": ["**/*"],
+    "references": [{ "path": "../shared" }]
 }

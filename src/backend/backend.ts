@@ -9,8 +9,6 @@ import { StatusCodes } from "http-status-codes";
 import { OpenAI } from "openai";
 import path from "path";
 
-const FRONTEND_JS = "verbal-web-frontend.js";
-
 interface StaticContent {
     path?: string;
     dir: string;
@@ -109,11 +107,6 @@ backend.use((req, res, next) => {
 // Set CORS headers for all responses
 backend.use(cors({ origin: process.env.VW_ALLOW_ORIGIN }));
 
-// Serve frontend Javascript
-backend.get("/" + FRONTEND_JS, (req, res) => {
-    res.sendFile(path.resolve(__dirname, FRONTEND_JS));
-});
-
 // Answer queries
 backend.post("/query", bodyParser.json(), (req, res) => {
     const breq: unknown = req.body;
@@ -129,6 +122,9 @@ backend.post("/query", bodyParser.json(), (req, res) => {
         res.sendStatus(StatusCodes.BAD_REQUEST);
     }
 });
+
+// Serve frontend assets
+backend.use("/", express.static(path.resolve(__dirname, "assets")));
 
 // Serve other static files, if so instructed
 for (const sc of staticContent) {
