@@ -54,7 +54,7 @@
         "lint-fix": "eslint --fix src/**/*.{ts,tsx}",
         "format": "prettier --write . --ignore-path .gitignore",
         "format-staged": "pretty-quick --staged",
-        "server": "cd dist && node verbal-web-backend.js"
+        "start": "node server.js -v --static static-example"
     },
     "lint-staged": {
         "**/*.{ts,tsx}": "eslint",
