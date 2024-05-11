@@ -36,7 +36,7 @@ export default function VerbalWebUI({ conf }: VerbalWebUIProps) {
             model: conf.useModel,
         };
 
-        return fetch(conf.backendURL + "/query", {
+        return fetch(getBackendBaseURL(conf) + "query", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -82,6 +82,14 @@ export default function VerbalWebUI({ conf }: VerbalWebUIProps) {
             />
         </Box>
     );
+}
+
+function getBackendBaseURL(conf: VerbalWebConfiguration) {
+    let baseURL = conf.backendURL;
+    if (baseURL && !baseURL.endsWith("/")) {
+        baseURL += "/";
+    }
+    return baseURL;
 }
 
 function extractPageContent(pageContentSelector: string): string {
