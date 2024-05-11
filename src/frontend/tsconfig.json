@@ -10,6 +10,5 @@
         "moduleResolution": "Node",
         "allowSyntheticDefaultImports": true
     },
-    "include": ["**/*"],
-    "references": [{ "path": "../shared" }]
+    "include": ["**/*"]
 }

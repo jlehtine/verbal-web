@@ -6,8 +6,7 @@
         "target": "ES2022",
         "module": "ESNext",
         "moduleResolution": "Node",
-        "allowSyntheticDefaultImports": true,
-        "composite": true
+        "allowSyntheticDefaultImports": true
     },
     "include": ["**/*"]
 }
