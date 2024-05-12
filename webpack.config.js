@@ -1,5 +1,6 @@
 const path = require("path");
 const ESLintPlugin = require("eslint-webpack-plugin");
+const nodeExternals = require("webpack-node-externals");
 
 const babelOptions = {
     presets: [
@@ -57,6 +58,7 @@ module.exports = [
     {
         mode: "production",
         target: "node",
+        externals: [nodeExternals()],
         entry: {
             backend: path.resolve(__dirname, "src", "backend", "backend.ts"),
         },
