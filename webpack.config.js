@@ -53,6 +53,17 @@ module.exports = [
         resolve: {
             extensions: [".tsx", ".ts", "..."],
         },
+        devServer: {
+            proxy: [
+                {
+                    static: [],
+                    context: ["/"],
+                    target: "http://localhost:8080",
+                },
+            ],
+            open: true,
+            port: 9000,
+        },
         plugins: [new ESLintPlugin()],
     },
     {
