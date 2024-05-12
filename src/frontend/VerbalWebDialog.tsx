@@ -24,6 +24,7 @@ import { blue } from "@mui/material/colors";
 import React, { useEffect, useRef, useState } from "react";
 
 interface VerbalWebDialogProps extends DialogProps {
+    open: boolean;
     onClose: () => void;
     onQuery: (query: Message[]) => Promise<string>;
 }
@@ -69,8 +70,7 @@ function createListItem(m: Message, id: number): React.JSX.Element {
     }
 }
 
-export default function VerbalWebDialog(props: VerbalWebDialogProps) {
-    const handleClose = props.onClose;
+export default function VerbalWebDialog({ open: open, onClose: onClose, onQuery: onQuery }: VerbalWebDialogProps) {
     const inputRef = useRef<HTMLDivElement>(null);
 
     // userInput stores value of textField
@@ -112,8 +112,7 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
 
             setWaitingForResponse(true);
             setTextFieldHelperText("Waiting for response to message!");
-            props
-                .onQuery([...messages, queryMessage])
+            onQuery([...messages, queryMessage])
                 .then((response) => {
                     setWaitingForResponse(false);
                     addMessage(queryMessage);
@@ -143,8 +142,6 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
         }
     };
 
-    const dialogProps = { ...props, onQuery: undefined };
-
     useEffect(() => {
         inputRef.current?.scrollIntoView({
             behavior: "smooth",
@@ -153,8 +150,8 @@ export default function VerbalWebDialog(props: VerbalWebDialogProps) {
     }, [messages, textFieldHelperText]);
 
     return (
-        <Dialog {...dialogProps} fullWidth>
-            <VerbalWebDialogTitle onClose={handleClose}>Verbal Web AI assistant</VerbalWebDialogTitle>
+        <Dialog open={open} onClose={onClose} fullWidth>
+            <VerbalWebDialogTitle onClose={onClose}>Verbal Web AI assistant</VerbalWebDialogTitle>
             <DialogContent dividers>
                 <VerbalWebMessageList messages={messages}></VerbalWebMessageList>
                 <TextField
