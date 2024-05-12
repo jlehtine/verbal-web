@@ -1,6 +1,6 @@
 import { isBackendRequest } from "../shared/api";
 import { describeError } from "../shared/error";
-import { logDebug, logError, logFatal, logInfo, setLogLevel } from "./log";
+import { logError, logFatal, logInfo, logInterfaceData, setLogLevel } from "./log";
 import { query } from "./query";
 import bodyParser from "body-parser";
 import cors from "cors";
@@ -112,11 +112,11 @@ backend.use(cors({ origin: process.env.VW_ALLOW_ORIGIN }));
 // Answer queries
 backend.post("/query", bodyParser.json(), (req, res) => {
     const breq: unknown = req.body;
-    logDebug("Received frontend request", breq);
+    logInterfaceData("Received frontend request", breq);
     if (isBackendRequest(breq)) {
         query(breq, openai)
             .then((bresp) => {
-                logDebug("Returning frontend response", bresp);
+                logInterfaceData("Returning frontend response", bresp);
                 res.json(bresp);
             })
             .catch(catchUnexpectedFunc(res));

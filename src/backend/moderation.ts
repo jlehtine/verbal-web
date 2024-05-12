@@ -1,4 +1,4 @@
-import { logDebug } from "./log";
+import { logInterfaceData } from "./log";
 import { OpenAI } from "openai";
 
 /** Signals that content was rejected by moderation */
@@ -45,9 +45,9 @@ export function checkModeration(msg: string, openai: OpenAI): Promise<void> {
         });
     } else {
         const request: OpenAI.ModerationCreateParams = { input: msg };
-        logDebug("Sending moderation request", request);
+        logInterfaceData("Sending moderation request", request);
         return openai.moderations.create(request).then((response) => {
-            logDebug("Received moderation response", response);
+            logInterfaceData("Received moderation response", response);
             const flagged = response.results
                 .map((r) => r.flagged)
                 .reduce((accumulator, currentValue) => accumulator || currentValue, false);

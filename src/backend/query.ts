@@ -1,5 +1,5 @@
 import { BackendRequest, BackendResponse } from "../shared/api";
-import { logDebug } from "./log";
+import { logInterfaceData } from "./log";
 import { checkModeration, checkModerations } from "./moderation";
 import { OpenAI } from "openai";
 
@@ -38,9 +38,9 @@ function doQuery(
     };
 
     // Process chat completion
-    logDebug("Sending chat completion request", params);
+    logInterfaceData("Sending chat completion request", params);
     return openai.chat.completions.create(params).then((chatCompletions) => {
-        logDebug("Received chat completion response", chatCompletions);
+        logInterfaceData("Received chat completion response", chatCompletions);
         const response = chatCompletions.choices[0].message.content;
         const bresp = { response: response ?? "(No response)" };
         if (response) {

@@ -24,3 +24,9 @@ export function logDebug(msg: string, ...params: unknown[]) {
         console.debug(msg, params);
     }
 }
+
+export function logInterfaceData(msg: string, data: unknown) {
+    if (logLevel >= 3) {
+        console.debug(msg + ": " + JSON.stringify(data, undefined, 2));
+    }
+}
