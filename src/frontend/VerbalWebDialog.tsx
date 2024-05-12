@@ -1,5 +1,7 @@
-import { Message } from "../shared/api";
+import { BackendRequest, Message, isBackendResponse } from "../shared/api";
 import { describeError } from "../shared/error";
+import VerbalWebConfiguration from "./VerbalWebConfiguration";
+import { extract } from "./extract";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import AssistantIcon from "@mui/icons-material/Assistant";
 import CloseIcon from "@mui/icons-material/Close";
@@ -24,9 +26,9 @@ import { blue } from "@mui/material/colors";
 import React, { useEffect, useRef, useState } from "react";
 
 interface VerbalWebDialogProps extends DialogProps {
+    conf: VerbalWebConfiguration;
     open: boolean;
     onClose: () => void;
-    onQuery: (query: Message[]) => Promise<string>;
 }
 
 interface VerbalWebDialogTitleProps extends DialogTitleProps {
@@ -70,7 +72,7 @@ function createListItem(m: Message, id: number): React.JSX.Element {
     }
 }
 
-export default function VerbalWebDialog({ open: open, onClose: onClose, onQuery: onQuery }: VerbalWebDialogProps) {
+export default function VerbalWebDialog({ conf: conf, open: open, onClose: onClose }: VerbalWebDialogProps) {
     const inputRef = useRef<HTMLDivElement>(null);
 
     // userInput stores value of textField
@@ -112,7 +114,7 @@ export default function VerbalWebDialog({ open: open, onClose: onClose, onQuery:
 
             setWaitingForResponse(true);
             setTextFieldHelperText("Waiting for response to message!");
-            onQuery([...messages, queryMessage])
+            handleQuery([...messages, queryMessage])
                 .then((response) => {
                     setWaitingForResponse(false);
                     addMessage(queryMessage);
@@ -133,6 +135,52 @@ export default function VerbalWebDialog({ open: open, onClose: onClose, onQuery:
             setTextFieldHelperText("Message must be longer than 5 characters!");
         }
     };
+
+    function handleQuery(query: Message[]): Promise<string> {
+        // Read page content, if so configured
+        let pageContent;
+        if (conf.pageContentSelector) {
+            pageContent = extract(conf.pageContentSelector);
+        }
+
+        const data: BackendRequest = {
+            query: query,
+            pageContent: pageContent,
+            initialInstruction: conf.initialInstruction,
+            model: conf.useModel,
+        };
+
+        return fetch(getBackendBaseURL() + "query", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+            },
+            body: JSON.stringify(data),
+        })
+            .then((resp) => {
+                if (resp.ok) {
+                    return resp.json();
+                } else {
+                    throw new Error("Query failed");
+                }
+            })
+            .then((data) => {
+                if (isBackendResponse(data)) {
+                    return data.response;
+                } else {
+                    throw new Error("Bad response");
+                }
+            });
+    }
+
+    function getBackendBaseURL() {
+        let baseURL = conf.backendURL;
+        if (baseURL && !baseURL.endsWith("/")) {
+            baseURL += "/";
+        }
+        return baseURL;
+    }
 
     const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
         // Enter submits user input but enter+shift doesn't
