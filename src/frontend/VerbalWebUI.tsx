@@ -1,15 +1,11 @@
 import { BackendRequest, Message, isBackendResponse } from "../shared/api";
-import { VerbalWebConfigurationError, describeError } from "../shared/error";
+import { VerbalWebConfigurationError } from "../shared/error";
+import LoadingIndicator from "./LoadingIndicator";
+import VerbalWebConfiguration from "./VerbalWebConfiguration";
+import load from "./load";
 import AssistantIcon from "@mui/icons-material/Assistant";
 import { Box, IconButton, Tooltip } from "@mui/material";
-import React, { useEffect, useState } from "react";
-
-export interface VerbalWebConfiguration {
-    backendURL: string;
-    pageContentSelector?: string;
-    initialInstruction?: string;
-    useModel?: string;
-}
+import React, { Suspense, lazy, useState } from "react";
 
 interface VerbalWebUIProps {
     conf: VerbalWebConfiguration;
@@ -22,32 +18,12 @@ const VERBAL_WEB_ASSISTANT_CLASS_NAME = "verbal-web-assistant";
 const VERBAL_WEB_ASSISTANT_DIALOG_CLASS_NAME = "verbal-web-assistant-dialog";
 
 export default function VerbalWebUI({ conf }: VerbalWebUIProps) {
-    const [dialog, setDialog] = useState<React.JSX.Element | null>(null);
     const [open, setOpen] = useState(false);
 
-    // Load dialog component on demand when opened
-    useEffect(() => {
-        if (open && !dialog) {
-            import(/* webpackPrefetch: true */ "./VerbalWebDialog")
-                .then(({ default: VerbalWebDialog }) => {
-                    setDialog(
-                        <VerbalWebDialog
-                            open={open}
-                            onClose={() => {
-                                setOpen(false);
-                            }}
-                            onQuery={handleQuery}
-                            className={VERBAL_WEB_ASSISTANT_DIALOG_CLASS_NAME}
-                        />,
-                    );
-                })
-                .catch((err: unknown) => {
-                    console.error(describeError(err, false, "Failed to load modules"));
-                    setOpen(false);
-                });
-        }
-        return undefined;
-    }, [open]);
+    // Lazy load the dialog code
+    const VerbalWebDialog = lazy(() =>
+        load(conf, "dialog", () => import(/* webpackPrefetch: true */ "./VerbalWebDialog")),
+    );
 
     function handleQuery(query: Message[]): Promise<string> {
         // Read page content, if so configured
@@ -100,7 +76,18 @@ export default function VerbalWebUI({ conf }: VerbalWebUIProps) {
                     <AssistantIcon />
                 </IconButton>
             </Tooltip>
-            {dialog}
+            {open ? (
+                <Suspense fallback={<LoadingIndicator conf={conf} />}>
+                    <VerbalWebDialog
+                        open={true}
+                        onClose={() => {
+                            setOpen(false);
+                        }}
+                        onQuery={handleQuery}
+                        className={VERBAL_WEB_ASSISTANT_DIALOG_CLASS_NAME}
+                    />
+                </Suspense>
+            ) : null}
         </Box>
     );
 }
