@@ -14,6 +14,8 @@ interface StaticContent {
     dir: string;
 }
 
+const DEFAULT_PORT = 3000;
+
 // Usage
 function usage() {
     const basename = process.argv[1].replace(/^.*[/\\]/, "");
@@ -23,7 +25,7 @@ options:
     -h, --help
         print this help text
     -p, --port PORT
-        listen to the specified port (default is 8080)
+        listen to the specified port (default is ${DEFAULT_PORT.toString()})
     --chdir DIR
         switch to DIR on startup
     --static [/PATH:]DIR
@@ -35,7 +37,7 @@ options:
 }
 
 // Read arguments
-let port = process.env.VW_PORT ? parseInt(process.env.VW_PORT) : 8080;
+let port = process.env.VW_PORT ? parseInt(process.env.VW_PORT) : DEFAULT_PORT;
 let chdir = process.env.VW_CHDIR;
 const staticContent: StaticContent[] = [];
 let logLevel = process.env.VW_LOG_LEVEL ? parseInt(process.env.VW_LOG_LEVEL) : 0;

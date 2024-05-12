@@ -58,7 +58,7 @@ module.exports = [
                 {
                     static: [],
                     context: ["/"],
-                    target: "http://localhost:8080",
+                    target: "http://localhost:3000",
                 },
             ],
             open: true,
