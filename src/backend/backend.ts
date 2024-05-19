@@ -1,4 +1,4 @@
-import { isBackendRequest } from "../shared/api";
+import { isChatInit } from "../shared/api";
 import { describeError } from "../shared/error";
 import { logError, logFatal, logInfo, logInterfaceData, setLogLevel } from "./log";
 import { query } from "./query";
@@ -113,7 +113,7 @@ backend.use(cors({ origin: process.env.VW_ALLOW_ORIGIN }));
 backend.post("/query", bodyParser.json(), (req, res) => {
     const breq: unknown = req.body;
     logInterfaceData("Received frontend request", breq);
-    if (isBackendRequest(breq)) {
+    if (isChatInit(breq)) {
         query(breq, openai)
             .then((bresp) => {
                 logInterfaceData("Returning frontend response", bresp);

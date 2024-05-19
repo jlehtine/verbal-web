@@ -1,4 +1,4 @@
-import { BackendRequest, Message, isBackendResponse } from "../shared/api";
+import { ChatInit, ChatMessage, isChatMessage } from "../shared/api";
 import { describeError } from "../shared/error";
 import VerbalWebConfiguration from "./VerbalWebConfiguration";
 import { extract } from "./extract";
@@ -36,10 +36,10 @@ interface VerbalWebDialogTitleProps extends DialogTitleProps {
 }
 
 interface VerbalWebMessageListProps {
-    messages: Message[];
+    messages: ChatMessage[];
 }
 
-function createListItem(m: Message, id: number): React.JSX.Element {
+function createListItem(m: ChatMessage, id: number): React.JSX.Element {
     // pr = padding-right, pl = padding-left
     if (m.role === "user") {
         return (
@@ -78,7 +78,7 @@ export default function VerbalWebDialog({ conf: conf, open: open, onClose: onClo
     // userInput stores value of textField
     const [userInput, setUserInput] = useState("");
     // messages stores previous queries and their responses
-    const [messages, setMessages] = useState<Message[]>([]);
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
     // true if userInput longer than 5 chars, updated in handleInputChange
     const [inputTooShort, setInputTooShort] = useState(true);
     // true if trying to submit too short message
@@ -88,7 +88,7 @@ export default function VerbalWebDialog({ conf: conf, open: open, onClose: onClo
     // true when waiting for response from backend, used to disable submit-button and display progress circle
     const [waitingForResponse, setWaitingForResponse] = useState(false);
 
-    function addMessage(newMessage: Message) {
+    function addMessage(newMessage: ChatMessage) {
         setMessages((messages) => [...messages, newMessage]);
     }
 
@@ -110,7 +110,7 @@ export default function VerbalWebDialog({ conf: conf, open: open, onClose: onClo
         // Only allowed to submit when textfield is not empty and response received from previous query
         if (!inputTooShort && !waitingForResponse) {
             setShowError(false);
-            const queryMessage: Message = { role: "user", content: userInput };
+            const queryMessage: ChatMessage = { role: "user", content: userInput };
 
             setWaitingForResponse(true);
             setTextFieldHelperText("Waiting for response to message!");
@@ -136,18 +136,19 @@ export default function VerbalWebDialog({ conf: conf, open: open, onClose: onClo
         }
     };
 
-    function handleQuery(query: Message[]): Promise<string> {
+    function handleQuery(query: ChatMessage[]): Promise<string> {
         // Read page content, if so configured
         let pageContent;
         if (conf.pageContentSelector) {
             pageContent = extract(conf.pageContentSelector);
         }
 
-        const data: BackendRequest = {
-            query: query,
+        const data: ChatInit = {
+            type: "init",
             pageContent: pageContent,
             initialInstruction: conf.initialInstruction,
             model: conf.useModel,
+            messages: query,
         };
 
         return fetch(getBackendBaseURL() + "query", {
@@ -166,8 +167,8 @@ export default function VerbalWebDialog({ conf: conf, open: open, onClose: onClo
                 }
             })
             .then((data) => {
-                if (isBackendResponse(data)) {
-                    return data.response;
+                if (isChatMessage(data)) {
+                    return data.content;
                 } else {
                     throw new Error("Bad response");
                 }
@@ -190,6 +191,7 @@ export default function VerbalWebDialog({ conf: conf, open: open, onClose: onClo
         }
     };
 
+    // Scroll to the bottom when there is new content
     useEffect(() => {
         inputRef.current?.scrollIntoView({
             behavior: "smooth",
