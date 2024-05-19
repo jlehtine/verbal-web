@@ -40,6 +40,13 @@ export abstract class TypedEventTarget<O, M> {
         });
     }
 
+    /**
+     * Clears all listeners.
+     */
+    protected clearListeners() {
+        this.listeners.clear();
+    }
+
     private getListenersForType(type: string) {
         return this.listeners.computeIfAbsent(type, () => new Set());
     }
