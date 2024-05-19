@@ -21,7 +21,7 @@ export function logInfo(msg: string, ...params: unknown[]) {
 
 export function logDebug(msg: string, ...params: unknown[]) {
     if (logLevel >= 2) {
-        console.debug(msg, params);
+        console.debug(msg, ...params);
     }
 }
 
