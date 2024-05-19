@@ -39,6 +39,8 @@ interface VerbalWebMessageListProps {
     messages: ChatMessage[];
 }
 
+const MINIMUM_USER_INPUT_LENGTH = 5;
+
 function createListItem(m: ChatMessage, id: number): React.JSX.Element {
     // pr = padding-right, pl = padding-left
     if (m.role === "user") {
@@ -79,14 +81,15 @@ export default function VerbalWebDialog({ conf: conf, open: open, onClose: onClo
     const [userInput, setUserInput] = useState("");
     // messages stores previous queries and their responses
     const [messages, setMessages] = useState<ChatMessage[]>([]);
-    // true if userInput longer than 5 chars, updated in handleInputChange
-    const [inputTooShort, setInputTooShort] = useState(true);
     // true if trying to submit too short message
     const [showError, setShowError] = useState(false);
     // text shown under input textField
     const [textFieldHelperText, setTextFieldHelperText] = useState("");
     // true when waiting for response from backend, used to disable submit-button and display progress circle
     const [waitingForResponse, setWaitingForResponse] = useState(false);
+
+    // Check user input length
+    const inputTooShort = userInput.trim().length < MINIMUM_USER_INPUT_LENGTH;
 
     function addMessage(newMessage: ChatMessage) {
         setMessages((messages) => [...messages, newMessage]);
@@ -97,10 +100,7 @@ export default function VerbalWebDialog({ conf: conf, open: open, onClose: onClo
     const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const text = event.target.value;
         setUserInput(text);
-        if (text.trim().length < 5) {
-            setInputTooShort(true);
-        } else if (!waitingForResponse) {
-            setInputTooShort(false);
+        if (!waitingForResponse) {
             setShowError(false);
             setTextFieldHelperText("");
         }
@@ -120,7 +120,6 @@ export default function VerbalWebDialog({ conf: conf, open: open, onClose: onClo
                     addMessage(queryMessage);
                     addMessage({ role: "assistant", content: response });
                     setUserInput("");
-                    setInputTooShort(true);
                     setShowError(false);
                     setTextFieldHelperText("");
                 })
