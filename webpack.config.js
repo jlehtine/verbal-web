@@ -56,9 +56,15 @@ module.exports = [
         devServer: {
             proxy: [
                 {
-                    static: [],
+                    static: false,
                     context: ["/"],
                     target: "http://localhost:3000",
+                },
+                {
+                    static: false,
+                    context: ["/chatws"],
+                    target: "http://localhost:3000",
+                    ws: true,
                 },
             ],
             open: true,

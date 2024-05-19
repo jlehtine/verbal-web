@@ -5,10 +5,13 @@ import { TypedEvent, TypedEventTarget } from "../shared/event";
 import { logDebug, logError, logThrownError } from "./log";
 
 /** Path to the added to the backend URL for WebSocket connections */
-const WS_PATH = "ws";
+const WS_PATH = "chatws";
 
 /** Base backoff period in milliseconds for exponential backoff */
 const BACKOFF_BASE_MILLIS = 8;
+
+/** Inactivity timeout is one minute */
+const INACTIVITY_TIMEOUT_MILLIS = 60 * 1000;
 
 /**
  * A client for the chat backend.
@@ -29,6 +32,8 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
 
     private retryTimer?: number;
 
+    private inactivityTimer?: number;
+
     constructor(backendUrl: string, initialState: InitialChatState) {
         logDebug("Chat client initialization");
         super();
@@ -42,20 +47,27 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
      * @param content message text
      */
     submitMessage(content: string) {
-        this.sendApiMessage({ type: "msgnew", content: content });
+        this.updateChat({ type: "msgnew", content: content });
     }
 
     /**
-     * Sends an API message, buffering it if necessary.
+     * Updates a chat.
+     *
      * @param amsg API message
      */
-    private sendApiMessage(amsg: ApiFrontendMessage) {
+    private updateChat(amsg: ApiFrontendMessage) {
         // Update chat model state
         this.chat.update(amsg);
 
         // Check if WebSocket needs to be created
         if (this.ws === undefined) {
             this.initWebSocket();
+        }
+
+        // Otherwise send the API message if already connected
+        else if (this.connectionState == ChatConnectionState.CONNECTED) {
+            logDebug("Sending a chat update");
+            this.ws.send(JSON.stringify(amsg));
         }
     }
 
@@ -64,20 +76,21 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
      */
     private initWebSocket() {
         logDebug(`Connecting to ${this.wsUrl.toString()}`);
+        this.clearRetryTimer();
         const ws = (this.ws = new WebSocket(this.wsUrl));
 
         // On connection established
         ws.addEventListener("open", () => {
             if (ws === this.ws) {
                 logDebug("Connection established");
-                if (this.connectionState !== ChatConnectionState.ERROR) {
-                    this.connectionState = ChatConnectionState.CONNECTED;
-                }
+                this.connectionState = ChatConnectionState.CONNECTED;
+                this.clearRetryTimer();
                 if (this.chat.backendProcessing) {
                     const initMsg: ChatInit = { ...this.chat.state, type: "init" };
-                    logDebug("Sending chat initialization");
+                    logDebug("Sending the chat initialization");
                     ws.send(JSON.stringify(initMsg));
                 }
+                this.initWebSocketInactivityTimeout();
                 this.changed();
             }
         });
@@ -91,10 +104,11 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
                     if (typeof data === "string") {
                         const amsg: unknown = JSON.parse(data);
                         if (isApiBackendMessage(amsg)) {
+                            logDebug("Received a chat update");
                             this.chat.update(amsg);
                             processed = true;
-                            this.connectionState = ChatConnectionState.CONNECTED;
                             this.numErrors = 0;
+                            this.initWebSocketInactivityTimeout();
                         }
                     }
                     if (!processed) {
@@ -102,12 +116,6 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
                     }
                 } catch (err: unknown) {
                     logThrownError("Failed to process backend message", err);
-                }
-                if (!processed) {
-                    this.connectionState = ChatConnectionState.ERROR;
-                    ws.close();
-                    this.ws = undefined;
-                    this.retryWebSocket();
                 }
                 this.changed();
             }
@@ -117,6 +125,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
         ws.addEventListener("error", (ev) => {
             if (ws === this.ws) {
                 logThrownError("Connection error", ev);
+                this.ws = undefined;
                 this.connectionState = ChatConnectionState.ERROR;
                 this.retryWebSocket();
                 this.changed();
@@ -128,6 +137,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
             if (ws === this.ws) {
                 logDebug("Connection closed");
                 this.connectionState = ChatConnectionState.UNCONNECTED;
+                this.clearInactivityTimer();
                 this.changed();
             }
         });
@@ -142,13 +152,53 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
      * Retries web socket connection after an exponential backoff.
      */
     private retryWebSocket() {
+        this.clearRetryTimer();
+        this.clearInactivityTimer();
         this.numErrors++;
         const backoffBase = Math.pow(BACKOFF_BASE_MILLIS, this.numErrors);
         const backoff = backoffBase + Math.random() * backoffBase;
         logDebug("Retrying connection in %d milliseconds", backoff);
         this.retryTimer = setTimeout(() => {
+            this.retryTimer = undefined;
             this.initWebSocket();
         }, backoff);
+    }
+
+    /**
+     * Clears the retry timer, if it is pending.
+     */
+    private clearRetryTimer() {
+        if (this.retryTimer !== undefined) {
+            clearTimeout(this.retryTimer);
+            this.retryTimer = undefined;
+        }
+    }
+
+    /**
+     * Initializes or re-initializes the inactivity timeout for the web socket.
+     */
+    private initWebSocketInactivityTimeout() {
+        this.clearInactivityTimer();
+        this.inactivityTimer = setTimeout(() => {
+            this.inactivityTimer = undefined;
+            if (
+                this.ws !== undefined &&
+                this.connectionState == ChatConnectionState.CONNECTED &&
+                !this.chat.backendProcessing
+            ) {
+                this.ws.close();
+            }
+        }, INACTIVITY_TIMEOUT_MILLIS);
+    }
+
+    /**
+     * Clears the inactivity timer, if it is pending.
+     */
+    private clearInactivityTimer() {
+        if (this.inactivityTimer !== undefined) {
+            clearTimeout(this.inactivityTimer);
+            this.inactivityTimer = undefined;
+        }
     }
 
     /**
@@ -158,10 +208,8 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
         logDebug("Chat client closing");
 
         // Clear any pending timers
-        if (this.retryTimer !== undefined) {
-            clearTimeout(this.retryTimer);
-            this.retryTimer = undefined;
-        }
+        this.clearRetryTimer();
+        this.clearInactivityTimer();
 
         // Close WebSocket
         if (this.ws !== undefined) {
