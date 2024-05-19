@@ -112,10 +112,10 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
                         }
                     }
                     if (!processed) {
-                        logError("Received unrecognized message from the backend");
+                        logError("Received an unrecognized message from the backend");
                     }
                 } catch (err: unknown) {
-                    logThrownError("Failed to process backend message", err);
+                    logThrownError("Failed to process a backend message", err);
                 }
                 this.changed();
             }
@@ -157,7 +157,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
         this.numErrors++;
         const backoffBase = Math.pow(BACKOFF_BASE_MILLIS, this.numErrors);
         const backoff = backoffBase + Math.random() * backoffBase;
-        logDebug("Retrying connection in %d milliseconds", backoff);
+        logDebug("Retrying to connect in %d milliseconds", backoff);
         this.retryTimer = setTimeout(() => {
             this.retryTimer = undefined;
             this.initWebSocket();
@@ -186,6 +186,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
                 this.connectionState == ChatConnectionState.CONNECTED &&
                 !this.chat.backendProcessing
             ) {
+                logDebug("Closing the connection due to inactivity timeout");
                 this.ws.close();
             }
         }, INACTIVITY_TIMEOUT_MILLIS);
