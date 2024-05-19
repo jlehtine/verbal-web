@@ -81,15 +81,17 @@ export default function VerbalWebDialog({ conf: conf, open: open, onClose: onClo
     const [userInput, setUserInput] = useState("");
     // messages stores previous queries and their responses
     const [messages, setMessages] = useState<ChatMessage[]>([]);
-    // true if trying to submit too short message
-    const [showError, setShowError] = useState(false);
-    // text shown under input textField
-    const [textFieldHelperText, setTextFieldHelperText] = useState("");
+    // error message shown
+    const [errorMessage, setErrorMessage] = useState<string>();
     // true when waiting for response from backend, used to disable submit-button and display progress circle
     const [waitingForResponse, setWaitingForResponse] = useState(false);
 
     // Check user input length
     const inputTooShort = userInput.trim().length < MINIMUM_USER_INPUT_LENGTH;
+
+    // Check whether to indicate an error and the helper text used
+    const error = errorMessage !== undefined;
+    const textFieldHelperText = waitingForResponse ? "Waiting for response to message!" : errorMessage;
 
     function addMessage(newMessage: ChatMessage) {
         setMessages((messages) => [...messages, newMessage]);
@@ -100,38 +102,31 @@ export default function VerbalWebDialog({ conf: conf, open: open, onClose: onClo
     const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const text = event.target.value;
         setUserInput(text);
-        if (!waitingForResponse) {
-            setShowError(false);
-            setTextFieldHelperText("");
-        }
+        setErrorMessage(undefined);
     };
 
     const handleSubmit = () => {
         // Only allowed to submit when textfield is not empty and response received from previous query
         if (!inputTooShort && !waitingForResponse) {
-            setShowError(false);
             const queryMessage: ChatMessage = { role: "user", content: userInput };
 
             setWaitingForResponse(true);
-            setTextFieldHelperText("Waiting for response to message!");
+            setErrorMessage(undefined);
             handleQuery([...messages, queryMessage])
                 .then((response) => {
                     setWaitingForResponse(false);
                     addMessage(queryMessage);
                     addMessage({ role: "assistant", content: response });
                     setUserInput("");
-                    setShowError(false);
-                    setTextFieldHelperText("");
+                    setWaitingForResponse(false);
                 })
                 .catch((err: unknown) => {
                     console.error(err);
                     setWaitingForResponse(false);
-                    setShowError(true);
-                    setTextFieldHelperText(describeError(err, false, "An error occurred"));
+                    setErrorMessage(describeError(err, false, "An error occurred"));
                 });
         } else {
-            setShowError(true);
-            setTextFieldHelperText("Message must be longer than 5 characters!");
+            setErrorMessage("Message must be longer than 5 characters!");
         }
     };
 
@@ -204,7 +199,7 @@ export default function VerbalWebDialog({ conf: conf, open: open, onClose: onClo
             <DialogContent dividers>
                 <VerbalWebMessageList messages={messages}></VerbalWebMessageList>
                 <TextField
-                    error={showError}
+                    error={error}
                     disabled={waitingForResponse}
                     fullWidth
                     multiline
