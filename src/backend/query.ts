@@ -3,7 +3,7 @@ import { logInterfaceData } from "./log";
 import { checkModeration, checkModerations } from "./moderation";
 import { OpenAI } from "openai";
 
-const DEFAULT_CHAT_MODEL = "gpt-4";
+const DEFAULT_CHAT_MODEL = "gpt-4o";
 
 export function query(breq: ChatState, openai: OpenAI): Promise<string> {
     const initialInstruction = breq.initialInstruction;

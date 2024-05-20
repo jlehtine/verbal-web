@@ -41,7 +41,7 @@ following properties.
 
   Example: `"gpt-3.5-turbo"`
 
-  Default value: `"gpt-4"`
+  Default value: `"gpt-4o"`
 
 ## Environment variables
 
