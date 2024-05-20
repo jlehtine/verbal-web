@@ -1,13 +1,14 @@
-import { ChatInit, ChatMessage, isChatMessage } from "../shared/api";
-import { describeError } from "../shared/error";
+import { ChatMessage } from "../shared/api";
+import { ChatClient, ChatConnectionState } from "./ChatClient";
 import VerbalWebConfiguration from "./VerbalWebConfiguration";
 import { extract } from "./extract";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import AssistantIcon from "@mui/icons-material/Assistant";
 import CloseIcon from "@mui/icons-material/Close";
 import {
+    Alert,
     Avatar,
-    CircularProgress,
+    Box,
     Dialog,
     DialogContent,
     DialogProps,
@@ -15,6 +16,7 @@ import {
     DialogTitleProps,
     IconButton,
     InputAdornment,
+    LinearProgress,
     List,
     ListItem,
     ListItemAvatar,
@@ -38,8 +40,6 @@ interface VerbalWebDialogTitleProps extends DialogTitleProps {
 interface VerbalWebMessageListProps {
     messages: ChatMessage[];
 }
-
-const MINIMUM_USER_INPUT_LENGTH = 5;
 
 function createListItem(m: ChatMessage, id: number): React.JSX.Element {
     // pr = padding-right, pl = padding-left
@@ -75,107 +75,46 @@ function createListItem(m: ChatMessage, id: number): React.JSX.Element {
 }
 
 export default function VerbalWebDialog({ conf: conf, open: open, onClose: onClose }: VerbalWebDialogProps) {
-    const inputRef = useRef<HTMLDivElement>(null);
+    const tailRef = useRef<HTMLDivElement>(null);
+
+    // Chat client containing also state and model
+    // This is not used directly for rendering but has the same lifecycle as the component
+    const [client] = useState(
+        () =>
+            new ChatClient(conf.backendURL, {
+                initialInstruction: conf.initialInstruction,
+                pageContent: extract(conf.pageContentSelector),
+                model: conf.useModel,
+            }),
+    );
+    client.addEventListener("change", onChatChange);
 
     // userInput stores value of textField
     const [userInput, setUserInput] = useState("");
     // messages stores previous queries and their responses
-    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [messages, setMessages] = useState<ChatMessage[]>(client.chat.state.messages);
     // error message shown
     const [errorMessage, setErrorMessage] = useState<string>();
     // true when waiting for response from backend, used to disable submit-button and display progress circle
     const [waitingForResponse, setWaitingForResponse] = useState(false);
 
     // Check user input length
-    const inputTooShort = userInput.trim().length < MINIMUM_USER_INPUT_LENGTH;
-
-    // Check whether to indicate an error and the helper text used
-    const error = errorMessage !== undefined;
-    const textFieldHelperText = waitingForResponse ? "Waiting for response to message!" : errorMessage;
-
-    function addMessage(newMessage: ChatMessage) {
-        setMessages((messages) => [...messages, newMessage]);
-    }
+    const inputEmpty = userInput.trim().length == 0;
 
     // Update value of userInput when value of textField is changed
     // Update value of allowSubmit
     const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const text = event.target.value;
         setUserInput(text);
-        setErrorMessage(undefined);
     };
 
     const handleSubmit = () => {
         // Only allowed to submit when textfield is not empty and response received from previous query
-        if (!inputTooShort && !waitingForResponse) {
-            const queryMessage: ChatMessage = { role: "user", content: userInput };
-
-            setWaitingForResponse(true);
-            setErrorMessage(undefined);
-            handleQuery([...messages, queryMessage])
-                .then((response) => {
-                    setWaitingForResponse(false);
-                    addMessage(queryMessage);
-                    addMessage({ role: "assistant", content: response });
-                    setUserInput("");
-                    setWaitingForResponse(false);
-                })
-                .catch((err: unknown) => {
-                    console.error(err);
-                    setWaitingForResponse(false);
-                    setErrorMessage(describeError(err, false, "An error occurred"));
-                });
-        } else {
-            setErrorMessage("Message must be longer than 5 characters!");
+        if (!inputEmpty && !waitingForResponse) {
+            client.submitMessage(userInput);
+            setUserInput("");
         }
     };
-
-    function handleQuery(query: ChatMessage[]): Promise<string> {
-        // Read page content, if so configured
-        let pageContent;
-        if (conf.pageContentSelector) {
-            pageContent = extract(conf.pageContentSelector);
-        }
-
-        const data: ChatInit = {
-            type: "init",
-            pageContent: pageContent,
-            initialInstruction: conf.initialInstruction,
-            model: conf.useModel,
-            messages: query,
-        };
-
-        return fetch(getBackendBaseURL() + "query", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Accept: "application/json",
-            },
-            body: JSON.stringify(data),
-        })
-            .then((resp) => {
-                if (resp.ok) {
-                    return resp.json();
-                } else {
-                    throw new Error("Query failed");
-                }
-            })
-            .then((data) => {
-                if (isChatMessage(data)) {
-                    return data.content;
-                } else {
-                    throw new Error("Bad response");
-                }
-            });
-    }
-
-    function getBackendBaseURL() {
-        let baseURL = conf.backendURL;
-        if (baseURL && !baseURL.endsWith("/")) {
-            baseURL += "/";
-        }
-        return baseURL;
-    }
 
     const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
         // Enter submits user input but enter+shift doesn't
@@ -185,55 +124,87 @@ export default function VerbalWebDialog({ conf: conf, open: open, onClose: onClo
         }
     };
 
+    function onChatChange() {
+        setMessages([...client.chat.state.messages]);
+        let errorMessage;
+        if (client.connectionState === ChatConnectionState.ERROR) {
+            errorMessage = "Connection error, retrying...";
+        } else if (client.chat.error !== undefined) {
+            switch (client.chat.error) {
+                case "chat":
+                    errorMessage = "AI assistant failed!";
+                    break;
+                case "connection":
+                    errorMessage = "Failed to contact AI assistant!";
+                    break;
+                case "moderation":
+                    errorMessage = "Message was blocked by moderation!";
+                    break;
+                case "limit":
+                    errorMessage = "Message was blocked by chat usage limits!";
+                    break;
+            }
+        }
+        setErrorMessage(errorMessage);
+        setWaitingForResponse(client.chat.backendProcessing);
+    }
+
     // Scroll to the bottom when there is new content
     useEffect(() => {
-        inputRef.current?.scrollIntoView({
+        tailRef.current?.scrollIntoView({
             behavior: "smooth",
             block: "end",
         });
-    }, [messages, textFieldHelperText]);
+    }, [messages, errorMessage, waitingForResponse]);
+
+    // Close chat client on unmount
+    useEffect(
+        () => () => {
+            client.close();
+        },
+        [],
+    );
 
     return (
         <Dialog open={open} onClose={onClose} fullWidth>
             <VerbalWebDialogTitle onClose={onClose}>Verbal Web AI assistant</VerbalWebDialogTitle>
             <DialogContent dividers>
                 <VerbalWebMessageList messages={messages}></VerbalWebMessageList>
-                <TextField
-                    error={error}
-                    disabled={waitingForResponse}
-                    fullWidth
-                    multiline
-                    label="Ask a question!"
-                    helperText={textFieldHelperText}
-                    value={userInput} // Value stored in state userInput
-                    onChange={handleInputChange}
-                    onKeyDown={handleKeyDown}
-                    ref={inputRef}
-                    InputProps={{
-                        endAdornment: (
-                            <InputAdornment position="end">
-                                <Tooltip title="Submit">
-                                    <IconButton
-                                        color="primary"
-                                        size="large"
-                                        onClick={handleSubmit}
-                                        disabled={waitingForResponse}
-                                    >
-                                        <AssistantIcon />
-                                    </IconButton>
-                                </Tooltip>
-                                {waitingForResponse && (
-                                    <CircularProgress
-                                        sx={{
-                                            position: "absolute",
-                                            right: "3%",
-                                        }}
-                                    />
-                                )}
-                            </InputAdornment>
-                        ),
-                    }}
-                ></TextField>
+                {!waitingForResponse && errorMessage === undefined ? (
+                    <TextField
+                        fullWidth
+                        multiline
+                        label="Ask a question!"
+                        value={userInput} // Value stored in state userInput
+                        onChange={handleInputChange}
+                        onKeyDown={handleKeyDown}
+                        inputRef={(input: unknown) => {
+                            if (input instanceof HTMLTextAreaElement || input instanceof HTMLInputElement) {
+                                input.focus();
+                            }
+                        }}
+                        InputProps={{
+                            endAdornment: (
+                                <InputAdornment position="end">
+                                    <Tooltip title="Submit">
+                                        <IconButton color="primary" size="large" onClick={handleSubmit}>
+                                            <AssistantIcon />
+                                        </IconButton>
+                                    </Tooltip>
+                                </InputAdornment>
+                            ),
+                        }}
+                    ></TextField>
+                ) : null}
+                {errorMessage ? (
+                    <Alert variant="filled" severity="error">
+                        {errorMessage}
+                    </Alert>
+                ) : null}
+                {waitingForResponse ? (
+                    <LinearProgress color={errorMessage ? "error" : "primary"} sx={{ marginTop: 1 }} />
+                ) : null}
+                <Box ref={tailRef} />
             </DialogContent>
         </Dialog>
     );
@@ -263,7 +234,6 @@ function VerbalWebDialogTitle(props: VerbalWebDialogTitleProps) {
     );
 }
 
-function VerbalWebMessageList(props: VerbalWebMessageListProps) {
-    const messages = props.messages;
+function VerbalWebMessageList({ messages: messages }: VerbalWebMessageListProps) {
     return <List>{messages.map((m, idx) => createListItem(m, idx))}</List>;
 }

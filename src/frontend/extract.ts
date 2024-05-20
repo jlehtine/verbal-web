@@ -1,7 +1,10 @@
 import { VerbalWebConfigurationError } from "../shared/error";
 import { VERBAL_WEB_ASSISTANT_CLASS_NAME, VERBAL_WEB_ASSISTANT_DIALOG_CLASS_NAME } from "./VerbalWebUI";
 
-export function extract(pageContentSelector: string): string {
+export function extract(pageContentSelector?: string): string | undefined {
+    if (!pageContentSelector) {
+        return undefined;
+    }
     // Get the node list
     let elems;
     try {

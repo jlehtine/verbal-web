@@ -1,8 +1,9 @@
+import { VerbalWebError } from "../shared/error";
 import { logInterfaceData } from "./log";
 import { OpenAI } from "openai";
 
 /** Signals that content was rejected by moderation */
-export class ModerationRejected extends Error {
+export class ModerationRejected extends VerbalWebError {
     constructor(message: string, options?: ErrorOptions) {
         super(`Moderation rejected message: ${message}`, options);
         this.name = "ModerationRejected";

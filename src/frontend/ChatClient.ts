@@ -1,4 +1,4 @@
-import { ApiFrontendMessage, ChatInit, isApiBackendMessage } from "../shared/api";
+import { ChatInit, ChatMessageNew, isApiBackendMessage } from "../shared/api";
 import { Chat, InitialChatState } from "../shared/chat";
 import { VerbalWebError } from "../shared/error";
 import { TypedEvent, TypedEventTarget } from "../shared/event";
@@ -47,16 +47,8 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
      * @param content message text
      */
     submitMessage(content: string) {
-        this.updateChat({ type: "msgnew", content: content });
-    }
-
-    /**
-     * Updates a chat.
-     *
-     * @param amsg API message
-     */
-    private updateChat(amsg: ApiFrontendMessage) {
         // Update chat model state
+        const amsg: ChatMessageNew = { type: "msgnew", content: content };
         this.chat.update(amsg);
 
         // Check if WebSocket needs to be created
@@ -69,83 +61,98 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
             logDebug("Sending a chat update");
             this.ws.send(JSON.stringify(amsg));
         }
+
+        this.changed();
     }
 
     /**
-     * Initializes the web socket and its listeners.
+     * Initializes a web socket.
      */
     private initWebSocket() {
         logDebug(`Connecting to ${this.wsUrl.toString()}`);
         this.clearRetryTimer();
         const ws = (this.ws = new WebSocket(this.wsUrl));
 
-        // On connection established
         ws.addEventListener("open", () => {
-            if (ws === this.ws) {
-                logDebug("Connection established");
-                this.connectionState = ChatConnectionState.CONNECTED;
-                this.clearRetryTimer();
-                if (this.chat.backendProcessing) {
-                    const initMsg: ChatInit = { ...this.chat.state, type: "init" };
-                    logDebug("Sending the chat initialization");
-                    ws.send(JSON.stringify(initMsg));
-                }
-                this.initWebSocketInactivityTimeout();
-                this.changed();
-            }
+            this.onWebSocketOpen(ws);
         });
-
-        // On received message
         ws.addEventListener("message", (ev) => {
-            if (ws === this.ws) {
-                let processed = false;
-                try {
-                    const data: unknown = ev.data;
-                    if (typeof data === "string") {
-                        const amsg: unknown = JSON.parse(data);
-                        if (isApiBackendMessage(amsg)) {
-                            logDebug("Received a chat update");
-                            this.chat.update(amsg);
-                            processed = true;
-                            this.numErrors = 0;
-                            this.initWebSocketInactivityTimeout();
-                        }
-                    }
-                    if (!processed) {
-                        logError("Received an unrecognized message from the backend");
-                    }
-                } catch (err: unknown) {
-                    logThrownError("Failed to process a backend message", err);
-                }
-                this.changed();
-            }
+            this.onWebSocketMessage(ws, ev);
         });
-
-        // On error
         ws.addEventListener("error", (ev) => {
-            if (ws === this.ws) {
-                logThrownError("Connection error", ev);
-                this.ws = undefined;
-                this.connectionState = ChatConnectionState.ERROR;
-                this.retryWebSocket();
-                this.changed();
-            }
+            this.onWebSocketError(ws, ev);
         });
-
-        // On connection closed
         ws.addEventListener("close", () => {
-            if (ws === this.ws) {
-                logDebug("Connection closed");
-                this.connectionState = ChatConnectionState.UNCONNECTED;
-                this.clearInactivityTimer();
-                this.changed();
-            }
+            this.onWebSocketClose(ws);
         });
 
         if (this.connectionState !== ChatConnectionState.ERROR) {
             this.connectionState = ChatConnectionState.CONNECTING;
         }
         this.changed();
+    }
+
+    // On web socket connection
+    private onWebSocketOpen(ws: WebSocket) {
+        if (ws === this.ws) {
+            logDebug("Connection established");
+            this.connectionState = ChatConnectionState.CONNECTED;
+            this.clearRetryTimer();
+            if (this.chat.backendProcessing) {
+                const initMsg: ChatInit = { ...this.chat.state, type: "init" };
+                logDebug("Sending the chat initialization");
+                ws.send(JSON.stringify(initMsg));
+            }
+            this.initWebSocketInactivityTimeout();
+            this.changed();
+        }
+    }
+
+    // On web socket message
+    private onWebSocketMessage(ws: WebSocket, ev: MessageEvent) {
+        if (ws === this.ws) {
+            let processed = false;
+            try {
+                const data: unknown = ev.data;
+                if (typeof data === "string") {
+                    const amsg: unknown = JSON.parse(data);
+                    if (isApiBackendMessage(amsg)) {
+                        logDebug("Received a chat update");
+                        this.chat.update(amsg);
+                        processed = true;
+                        this.numErrors = 0;
+                        this.initWebSocketInactivityTimeout();
+                    }
+                }
+                if (!processed) {
+                    logError("Received an unrecognized message from the backend");
+                }
+            } catch (err: unknown) {
+                logThrownError("Failed to process a backend message", err);
+            }
+            this.changed();
+        }
+    }
+
+    // On web socket error
+    private onWebSocketError(ws: WebSocket, ev: Event) {
+        if (ws === this.ws) {
+            logThrownError("Connection error", ev);
+            this.ws = undefined;
+            this.connectionState = ChatConnectionState.ERROR;
+            this.retryWebSocket();
+            this.changed();
+        }
+    }
+
+    // On web socket close
+    private onWebSocketClose(ws: WebSocket) {
+        if (ws === this.ws) {
+            logDebug("Connection closed");
+            this.connectionState = ChatConnectionState.UNCONNECTED;
+            this.clearInactivityTimer();
+            this.changed();
+        }
     }
 
     /**
@@ -188,6 +195,8 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
             ) {
                 logDebug("Closing the connection due to inactivity timeout");
                 this.ws.close();
+                this.ws = undefined;
+                this.connectionState = ChatConnectionState.UNCONNECTED;
             }
         }, INACTIVITY_TIMEOUT_MILLIS);
     }
@@ -216,7 +225,14 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
         if (this.ws !== undefined) {
             this.ws.close();
             this.ws = undefined;
+            this.connectionState = ChatConnectionState.UNCONNECTED;
         }
+
+        // Notify event listeners
+        this.changed();
+
+        // Clear event listeners
+        this.clearListeners();
     }
 
     /**

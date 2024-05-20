@@ -1,13 +1,11 @@
-import { isChatInit } from "../shared/api";
-import { describeError } from "../shared/error";
-import { logError, logFatal, logInfo, logInterfaceData, setLogLevel } from "./log";
-import { query } from "./query";
-import bodyParser from "body-parser";
+import { InitialChatStateOverrides } from "../shared/chat";
+import { ChatServer } from "./ChatServer";
+import { logFatal, logInfo, logThrownError, setLogLevel } from "./log";
 import cors from "cors";
-import express, { Request, Response } from "express";
-import { StatusCodes } from "http-status-codes";
+import express, { Request } from "express";
 import { OpenAI } from "openai";
 import path from "path";
+import { WebSocketExpress } from "websocket-express";
 
 interface StaticContent {
     path?: string;
@@ -87,6 +85,13 @@ if (chdir !== undefined) {
     process.chdir(chdir);
 }
 
+// Initialize server configuration
+const serverOverrides: InitialChatStateOverrides = {
+    initialInstruction: process.env.VW_INITIAL_INSTRUCTION,
+    pageContent: process.env.VW_PAGE_CONTENT,
+    model: process.env.VW_CHAT_MODEL,
+};
+
 // Initialize OpenAI API
 logInfo("Initializing OpenAI API");
 const apiKey = process.env.OPENAI_API_KEY;
@@ -97,8 +102,8 @@ const openai = new OpenAI({
     apiKey: apiKey,
 });
 
-// Use Express.js
-const backend = express();
+// Use WebSocket Express
+const backend = new WebSocketExpress();
 
 // Log all requests
 backend.use((req, res, next) => {
@@ -109,20 +114,16 @@ backend.use((req, res, next) => {
 // Set CORS headers for all responses
 backend.use(cors({ origin: process.env.VW_ALLOW_ORIGIN }));
 
-// Answer queries
-backend.post("/query", bodyParser.json(), (req, res) => {
-    const breq: unknown = req.body;
-    logInterfaceData("Received frontend request", breq);
-    if (isChatInit(breq)) {
-        query(breq, openai)
-            .then((bresp) => {
-                logInterfaceData("Returning frontend response", bresp);
-                res.json(bresp);
-            })
-            .catch(catchUnexpectedFunc(res));
-    } else {
-        res.sendStatus(StatusCodes.BAD_REQUEST);
-    }
+// Client API web socket endpoint
+backend.ws("/chatws", (req, res) => {
+    logInfo("Accepting web socket connection [%s]", req.ip);
+    res.accept()
+        .then((ws) => {
+            new ChatServer(req, ws, openai, serverOverrides);
+        })
+        .catch((err: unknown) => {
+            logThrownError("Failed to accept web socket connection [%s]", err, req.ip);
+        });
 });
 
 // Serve frontend assets
@@ -133,13 +134,6 @@ for (const sc of staticContent) {
     const path = sc.path ?? "/";
     logInfo("Serving static content from %s at path %s", sc.dir, path);
     backend.use(path, express.static(sc.dir));
-}
-
-function catchUnexpectedFunc(resp: Response) {
-    return (err: unknown) => {
-        logError(describeError(err, true, "ERROR"));
-        resp.sendStatus(StatusCodes.INTERNAL_SERVER_ERROR);
-    };
 }
 
 function logRequest(req: Request) {

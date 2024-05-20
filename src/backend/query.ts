@@ -1,14 +1,14 @@
-import { ChatInit, ChatMessage } from "../shared/api";
+import { ChatState } from "../shared/api";
 import { logInterfaceData } from "./log";
 import { checkModeration, checkModerations } from "./moderation";
 import { OpenAI } from "openai";
 
 const DEFAULT_CHAT_MODEL = "gpt-4";
 
-export function query(breq: ChatInit, openai: OpenAI): Promise<ChatMessage> {
-    const initialInstruction = process.env.VW_INITIAL_INSTRUCTION ?? breq.initialInstruction;
-    const pageContent = process.env.VW_PAGE_CONTENT ?? breq.pageContent;
-    const model = process.env.VW_CHAT_MODEL ?? breq.model ?? DEFAULT_CHAT_MODEL;
+export function query(breq: ChatState, openai: OpenAI): Promise<string> {
+    const initialInstruction = breq.initialInstruction;
+    const pageContent = breq.pageContent;
+    const model = breq.model ?? DEFAULT_CHAT_MODEL;
     const systemInstruction = initialInstruction
         ? initialInstruction + (pageContent ? "\n\n" + pageContent : "")
         : undefined;
@@ -20,10 +20,10 @@ export function query(breq: ChatInit, openai: OpenAI): Promise<ChatMessage> {
 
 function doQuery(
     systemInstruction: string | undefined,
-    breq: ChatInit,
+    breq: ChatState,
     model: string,
     openai: OpenAI,
-): Promise<ChatMessage> {
+): Promise<string> {
     // Construct a chat completion request
     const chatCompletionMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
     if (systemInstruction) {
@@ -41,12 +41,11 @@ function doQuery(
     logInterfaceData("Sending chat completion request", params);
     return openai.chat.completions.create(params).then((chatCompletions) => {
         logInterfaceData("Received chat completion response", chatCompletions);
-        const response = chatCompletions.choices[0].message.content;
-        const bresp: ChatMessage = { role: "assistant", content: response ?? "(No response)" };
+        const response = chatCompletions.choices[0].message.content ?? "";
         if (response) {
-            return checkModeration(response, openai).then(() => bresp);
+            return checkModeration(response, openai).then(() => response);
         } else {
-            return bresp;
+            return response;
         }
     });
 }
