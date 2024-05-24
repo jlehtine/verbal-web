@@ -116,8 +116,9 @@ export class TextChunker {
                 end = boundaryIndexLeftOf(giter, start + this.params.maxChunkSize, start + this.params.minChunkSize);
             }
 
-            // Check if enough new content available
-            if (end - start >= this.params.minChunkSize) {
+            // Check if finished or enough new content available
+            if (this.finished || end - start >= this.params.minChunkSize) {
+                this.chunked = end;
                 return { done: false, value: { start: start, end: end } };
             }
 
@@ -187,7 +188,7 @@ function graphemeIndexAtOrAfter(giter: GraphemeIterable, index: number) {
     let gind = 0;
     for (const g of giter) {
         const nextgind = gind + g.length;
-        if (nextgind < index) {
+        if (nextgind <= index) {
             gind = nextgind;
         } else {
             break;
