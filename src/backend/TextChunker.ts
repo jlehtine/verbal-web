@@ -25,6 +25,16 @@ export interface TextChunkerParams {
     readonly minChunkOverlap: number;
 }
 
+export type TextChunkerResult =
+    | {
+          done: true;
+          value: undefined;
+      }
+    | {
+          done: false;
+          value: TextChunk | undefined;
+      };
+
 /**
  * Text chunk position within a string as code unit indexes.
  * The end index is exclusive.
@@ -90,10 +100,10 @@ export class TextChunker {
      *      done - whether all chunks processed,
      *      value - the next chunk or undefined if no chunk currently available
      */
-    chunk(): { done: boolean; value?: TextChunk } {
+    chunk(): TextChunkerResult {
         // Check if all text chunked
         if (this.finished && this.chunked >= this.text.length) {
-            return { done: true };
+            return { done: true, value: undefined };
         }
 
         // Determine the next chunk, if any available at this time
@@ -124,7 +134,7 @@ export class TextChunker {
 
             // Otherwise wait for new content
             else {
-                return { done: false };
+                return { done: false, value: undefined };
             }
         }
     }
@@ -151,7 +161,7 @@ function boundaryIndexLeftOf(giter: GraphemeIterable, index: number, minIndex: n
  * Returns the index of the last word boundary in the specified string segment.
  *
  * @param graphemes graphemes
- * @param end exclusive end index of the string segment
+ * @param end end index of the string segment
  * @returns index of the last alphabetic boundary in the specified string segment
  */
 function lastBoundaryIndex(giter: GraphemeIterable, end: number) {
@@ -168,7 +178,7 @@ function lastBoundaryIndex(giter: GraphemeIterable, end: number) {
 
         // Jump to next grapheme index
         const nextgind = gind + g.length;
-        if (nextgind < end) {
+        if (nextgind <= end) {
             gind = nextgind;
         } else {
             break;
