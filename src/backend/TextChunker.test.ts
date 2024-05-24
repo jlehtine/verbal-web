@@ -1,11 +1,14 @@
 import { TextChunkerResult, TextChunk, TextChunker, TextChunkerParams } from "./TextChunker";
 import { test, expect } from "@jest/globals";
+import Graphemer from "graphemer";
 import { LoremIpsum } from "lorem-ipsum";
 
 const CHUNKER_MAX_ROUNDS = 100;
 
 const lorem = new LoremIpsum();
 const input = lorem.generateParagraphs(10).replace(/h/gi, "😊").replace(/m/gi, "🍄‍🟫").replace(/t/gi, "🧑‍💻");
+
+const graphemer = new Graphemer();
 
 const nonOverlappingChunksParams: TextChunkerParams = {
     minChunkSize: 100,
@@ -143,6 +146,22 @@ function checkGeneric(
             // Chunk must respect the strictly limiting chunker parameters
             expect(chunk.end - chunk.start).toBeLessThanOrEqual(params.maxChunkSize);
             expect(prevChunkEnd - chunk.start).toBeLessThanOrEqual(params.maxChunkOverlap);
+
+            // Chunk start and end must be on grapheme boundaries
+            let gind = 0;
+            for (const g of graphemer.iterateGraphemes(text)) {
+                const nextgind = gind + g.length;
+                if (nextgind === chunk.start || (nextgind >= chunk.start && gind < chunk.start)) {
+                    expect(chunk.start).toStrictEqual(nextgind);
+                }
+                if (nextgind === chunk.end || (nextgind >= chunk.end && gind < chunk.end)) {
+                    expect(chunk.end).toStrictEqual(nextgind);
+                }
+                if (nextgind >= chunk.end) {
+                    break;
+                }
+                gind = nextgind;
+            }
         }
     }
 }
