@@ -58,7 +58,7 @@ export interface ChatMessagePart extends TypedMessage<"msgpart"> {
     content: string;
 
     /** Is this the final part */
-    final?: true;
+    done: boolean;
 }
 
 /** Chat message generation error codes */
@@ -70,6 +70,9 @@ export interface ChatMessageError extends TypedMessage<"msgerror"> {
 
     /** Error code */
     code: ChatMessageErrorCode;
+
+    /** Error message as human readable text */
+    message: string;
 }
 
 function isObject(v: unknown): v is Record<string, unknown> {

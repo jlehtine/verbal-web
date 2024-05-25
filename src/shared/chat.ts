@@ -57,7 +57,7 @@ export class Chat {
             } else {
                 this.state.messages.push({ role: "assistant", content: amsg.content });
             }
-            if (amsg.final) {
+            if (amsg.done) {
                 this.backendProcessing = false;
             }
         } else if (isChatMessageError(amsg)) {
