@@ -31,6 +31,12 @@ export function logDebug(msg: string, ...params: unknown[]) {
     }
 }
 
+export function logTrace(msg: string, ...params: unknown[]) {
+    if (logLevel >= 3) {
+        console.debug(msg, ...params);
+    }
+}
+
 export function logInterfaceData(msg: string, data: unknown, ...params: unknown[]) {
     if (logLevel >= 3) {
         console.debug(msg + ": " + JSON.stringify(data, undefined, 2), ...params);
