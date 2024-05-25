@@ -1,8 +1,9 @@
 import LoadingIndicator from "./LoadingIndicator";
 import VerbalWebConfiguration from "./VerbalWebConfiguration";
+import { defaultTheme } from "./defaultTheme";
 import load from "./load";
 import AssistantIcon from "@mui/icons-material/Assistant";
-import { Box, IconButton, Tooltip } from "@mui/material";
+import { Box, IconButton, ThemeProvider, Tooltip } from "@mui/material";
 import React, { Suspense, lazy, useState } from "react";
 
 interface VerbalWebUIProps {
@@ -24,30 +25,32 @@ export default function VerbalWebUI({ conf }: VerbalWebUIProps) {
     );
 
     return (
-        <Box className={VERBAL_WEB_ASSISTANT_CLASS_NAME}>
-            <Tooltip title="Verbal Web AI assistant">
-                <IconButton
-                    color="primary"
-                    size="large"
-                    onClick={() => {
-                        setOpen(true);
-                    }}
-                >
-                    <AssistantIcon />
-                </IconButton>
-            </Tooltip>
-            {open ? (
-                <Suspense fallback={<LoadingIndicator conf={conf} />}>
-                    <VerbalWebDialog
-                        conf={conf}
-                        open={true}
-                        onClose={() => {
-                            setOpen(false);
+        <ThemeProvider theme={defaultTheme()}>
+            <Box className={VERBAL_WEB_ASSISTANT_CLASS_NAME}>
+                <Tooltip title="Verbal Web AI assistant">
+                    <IconButton
+                        color="primary"
+                        size="large"
+                        onClick={() => {
+                            setOpen(true);
                         }}
-                        className={VERBAL_WEB_ASSISTANT_DIALOG_CLASS_NAME}
-                    />
-                </Suspense>
-            ) : null}
-        </Box>
+                    >
+                        <AssistantIcon />
+                    </IconButton>
+                </Tooltip>
+                {open ? (
+                    <Suspense fallback={<LoadingIndicator conf={conf} />}>
+                        <VerbalWebDialog
+                            conf={conf}
+                            open={true}
+                            onClose={() => {
+                                setOpen(false);
+                            }}
+                            className={VERBAL_WEB_ASSISTANT_DIALOG_CLASS_NAME}
+                        />
+                    </Suspense>
+                ) : null}
+            </Box>
+        </ThemeProvider>
     );
 }

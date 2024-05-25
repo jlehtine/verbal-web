@@ -24,7 +24,6 @@ import {
     TextField,
     Tooltip,
 } from "@mui/material";
-import { blue } from "@mui/material/colors";
 import React, { useEffect, useRef, useState } from "react";
 
 interface VerbalWebDialogProps extends DialogProps {
@@ -45,13 +44,13 @@ function createListItem(m: ChatMessage, id: number): React.JSX.Element {
     // pr = padding-right, pl = padding-left
     if (m.role === "user") {
         return (
-            <ListItem key={id} sx={{ pl: 14, pr: 0 }}>
+            <ListItem key={id} alignItems="flex-start" sx={{ pl: 14, pr: 0 }}>
                 <ListItemText
                     primary={m.content}
                     sx={{ whiteSpace: "pre-wrap", border: 2, padding: 2, marginRight: 2, borderRadius: 2 }}
                 />
                 <ListItemAvatar sx={{ marginRight: -2 }}>
-                    <Avatar sx={{ bgcolor: blue[500] }}>
+                    <Avatar sx={{ bgcolor: "primary.main" }}>
                         <AccountCircleIcon />
                     </Avatar>
                 </ListItemAvatar>
@@ -59,9 +58,9 @@ function createListItem(m: ChatMessage, id: number): React.JSX.Element {
         );
     } else {
         return (
-            <ListItem key={id} sx={{ pr: 14, pl: 0 }}>
+            <ListItem key={id} alignItems="flex-start" sx={{ pr: 14, pl: 0 }}>
                 <ListItemAvatar>
-                    <Avatar sx={{ bgcolor: blue[500] }}>
+                    <Avatar sx={{ bgcolor: "primary.main" }}>
                         <AssistantIcon />
                     </Avatar>
                 </ListItemAvatar>
@@ -224,7 +223,6 @@ function VerbalWebDialogTitle(props: VerbalWebDialogTitleProps) {
                         position: "absolute",
                         right: 8,
                         top: 8,
-                        color: (theme) => theme.palette.grey[500],
                     }}
                 >
                     <CloseIcon />
