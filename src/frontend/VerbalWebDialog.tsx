@@ -22,6 +22,8 @@ import {
     Tooltip,
     Typography,
     Paper,
+    useMediaQuery,
+    useTheme,
 } from "@mui/material";
 import React, { useEffect, useRef, useState } from "react";
 
@@ -41,35 +43,22 @@ interface VerbalWebMessageListProps {
 
 function createListItem(m: ChatMessage, id: number): React.JSX.Element {
     const um = m.role === "user";
-    const avatar = (
-        <Box sx={{ padding: 1, ...(um ? { pr: 0 } : { pl: 0 }) }}>
-            <Avatar sx={{ bgcolor: "primary.main" }}>{um ? <AccountCircleIcon /> : <AssistantIcon />}</Avatar>
-        </Box>
-    );
-    const msg = <Typography sx={{ whiteSpace: "pre-wrap", padding: 2 }}>{m.content}</Typography>;
-    const tuple = um ? (
-        <>
-            {avatar}
-            {msg}
-        </>
-    ) : (
-        <>
-            {msg}
-            {avatar}
-        </>
-    );
     return (
-        <Box sx={um ? { pr: 8 } : { pl: 8 }}>
-            <Paper key={id} variant="outlined" sx={{ display: "inline-block" }}>
-                <Stack direction="row" alignItems="flex-start" justifyContent={um ? "flex-start" : "flex-end"}>
-                    {tuple}
-                </Stack>
+        <Box sx={um ? { pr: 4 } : { pl: 4 }}>
+            <Paper key={id} variant="outlined">
+                <Box sx={{ padding: 1, float: um ? "left" : "right" }}>
+                    <Avatar sx={{ bgcolor: "primary.main" }}>{um ? <AccountCircleIcon /> : <AssistantIcon />}</Avatar>
+                </Box>
+                <Typography sx={{ whiteSpace: "pre-wrap", padding: 2 }}>{m.content}</Typography>
+                <Box sx={{ clear: um ? "left" : "right" }} />
             </Paper>
         </Box>
     );
 }
 
 export default function VerbalWebDialog({ conf: conf, open: open, onClose: onClose }: VerbalWebDialogProps) {
+    const theme = useTheme();
+    const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
     const tailRef = useRef<HTMLDivElement>(null);
 
     // Chat client containing also state and model
@@ -161,7 +150,11 @@ export default function VerbalWebDialog({ conf: conf, open: open, onClose: onClo
     );
 
     return (
-        <Dialog open={open} onClose={onClose} fullWidth maxWidth="lg">
+        <Dialog
+            open={open}
+            onClose={onClose}
+            {...(fullScreen ? { fullScreen: true } : { fullWidth: true, maxWidth: "lg" })}
+        >
             <VerbalWebDialogTitle onClose={onClose}>Verbal Web AI assistant</VerbalWebDialogTitle>
             <DialogContent dividers>
                 <VerbalWebMessageList messages={messages}></VerbalWebMessageList>
