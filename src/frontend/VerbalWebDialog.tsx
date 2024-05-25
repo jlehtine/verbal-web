@@ -152,7 +152,7 @@ export default function VerbalWebDialog({ conf: conf, open: open, onClose: onClo
     // Scroll to the bottom when there is new content
     useEffect(() => {
         tailRef.current?.scrollIntoView({
-            behavior: "smooth",
+            behavior: "instant",
             block: "end",
         });
     }, [messages, errorMessage, waitingForResponse]);
