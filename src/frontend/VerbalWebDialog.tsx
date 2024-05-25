@@ -20,12 +20,13 @@ import {
     Stack,
     TextField,
     Tooltip,
-    Typography,
     Paper,
     useMediaQuery,
     useTheme,
+    GlobalStyles,
 } from "@mui/material";
 import React, { useEffect, useRef, useState } from "react";
+import Markdown from "react-markdown";
 
 interface VerbalWebDialogProps extends DialogProps {
     conf: VerbalWebConfiguration;
@@ -41,6 +42,18 @@ interface VerbalWebMessageListProps {
     messages: ChatMessage[];
 }
 
+const globalStyles = (
+    <GlobalStyles
+        styles={{
+            ".vw-markdown-message": {
+                fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+                fontSize: "16px",
+                fontWeight: 400,
+            },
+        }}
+    />
+);
+
 function createListItem(m: ChatMessage, id: number): React.JSX.Element {
     const um = m.role === "user";
     return (
@@ -49,7 +62,9 @@ function createListItem(m: ChatMessage, id: number): React.JSX.Element {
                 <Box sx={{ padding: 1, float: um ? "left" : "right" }}>
                     <Avatar sx={{ bgcolor: "primary.main" }}>{um ? <AccountCircleIcon /> : <AssistantIcon />}</Avatar>
                 </Box>
-                <Typography sx={{ whiteSpace: "pre-wrap", padding: 2 }}>{m.content}</Typography>
+                <Box sx={{ padding: 2 }}>
+                    <Markdown className="vw-markdown-message">{m.content}</Markdown>
+                </Box>
                 <Box sx={{ clear: um ? "left" : "right" }} />
             </Paper>
         </Box>
@@ -155,6 +170,7 @@ export default function VerbalWebDialog({ conf: conf, open: open, onClose: onClo
             onClose={onClose}
             {...(fullScreen ? { fullScreen: true } : { fullWidth: true, maxWidth: "lg" })}
         >
+            {globalStyles}
             <VerbalWebDialogTitle onClose={onClose}>Verbal Web AI assistant</VerbalWebDialogTitle>
             <DialogContent dividers>
                 <VerbalWebMessageList messages={messages}></VerbalWebMessageList>
