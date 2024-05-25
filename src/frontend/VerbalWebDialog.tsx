@@ -165,7 +165,7 @@ export default function VerbalWebDialog({ conf: conf, open: open, onClose: onClo
     );
 
     return (
-        <Dialog open={open} onClose={onClose} fullWidth>
+        <Dialog open={open} onClose={onClose} fullWidth maxWidth="lg">
             <VerbalWebDialogTitle onClose={onClose}>Verbal Web AI assistant</VerbalWebDialogTitle>
             <DialogContent dividers>
                 <VerbalWebMessageList messages={messages}></VerbalWebMessageList>
