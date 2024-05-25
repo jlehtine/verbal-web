@@ -24,5 +24,5 @@ export interface ChatCompletionProvider {
      * @param request initial chat state
      * @return one or more updates asynchronously as API backend messages
      */
-    chatCompletion(request: ChatCompletionRequest): Promise<ReadableStream<string>>;
+    chatCompletion(request: ChatCompletionRequest): Promise<AsyncIterable<string>>;
 }

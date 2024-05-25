@@ -1,9 +1,11 @@
 import { InitialChatStateOverrides } from "../shared/chat";
+import { ChatCompletionProvider } from "./ChatCompletionProvider";
 import { ChatServer } from "./ChatServer";
+import { ModerationProvider } from "./ModerationProvider";
+import { OpenAIEngine } from "./OpenAIEngine";
 import { logFatal, logInfo, logThrownError, setLogLevel } from "./log";
 import cors from "cors";
 import express, { Request } from "express";
-import { OpenAI } from "openai";
 import path from "path";
 import { WebSocketExpress } from "websocket-express";
 
@@ -92,15 +94,10 @@ const serverOverrides: InitialChatStateOverrides = {
     model: process.env.VW_CHAT_MODEL,
 };
 
-// Initialize OpenAI API
-logInfo("Initializing OpenAI API");
-const apiKey = process.env.OPENAI_API_KEY;
-if (!apiKey) {
-    logFatal("API key not configured in environment variable OPENAI_API_KEY");
-}
-const openai = new OpenAI({
-    apiKey: apiKey,
-});
+// Initialize AI engine
+const engine = new OpenAIEngine();
+const moderation: ModerationProvider = engine;
+const chatCompletion: ChatCompletionProvider = engine;
 
 // Use WebSocket Express
 const backend = new WebSocketExpress();
@@ -119,7 +116,7 @@ backend.ws("/chatws", (req, res) => {
     logInfo("Accepting web socket connection [%s]", req.ip);
     res.accept()
         .then((ws) => {
-            new ChatServer(req, ws, openai, serverOverrides);
+            new ChatServer(req, ws, moderation, chatCompletion, serverOverrides);
         })
         .catch((err: unknown) => {
             logThrownError("Failed to accept web socket connection [%s]", err, req.ip);
