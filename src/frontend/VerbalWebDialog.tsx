@@ -17,12 +17,11 @@ import {
     IconButton,
     InputAdornment,
     LinearProgress,
-    List,
-    ListItem,
-    ListItemAvatar,
-    ListItemText,
+    Stack,
     TextField,
     Tooltip,
+    Typography,
+    Paper,
 } from "@mui/material";
 import React, { useEffect, useRef, useState } from "react";
 
@@ -41,36 +40,33 @@ interface VerbalWebMessageListProps {
 }
 
 function createListItem(m: ChatMessage, id: number): React.JSX.Element {
-    // pr = padding-right, pl = padding-left
-    if (m.role === "user") {
-        return (
-            <ListItem key={id} alignItems="flex-start" sx={{ pl: 14, pr: 0 }}>
-                <ListItemText
-                    primary={m.content}
-                    sx={{ whiteSpace: "pre-wrap", border: 2, padding: 2, marginRight: 2, borderRadius: 2 }}
-                />
-                <ListItemAvatar sx={{ marginRight: -2 }}>
-                    <Avatar sx={{ bgcolor: "primary.main" }}>
-                        <AccountCircleIcon />
-                    </Avatar>
-                </ListItemAvatar>
-            </ListItem>
-        );
-    } else {
-        return (
-            <ListItem key={id} alignItems="flex-start" sx={{ pr: 14, pl: 0 }}>
-                <ListItemAvatar>
-                    <Avatar sx={{ bgcolor: "primary.main" }}>
-                        <AssistantIcon />
-                    </Avatar>
-                </ListItemAvatar>
-                <ListItemText
-                    primary={m.content}
-                    sx={{ whiteSpace: "pre-wrap", border: 2, padding: 2, borderRadius: 2 }}
-                />
-            </ListItem>
-        );
-    }
+    const um = m.role === "user";
+    const avatar = (
+        <Box sx={{ padding: 1, ...(um ? { pr: 0 } : { pl: 0 }) }}>
+            <Avatar sx={{ bgcolor: "primary.main" }}>{um ? <AccountCircleIcon /> : <AssistantIcon />}</Avatar>
+        </Box>
+    );
+    const msg = <Typography sx={{ whiteSpace: "pre-wrap", padding: 2 }}>{m.content}</Typography>;
+    const tuple = um ? (
+        <>
+            {avatar}
+            {msg}
+        </>
+    ) : (
+        <>
+            {msg}
+            {avatar}
+        </>
+    );
+    return (
+        <Box sx={um ? { pr: 8 } : { pl: 8 }}>
+            <Paper key={id} variant="outlined" sx={{ display: "inline-block" }}>
+                <Stack direction="row" alignItems="flex-start" justifyContent={um ? "flex-start" : "flex-end"}>
+                    {tuple}
+                </Stack>
+            </Paper>
+        </Box>
+    );
 }
 
 export default function VerbalWebDialog({ conf: conf, open: open, onClose: onClose }: VerbalWebDialogProps) {
@@ -193,6 +189,7 @@ export default function VerbalWebDialog({ conf: conf, open: open, onClose: onClo
                                 </InputAdornment>
                             ),
                         }}
+                        sx={{ mt: 2 }}
                     ></TextField>
                 ) : null}
                 {errorMessage ? (
@@ -233,5 +230,5 @@ function VerbalWebDialogTitle(props: VerbalWebDialogTitleProps) {
 }
 
 function VerbalWebMessageList({ messages: messages }: VerbalWebMessageListProps) {
-    return <List>{messages.map((m, idx) => createListItem(m, idx))}</List>;
+    return <Stack spacing={2}>{messages.map((m, idx) => createListItem(m, idx))}</Stack>;
 }
