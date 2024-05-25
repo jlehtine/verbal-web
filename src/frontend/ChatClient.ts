@@ -8,7 +8,7 @@ import { logDebug, logError, logThrownError } from "./log";
 const WS_PATH = "chatws";
 
 /** Base backoff period in milliseconds for exponential backoff */
-const BACKOFF_BASE_MILLIS = 8;
+const BACKOFF_BASE_MILLIS = 100;
 
 /** Inactivity timeout is one minute */
 const INACTIVITY_TIMEOUT_MILLIS = 60 * 1000;
@@ -149,6 +149,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
     private onWebSocketClose(ws: WebSocket) {
         if (ws === this.ws) {
             logDebug("Connection closed");
+            this.ws = undefined;
             this.connectionState = ChatConnectionState.UNCONNECTED;
             this.clearInactivityTimer();
             this.changed();
@@ -161,10 +162,10 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
     private retryWebSocket() {
         this.clearRetryTimer();
         this.clearInactivityTimer();
-        this.numErrors++;
-        const backoffBase = Math.pow(BACKOFF_BASE_MILLIS, this.numErrors);
+        const backoffBase = BACKOFF_BASE_MILLIS * Math.pow(2, this.numErrors);
         const backoff = backoffBase + Math.random() * backoffBase;
         logDebug("Retrying to connect in %d milliseconds", backoff);
+        this.numErrors++;
         this.retryTimer = setTimeout(() => {
             this.retryTimer = undefined;
             this.initWebSocket();
