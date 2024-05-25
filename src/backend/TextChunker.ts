@@ -206,3 +206,24 @@ function graphemeIndexAtOrAfter(giter: GraphemeIterable, index: number) {
     }
     return gind;
 }
+
+/**
+ * Chunks text.
+ *
+ * @param params chunking parameters
+ * @param text input text
+ * @returns text chunks
+ */
+export function chunkText(params: TextChunkerParams, text: string): string[] {
+    const chunker = new TextChunker(params, text);
+    const chunks: string[] = [];
+    let result;
+    do {
+        result = chunker.chunk();
+        const v = result.value;
+        if (v !== undefined) {
+            chunks.push(text.slice(v.start, v.end));
+        }
+    } while (!result.done);
+    return chunks;
+}
