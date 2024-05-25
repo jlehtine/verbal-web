@@ -27,6 +27,7 @@ import {
 } from "@mui/material";
 import React, { useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface VerbalWebDialogProps extends DialogProps {
     conf: VerbalWebConfiguration;
@@ -42,6 +43,7 @@ interface VerbalWebMessageListProps {
     messages: ChatMessage[];
 }
 
+// Global styles for Markdown component
 const globalStyles = (
     <GlobalStyles
         styles={{
@@ -49,6 +51,9 @@ const globalStyles = (
                 fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
                 fontSize: "16px",
                 fontWeight: 400,
+            },
+            ".vw-markdown-message table": {
+                color: "inherit",
             },
         }}
     />
@@ -63,7 +68,9 @@ function createListItem(m: ChatMessage, id: number): React.JSX.Element {
                     <Avatar sx={{ bgcolor: "primary.main" }}>{um ? <AccountCircleIcon /> : <AssistantIcon />}</Avatar>
                 </Box>
                 <Box sx={{ padding: 2 }}>
-                    <Markdown className="vw-markdown-message">{m.content}</Markdown>
+                    <Markdown className="vw-markdown-message" remarkPlugins={[remarkGfm]}>
+                        {m.content}
+                    </Markdown>
                 </Box>
                 <Box sx={{ clear: um ? "left" : "right" }} />
             </Paper>
