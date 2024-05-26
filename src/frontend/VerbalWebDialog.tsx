@@ -67,7 +67,7 @@ function createListItem(m: ChatMessage, id: number): React.JSX.Element {
                 <Box sx={{ padding: 1, float: um ? "left" : "right" }}>
                     <Avatar sx={{ bgcolor: "primary.main" }}>{um ? <AccountCircleIcon /> : <AssistantIcon />}</Avatar>
                 </Box>
-                <Box sx={{ padding: 2 }}>
+                <Box sx={{ pl: 2, pr: 2 }}>
                     <Markdown className="vw-markdown-message" remarkPlugins={[remarkGfm]}>
                         {m.content}
                     </Markdown>
