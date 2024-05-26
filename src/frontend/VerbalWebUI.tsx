@@ -3,7 +3,7 @@ import VerbalWebConfiguration from "./VerbalWebConfiguration";
 import { defaultTheme } from "./defaultTheme";
 import load from "./load";
 import AssistantIcon from "@mui/icons-material/Assistant";
-import { Box, IconButton, ThemeProvider, Tooltip } from "@mui/material";
+import { Box, Button, ThemeProvider, Tooltip } from "@mui/material";
 import React, { Suspense, lazy, useState } from "react";
 
 interface VerbalWebUIProps {
@@ -28,15 +28,16 @@ export default function VerbalWebUI({ conf }: VerbalWebUIProps) {
         <ThemeProvider theme={defaultTheme()}>
             <Box className={VERBAL_WEB_ASSISTANT_CLASS_NAME}>
                 <Tooltip title="Verbal Web AI assistant">
-                    <IconButton
+                    <Button
+                        variant="outlined"
                         color="primary"
-                        size="large"
                         onClick={() => {
                             setOpen(true);
                         }}
+                        startIcon={<AssistantIcon />}
                     >
-                        <AssistantIcon />
-                    </IconButton>
+                        AI Assistant
+                    </Button>
                 </Tooltip>
                 {open ? (
                     <Suspense fallback={<LoadingIndicator conf={conf} />}>
