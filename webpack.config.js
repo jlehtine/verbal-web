@@ -44,7 +44,7 @@ module.exports = [
 
                 // Source map loader for output files
                 {
-                    test: path.resolve(__dirname, "dist", "verbal-web-frontend.js"),
+                    test: /dist[/\\]*.js$/,
                     exclude: /node_modules/,
                     use: "source-map-loader",
                 },
