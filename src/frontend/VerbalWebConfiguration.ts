@@ -1,3 +1,5 @@
+import { FallbackLng, Resource } from "i18next";
+
 /** Describes the phase of loading components */
 export type VerbalWebLoadingPhase =
     /** Loading assistant button and associated dependencies */
@@ -18,6 +20,18 @@ export default interface VerbalWebConfiguration {
 
     /** GPT model to be used */
     useModel?: string;
+
+    /** Forced language */
+    lng?: string;
+
+    /** Default language */
+    fallbackLng?: FallbackLng;
+
+    /** Supported languages */
+    supportedLngs?: readonly string[];
+
+    /** Override localized text resources */
+    resources?: Resource;
 
     /**
      * Callback for loading state changes.

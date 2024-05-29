@@ -12,11 +12,13 @@ function initVerbalWeb(elementId: string, conf: VerbalWebConfiguration) {
         load(conf, "initial", () =>
             Promise.all([
                 import(/* webpackPrefetch: true */ "react"),
+                import(/* webpackPrefetch: true */ "./i18n"),
                 import(/* webpackPrefetch: true */ "react-dom/client"),
                 import(/* webpackPrefetch: true */ "./VerbalWebUI"),
             ]),
         )
-            .then(([{ default: React }, { createRoot: createRoot }, { default: VerbalWebUI }]) => {
+            .then(([{ default: React }, { initI18n }, { createRoot: createRoot }, { default: VerbalWebUI }]) => {
+                initI18n(conf);
                 const root = createRoot(elem);
                 root.render(<VerbalWebUI conf={conf} />);
             })

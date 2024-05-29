@@ -1,7 +1,8 @@
+import VerbalWebConfiguration from "./VerbalWebConfiguration";
 import enTranslation from "./locales/en/translation.json";
 import fiTranslation from "./locales/fi/translation.json";
 import { logThrownError } from "./log";
-import i18n from "i18next";
+import i18n, { Resource } from "i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
 import { initReactI18next } from "react-i18next";
 
@@ -14,25 +15,68 @@ const resources = {
     },
 };
 
-// Initialize and configure i18next
-i18n
-    // Detect language
-    .use(LanguageDetector)
+function isObject(v: unknown): v is Record<string, unknown> {
+    return v !== null && typeof v === "object";
+}
 
-    // React integration
-    .use(initReactI18next)
+function mergeObjects(target: Record<string, unknown>, ...other: Record<string, unknown>[]) {
+    for (const r of other) {
+        for (const key in r) {
+            const rv = r[key];
+            if (isObject(rv)) {
+                const tv = target[key];
+                if (isObject(tv)) {
+                    mergeObjects(tv, rv);
+                } else {
+                    target[key] = { ...rv };
+                }
+            } else {
+                target[key] = rv;
+            }
+        }
+    }
+}
 
-    // Configuration
-    .init({
-        debug: process.env.NODE_ENV !== "production",
-        fallbackLng: "en",
-        interpolation: {
-            escapeValue: false,
-        },
-        resources: resources,
-    })
+function deepCopy<T>(value: T): T {
+    // We know it always produces the same type out
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    return JSON.parse(JSON.stringify(value));
+}
 
-    // Handle errors
-    .catch((err: unknown) => {
-        logThrownError("i18next failed", err);
-    });
+function mergeResources(initial: Resource, ...resources: Resource[]): Resource {
+    const target = deepCopy(initial);
+    mergeObjects(target, ...resources);
+    return target;
+}
+
+/**
+ * Initialize internationalization features.
+ *
+ * @param conf configuration
+ */
+export function initI18n(conf: VerbalWebConfiguration) {
+    // Initialize and configure i18next
+    i18n
+        // Detect language
+        .use(LanguageDetector)
+
+        // React integration
+        .use(initReactI18next)
+
+        // Configuration
+        .init({
+            debug: process.env.NODE_ENV !== "production",
+            lng: conf.lng,
+            fallbackLng: conf.fallbackLng ?? "en",
+            supportedLngs: conf.supportedLngs,
+            interpolation: {
+                escapeValue: false,
+            },
+            resources: mergeResources(resources, ...(conf.resources ? [conf.resources] : [])),
+        })
+
+        // Handle errors
+        .catch((err: unknown) => {
+            logThrownError("i18next failed", err);
+        });
+}

@@ -1,7 +1,6 @@
 import LoadingIndicator from "./LoadingIndicator";
 import VerbalWebConfiguration from "./VerbalWebConfiguration";
 import { defaultTheme } from "./defaultTheme";
-import "./i18n";
 import load from "./load";
 import AssistantIcon from "@mui/icons-material/Assistant";
 import { Box, Button, ThemeProvider, Tooltip } from "@mui/material";
