@@ -62,8 +62,8 @@ const globalStyles = (
 function createListItem(m: ChatMessage, id: number): React.JSX.Element {
     const um = m.role === "user";
     return (
-        <Box sx={um ? { pr: 4 } : { pl: 4 }}>
-            <Paper key={id} variant="outlined">
+        <Box key={id} sx={um ? { pr: 4 } : { pl: 4 }}>
+            <Paper variant="outlined">
                 <Box sx={{ padding: 1, float: um ? "left" : "right" }}>
                     <Avatar sx={{ bgcolor: "primary.main" }}>{um ? <AccountCircleIcon /> : <AssistantIcon />}</Avatar>
                 </Box>
