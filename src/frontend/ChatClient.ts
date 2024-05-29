@@ -69,7 +69,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
      * Initializes a web socket.
      */
     private initWebSocket() {
-        logDebug(`Connecting to ${this.wsUrl.toString()}`);
+        logDebug("Connecting to %s", this.wsUrl);
         this.clearRetryTimer();
         const ws = (this.ws = new WebSocket(this.wsUrl));
 
