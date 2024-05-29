@@ -26,6 +26,7 @@ import {
     GlobalStyles,
 } from "@mui/material";
 import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -79,6 +80,7 @@ function createListItem(m: ChatMessage, id: number): React.JSX.Element {
 }
 
 export default function VerbalWebDialog({ conf: conf, open: open, onClose: onClose }: VerbalWebDialogProps) {
+    const { t } = useTranslation();
     const theme = useTheme();
     const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
     const tailRef = useRef<HTMLDivElement>(null);
@@ -134,20 +136,20 @@ export default function VerbalWebDialog({ conf: conf, open: open, onClose: onClo
         setMessages([...client.chat.state.messages]);
         let errorMessage;
         if (client.connectionState === ChatConnectionState.ERROR) {
-            errorMessage = "Connection error, retrying...";
+            errorMessage = t("error.backendConnection");
         } else if (client.chat.error !== undefined) {
             switch (client.chat.error) {
                 case "chat":
-                    errorMessage = "AI assistant failed!";
+                    errorMessage = t("error.chat");
                     break;
                 case "connection":
-                    errorMessage = "Failed to contact AI assistant!";
+                    errorMessage = t("error.connection");
                     break;
                 case "moderation":
-                    errorMessage = "Message was blocked by moderation!";
+                    errorMessage = t("error.moderation");
                     break;
                 case "limit":
-                    errorMessage = "Message was blocked by chat usage limits!";
+                    errorMessage = t("error.limit");
                     break;
             }
         }
@@ -178,14 +180,14 @@ export default function VerbalWebDialog({ conf: conf, open: open, onClose: onClo
             {...(fullScreen ? { fullScreen: true } : { fullWidth: true, maxWidth: "lg" })}
         >
             {globalStyles}
-            <VerbalWebDialogTitle onClose={onClose}>Verbal Web AI assistant</VerbalWebDialogTitle>
+            <VerbalWebDialogTitle onClose={onClose}>{t("dialog.title")}</VerbalWebDialogTitle>
             <DialogContent dividers>
                 <VerbalWebMessageList messages={messages}></VerbalWebMessageList>
                 {!waitingForResponse && errorMessage === undefined ? (
                     <TextField
                         fullWidth
                         multiline
-                        label="Ask a question!"
+                        label={t("input.label")}
                         value={userInput} // Value stored in state userInput
                         onChange={handleInputChange}
                         onKeyDown={handleKeyDown}

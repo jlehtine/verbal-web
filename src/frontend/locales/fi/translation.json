@@ -1,0 +1,19 @@
+{
+    "dialog": {
+        "title": "Tekoälyavustaja"
+    },
+    "error": {
+        "backendConnection": "Yhteysvirhe, yritetään uudestaan...",
+        "chat": "Tekoälyavustaja epäonnistui.",
+        "connection": "Tekoälyavustajaan ei saatu yhteyttä.",
+        "limit": "Viesti estettiin käyttörajojen takia.",
+        "moderation": "Viesti estettiin moderoinnin takia."
+    },
+    "input": {
+        "label": "Keskustele tekoälyavustajan kanssa"
+    },
+    "launch": {
+        "text": "Tekoälyavustaja",
+        "tooltip": "Kysy tekoälyavustajalta"
+    }
+}

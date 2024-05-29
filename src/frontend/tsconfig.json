@@ -8,7 +8,8 @@
         "jsx": "preserve",
         "module": "ESNext",
         "moduleResolution": "Node",
-        "allowSyntheticDefaultImports": true
+        "allowSyntheticDefaultImports": true,
+        "resolveJsonModule": true
     },
     "include": ["**/*"]
 }

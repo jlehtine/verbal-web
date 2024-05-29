@@ -16,6 +16,13 @@
             "options": {
                 "trailingComma": "none"
             }
+        },
+        {
+            "files": "**/locales/**/*.json",
+            "options": {
+                "plugins": ["prettier-plugin-sort-json"],
+                "jsonRecursiveSort": true
+            }
         }
     ]
 }
