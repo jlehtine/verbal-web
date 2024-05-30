@@ -106,8 +106,10 @@ function setHighlightPaletteMode(mode: PaletteMode) {
         highlightMode = mode;
 
         // Load highlight styles, if necessary
-        const cssFile = "highlight.js/styles/base16/default-" + mode + ".min.css";
-        import(cssFile)
+        (mode === "light"
+            ? import("highlight.js/styles/base16/default-light.min.css")
+            : import("highlight.js/styles/base16/default-dark.min.css")
+        )
             .then((module) => {
                 if (!highlightStyle) {
                     highlightStyle = document.createElement("style");
