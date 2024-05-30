@@ -1,5 +1,6 @@
 import LoadingIndicator from "./LoadingIndicator";
 import VerbalWebConfiguration from "./VerbalWebConfiguration";
+import { ConfigContext } from "./context";
 import { defaultTheme } from "./defaultTheme";
 import load from "./load";
 import AssistantIcon from "@mui/icons-material/Assistant";
@@ -27,34 +28,40 @@ export default function VerbalWebUI({ conf }: VerbalWebUIProps) {
         load(conf, "dialog", () => import(/* webpackPrefetch: true */ "./VerbalWebDialog")),
     );
 
-    return (
-        <ThemeProvider theme={defaultTheme()}>
-            <Box className={VERBAL_WEB_ASSISTANT_CLASS_NAME}>
-                <Tooltip title={t("launch.tooltip")}>
-                    <Button
-                        variant="outlined"
-                        color="primary"
-                        onClick={() => {
-                            setOpen(true);
+    // Wrap elements by providers
+    function wrapProviders(elem: React.JSX.Element) {
+        return (
+            <ThemeProvider theme={defaultTheme()}>
+                <ConfigContext.Provider value={conf}>{elem}</ConfigContext.Provider>
+            </ThemeProvider>
+        );
+    }
+
+    return wrapProviders(
+        <Box className={VERBAL_WEB_ASSISTANT_CLASS_NAME}>
+            <Tooltip title={t("launch.tooltip")}>
+                <Button
+                    variant="outlined"
+                    color="primary"
+                    onClick={() => {
+                        setOpen(true);
+                    }}
+                    startIcon={<AssistantIcon />}
+                >
+                    {t("launch.text")}
+                </Button>
+            </Tooltip>
+            {open ? (
+                <Suspense fallback={<LoadingIndicator conf={conf} />}>
+                    <VerbalWebDialog
+                        open={true}
+                        onClose={() => {
+                            setOpen(false);
                         }}
-                        startIcon={<AssistantIcon />}
-                    >
-                        {t("launch.text")}
-                    </Button>
-                </Tooltip>
-                {open ? (
-                    <Suspense fallback={<LoadingIndicator conf={conf} />}>
-                        <VerbalWebDialog
-                            conf={conf}
-                            open={true}
-                            onClose={() => {
-                                setOpen(false);
-                            }}
-                            className={VERBAL_WEB_ASSISTANT_DIALOG_CLASS_NAME}
-                        />
-                    </Suspense>
-                ) : null}
-            </Box>
-        </ThemeProvider>
+                        className={VERBAL_WEB_ASSISTANT_DIALOG_CLASS_NAME}
+                    />
+                </Suspense>
+            ) : null}
+        </Box>,
     );
 }

@@ -42,6 +42,12 @@ module.exports = [
                     ],
                 },
 
+                // CSS styles
+                {
+                    test: /\.css$/,
+                    use: ["css-loader"],
+                },
+
                 // Source map loader for output files
                 {
                     test: /dist[/\\]*.js$/,

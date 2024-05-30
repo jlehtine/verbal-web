@@ -1,10 +1,8 @@
 import { ChatMessage } from "../shared/api";
 import { ChatClient, ChatConnectionState } from "./ChatClient";
 import LoadingIndicator from "./LoadingIndicator";
-import VerbalWebConfiguration from "./VerbalWebConfiguration";
+import { ConfigContext } from "./context";
 import { extract } from "./extract";
-import load from "./load";
-import { logDebug } from "./log";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import AssistantIcon from "@mui/icons-material/Assistant";
 import CloseIcon from "@mui/icons-material/Close";
@@ -27,15 +25,16 @@ import {
     useMediaQuery,
     useTheme,
     GlobalStyles,
+    PaletteMode,
 } from "@mui/material";
-import { HLJSApi } from "highlight.js";
-import React, { PropsWithChildren, Suspense, lazy, useEffect, useRef, useState } from "react";
+import React, { PropsWithChildren, Suspense, useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { logThrownError } from "./log";
+import { VerbalWebError } from "../shared/error";
 
 interface VerbalWebDialogProps extends DialogProps {
-    conf: VerbalWebConfiguration;
     open: boolean;
     onClose: () => void;
 }
@@ -46,10 +45,8 @@ interface VerbalWebDialogTitleProps extends DialogTitleProps {
 
 interface VerbalWebMessageListProps {
     messages: ChatMessage[];
-    Highlight: HighlightFC;
+    waitingForResponse: boolean;
 }
-
-type HighlightFC = React.FC<PropsWithChildren>;
 
 // Global styles for Markdown component
 const globalStyles = (
@@ -67,20 +64,132 @@ const globalStyles = (
     />
 );
 
-function createListItem(m: ChatMessage, id: number, Highlight: HighlightFC): React.JSX.Element {
-    const um = m.role === "user";
+let highlightStyle: HTMLStyleElement | undefined;
+let highlightMode: PaletteMode;
+
+function isObject(v: unknown): v is Record<string, unknown> {
+    return typeof v === "object" && v !== null;
+}
+
+interface CssModule {
+    default: Array<[unknown, string]>;
+}
+
+function isCssModule(v: unknown): v is CssModule {
     return (
-        <Box key={id} sx={um ? { pr: 4 } : { pl: 4 }}>
+        isObject(v) &&
+        Array.isArray(v.default) &&
+        v.default.length > 0 &&
+        Array.isArray(v.default[0]) &&
+        v.default[0].length > 1 &&
+        typeof v.default[0][1] === "string"
+    );
+}
+
+function getCssContent(module: unknown): string {
+    if (isCssModule(module)) {
+        return module.default[0][1];
+    } else {
+        throw new VerbalWebError("Not a CSS module");
+    }
+}
+
+/**
+ * Loads and sets the highlighting styles.
+ *
+ * @param mode palette mode
+ */
+function setHighlightPaletteMode(mode: PaletteMode) {
+    // Check if mode changed
+    if (mode !== highlightMode) {
+        // Set mode
+        highlightMode = mode;
+
+        // Load highlight styles, if necessary
+        const cssFile = "highlight.js/styles/base16/default-" + mode + ".min.css";
+        import(cssFile)
+            .then((module) => {
+                if (!highlightStyle) {
+                    highlightStyle = document.createElement("style");
+                    document.head.appendChild(highlightStyle);
+                }
+                if (mode === highlightMode) {
+                    highlightStyle.innerHTML = getCssContent(module);
+                }
+            })
+            .catch((err: unknown) => {
+                logThrownError("Failed to load syntax highlighting styles", err);
+            });
+    }
+}
+
+/**
+ * Highlights the specified HTML elements.
+ *
+ * @param nodes nodes to be highlighted
+ * @param mode palette mode
+ */
+function highlight(elem: HTMLElement, completed: boolean, mode: PaletteMode) {
+    const selector = "pre code";
+    const nodes = elem.querySelectorAll(selector);
+    if (nodes.length > 0) {
+        setHighlightPaletteMode(mode);
+        import("highlight.js")
+            .then(({ default: hljs }) => {
+                for (const n of elem.querySelectorAll(selector + ':not([data-highlighted="yes"]')) {
+                    if (n instanceof HTMLElement) {
+                        if (
+                            completed ||
+                            n.nextElementSibling instanceof Element ||
+                            n.parentElement?.nextElementSibling instanceof Element
+                        ) {
+                            hljs.highlightElement(n);
+                        }
+                    }
+                }
+            })
+            .catch((err: unknown) => {
+                logThrownError("Syntax highlighting failed", err);
+            });
+    }
+}
+
+/**
+ * Component for handling markdown and code snippet content.
+ */
+function MarkdownContent({ content, completed }: { content: string; completed: boolean }) {
+    const conf = useContext(ConfigContext);
+    const theme = useTheme();
+    const selfRef = useRef<HTMLElement>();
+
+    // Highlight, if highlighting not disabled
+    useEffect(() => {
+        if (conf.highlight !== false) {
+            if (selfRef.current) {
+                highlight(selfRef.current, completed, theme.palette.mode);
+            }
+        }
+    }, [content, completed]);
+
+    return (
+        <Box ref={selfRef}>
+            <Markdown className="vw-markdown-message" remarkPlugins={[remarkGfm]}>
+                {content}
+            </Markdown>
+        </Box>
+    );
+}
+
+function ChatMessage({ msg, completed }: PropsWithChildren<{ msg: ChatMessage; completed: boolean }>) {
+    const um = msg.role === "user";
+    return (
+        <Box sx={um ? { pr: 4 } : { pl: 4 }}>
             <Paper variant="outlined">
                 <Box sx={{ padding: 1, float: um ? "left" : "right" }}>
                     <Avatar sx={{ bgcolor: "primary.main" }}>{um ? <AccountCircleIcon /> : <AssistantIcon />}</Avatar>
                 </Box>
                 <Box sx={{ pl: 2, pr: 2 }}>
-                    <Highlight>
-                        <Markdown className="vw-markdown-message" remarkPlugins={[remarkGfm]}>
-                            {m.content}
-                        </Markdown>
-                    </Highlight>
+                    <MarkdownContent content={msg.content} completed={completed} />
                 </Box>
                 <Box sx={{ clear: um ? "left" : "right" }} />
             </Paper>
@@ -88,42 +197,12 @@ function createListItem(m: ChatMessage, id: number, Highlight: HighlightFC): Rea
     );
 }
 
-/** Creates a highlight component */
-function createHighlight(hljs?: HLJSApi): HighlightFC {
-    logDebug("Creating Highlight with highlighting %s", hljs ? "enabled" : "disabled");
-    return ({ children }) => {
-        const selfRef = useRef<HTMLDivElement>();
-
-        // Highlight, if highlighting configured
-        if (hljs) {
-            useEffect(() => {
-                selfRef.current?.querySelectorAll("pre code").forEach((e) => {
-                    if (e instanceof HTMLElement) {
-                        logDebug("Highlighting an element %s", e);
-                        hljs.highlightElement(e);
-                    }
-                });
-            }, []);
-        }
-
-        return <Box ref={selfRef}>{children}</Box>;
-    };
-}
-
-export default function VerbalWebDialog({ conf: conf, open: open, onClose: onClose }: VerbalWebDialogProps) {
+export default function VerbalWebDialog({ open: open, onClose: onClose }: VerbalWebDialogProps) {
+    const conf = useContext(ConfigContext);
     const { t } = useTranslation();
     const theme = useTheme();
     const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
     const tailRef = useRef<HTMLDivElement>();
-
-    // Enable syntax hightlighting, if so configured
-    const Highlight: HighlightFC = conf.highlight
-        ? lazy<HighlightFC>(() =>
-              load(conf, "dialog", () =>
-                  import("highlight.js").then(({ default: hljs }) => ({ default: createHighlight(hljs) })),
-              ),
-          )
-        : createHighlight();
 
     // Chat client containing also state and model
     // This is not used directly for rendering but has the same lifecycle as the component
@@ -223,7 +302,10 @@ export default function VerbalWebDialog({ conf: conf, open: open, onClose: onClo
             <VerbalWebDialogTitle onClose={onClose}>{t("dialog.title")}</VerbalWebDialogTitle>
             <DialogContent dividers>
                 <Suspense fallback={<LoadingIndicator conf={conf} />}>
-                    <VerbalWebMessageList messages={messages} Highlight={Highlight}></VerbalWebMessageList>
+                    <VerbalWebMessageList
+                        messages={messages}
+                        waitingForResponse={waitingForResponse}
+                    ></VerbalWebMessageList>
                 </Suspense>
                 {!waitingForResponse && errorMessage === undefined ? (
                     <TextField
@@ -289,6 +371,12 @@ function VerbalWebDialogTitle(props: VerbalWebDialogTitleProps) {
     );
 }
 
-function VerbalWebMessageList({ messages: messages, Highlight: Highlight }: VerbalWebMessageListProps) {
-    return <Stack spacing={2}>{messages.map((m, idx) => createListItem(m, idx, Highlight))}</Stack>;
+function VerbalWebMessageList({ messages, waitingForResponse }: VerbalWebMessageListProps) {
+    return (
+        <Stack spacing={2}>
+            {messages.map((m, idx, array) => (
+                <ChatMessage key={idx} msg={m} completed={!waitingForResponse || idx < array.length - 1} />
+            ))}
+        </Stack>
+    );
 }
