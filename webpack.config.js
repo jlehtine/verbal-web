@@ -2,13 +2,32 @@ const path = require("path");
 const ESLintPlugin = require("eslint-webpack-plugin");
 const nodeExternals = require("webpack-node-externals");
 
+const COREJS_VERSION = "3.37";
+const NODE_VERSION = "20";
+
 const babelOptions = {
     presets: [
         [
             "@babel/preset-env",
             {
                 useBuiltIns: "usage",
-                corejs: "3.37",
+                corejs: COREJS_VERSION,
+            },
+        ],
+        "@babel/preset-react",
+    ],
+};
+
+const babelOptionsBackend = {
+    presets: [
+        [
+            "@babel/preset-env",
+            {
+                useBuiltIns: "usage",
+                corejs: COREJS_VERSION,
+                targets: {
+                    node: NODE_VERSION,
+                },
             },
         ],
         "@babel/preset-react",
@@ -96,6 +115,10 @@ module.exports = [
                     test: /\.ts$/,
                     exclude: /node_modules/,
                     use: [
+                        {
+                            loader: "babel-loader",
+                            options: babelOptionsBackend,
+                        },
                         {
                             loader: "ts-loader",
                         },
