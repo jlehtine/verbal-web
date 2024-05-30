@@ -107,8 +107,8 @@ function setHighlightPaletteMode(mode: PaletteMode) {
 
         // Load highlight styles, if necessary
         (mode === "light"
-            ? import("highlight.js/styles/base16/default-light.min.css")
-            : import("highlight.js/styles/base16/default-dark.min.css")
+            ? import("highlight.js/styles/stackoverflow-light.min.css")
+            : import("highlight.js/styles/stackoverflow-dark.min.css")
         )
             .then((module) => {
                 if (!highlightStyle) {
