@@ -65,14 +65,14 @@ const globalStyles = (
 );
 
 let highlightStyle: HTMLStyleElement | undefined;
-let highlightMode: PaletteMode;
+let highlightMode: PaletteMode | undefined;
 
 function isObject(v: unknown): v is Record<string, unknown> {
     return typeof v === "object" && v !== null;
 }
 
 interface CssModule {
-    default: Array<[unknown, string]>;
+    default: [[unknown, string]];
 }
 
 function isCssModule(v: unknown): v is CssModule {
@@ -285,6 +285,13 @@ export default function VerbalWebDialog({ open: open, onClose: onClose }: Verbal
             block: "end",
         });
     }, [messages, errorMessage, waitingForResponse]);
+
+    // Switch highlight palette on light/dark mode changes
+    useEffect(() => {
+        if (highlightMode !== undefined) {
+            setHighlightPaletteMode(theme.palette.mode);
+        }
+    }, [theme.palette.mode]);
 
     // Close chat client on unmount
     useEffect(
