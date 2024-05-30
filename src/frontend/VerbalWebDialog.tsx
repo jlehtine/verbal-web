@@ -1,7 +1,10 @@
 import { ChatMessage } from "../shared/api";
 import { ChatClient, ChatConnectionState } from "./ChatClient";
+import LoadingIndicator from "./LoadingIndicator";
 import VerbalWebConfiguration from "./VerbalWebConfiguration";
 import { extract } from "./extract";
+import load from "./load";
+import { logDebug } from "./log";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import AssistantIcon from "@mui/icons-material/Assistant";
 import CloseIcon from "@mui/icons-material/Close";
@@ -25,7 +28,8 @@ import {
     useTheme,
     GlobalStyles,
 } from "@mui/material";
-import React, { useEffect, useRef, useState } from "react";
+import { HLJSApi } from "highlight.js";
+import React, { PropsWithChildren, Suspense, lazy, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -42,7 +46,10 @@ interface VerbalWebDialogTitleProps extends DialogTitleProps {
 
 interface VerbalWebMessageListProps {
     messages: ChatMessage[];
+    Highlight: HighlightFC;
 }
+
+type HighlightFC = React.FC<PropsWithChildren>;
 
 // Global styles for Markdown component
 const globalStyles = (
@@ -60,7 +67,7 @@ const globalStyles = (
     />
 );
 
-function createListItem(m: ChatMessage, id: number): React.JSX.Element {
+function createListItem(m: ChatMessage, id: number, Highlight: HighlightFC): React.JSX.Element {
     const um = m.role === "user";
     return (
         <Box key={id} sx={um ? { pr: 4 } : { pl: 4 }}>
@@ -69,9 +76,11 @@ function createListItem(m: ChatMessage, id: number): React.JSX.Element {
                     <Avatar sx={{ bgcolor: "primary.main" }}>{um ? <AccountCircleIcon /> : <AssistantIcon />}</Avatar>
                 </Box>
                 <Box sx={{ pl: 2, pr: 2 }}>
-                    <Markdown className="vw-markdown-message" remarkPlugins={[remarkGfm]}>
-                        {m.content}
-                    </Markdown>
+                    <Highlight>
+                        <Markdown className="vw-markdown-message" remarkPlugins={[remarkGfm]}>
+                            {m.content}
+                        </Markdown>
+                    </Highlight>
                 </Box>
                 <Box sx={{ clear: um ? "left" : "right" }} />
             </Paper>
@@ -79,11 +88,42 @@ function createListItem(m: ChatMessage, id: number): React.JSX.Element {
     );
 }
 
+/** Creates a highlight component */
+function createHighlight(hljs?: HLJSApi): HighlightFC {
+    logDebug("Creating Highlight with highlighting %s", hljs ? "enabled" : "disabled");
+    return ({ children }) => {
+        const selfRef = useRef<HTMLDivElement>();
+
+        // Highlight, if highlighting configured
+        if (hljs) {
+            useEffect(() => {
+                selfRef.current?.querySelectorAll("pre code").forEach((e) => {
+                    if (e instanceof HTMLElement) {
+                        logDebug("Highlighting an element %s", e);
+                        hljs.highlightElement(e);
+                    }
+                });
+            }, []);
+        }
+
+        return <Box ref={selfRef}>{children}</Box>;
+    };
+}
+
 export default function VerbalWebDialog({ conf: conf, open: open, onClose: onClose }: VerbalWebDialogProps) {
     const { t } = useTranslation();
     const theme = useTheme();
     const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
-    const tailRef = useRef<HTMLDivElement>(null);
+    const tailRef = useRef<HTMLDivElement>();
+
+    // Enable syntax hightlighting, if so configured
+    const Highlight: HighlightFC = conf.highlight
+        ? lazy<HighlightFC>(() =>
+              load(conf, "dialog", () =>
+                  import("highlight.js").then(({ default: hljs }) => ({ default: createHighlight(hljs) })),
+              ),
+          )
+        : createHighlight();
 
     // Chat client containing also state and model
     // This is not used directly for rendering but has the same lifecycle as the component
@@ -182,7 +222,9 @@ export default function VerbalWebDialog({ conf: conf, open: open, onClose: onClo
             {globalStyles}
             <VerbalWebDialogTitle onClose={onClose}>{t("dialog.title")}</VerbalWebDialogTitle>
             <DialogContent dividers>
-                <VerbalWebMessageList messages={messages}></VerbalWebMessageList>
+                <Suspense fallback={<LoadingIndicator conf={conf} />}>
+                    <VerbalWebMessageList messages={messages} Highlight={Highlight}></VerbalWebMessageList>
+                </Suspense>
                 {!waitingForResponse && errorMessage === undefined ? (
                     <TextField
                         fullWidth
@@ -247,6 +289,6 @@ function VerbalWebDialogTitle(props: VerbalWebDialogTitleProps) {
     );
 }
 
-function VerbalWebMessageList({ messages: messages }: VerbalWebMessageListProps) {
-    return <Stack spacing={2}>{messages.map((m, idx) => createListItem(m, idx))}</Stack>;
+function VerbalWebMessageList({ messages: messages, Highlight: Highlight }: VerbalWebMessageListProps) {
+    return <Stack spacing={2}>{messages.map((m, idx) => createListItem(m, idx, Highlight))}</Stack>;
 }

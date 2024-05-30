@@ -33,6 +33,9 @@ export default interface VerbalWebConfiguration {
     /** Override localized text resources */
     resources?: Resource;
 
+    /** Whether to enable syntax highlighting */
+    highlight?: boolean;
+
     /**
      * Callback for loading state changes.
      * Default indicators for loading progress and loading errors are
