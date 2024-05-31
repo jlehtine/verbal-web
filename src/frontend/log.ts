@@ -38,8 +38,8 @@ export function logError(msg: string, ...params: unknown[]) {
  * @param err error
  * @param baseMsg base message
  */
-export function logThrownError(msg: string, err: unknown) {
-    console.error(describeError(err, isInDevelopment(), VERBAL_WEB_PREFIX + msg));
+export function logThrownError(msg: string, err: unknown, ...params: unknown[]) {
+    console.error(describeError(err, isInDevelopment(), VERBAL_WEB_PREFIX + msg), ...params);
 }
 
 function isInDevelopment() {
