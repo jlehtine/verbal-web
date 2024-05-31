@@ -25,7 +25,7 @@ export default function VerbalWebUI({ conf }: VerbalWebUIProps) {
 
     // Lazy load the dialog code
     const VerbalWebDialog = lazy(() =>
-        load(conf, "dialog", () => import(/* webpackPrefetch: true */ "./VerbalWebDialog")),
+        load("VerbalWebDialog", conf, "dialog", () => import(/* webpackPrefetch: true */ "./VerbalWebDialog")),
     );
 
     // Wrap elements by providers

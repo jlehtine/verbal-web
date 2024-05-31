@@ -9,7 +9,7 @@ declare global {
 function initVerbalWeb(elementId: string, conf: VerbalWebConfiguration) {
     const elem = document.getElementById(elementId);
     if (elem !== null) {
-        load(conf, "initial", () =>
+        load("initial", conf, "initial", () =>
             Promise.all([
                 import(/* webpackPrefetch: true */ "react"),
                 import(/* webpackPrefetch: true */ "./i18n"),
@@ -17,7 +17,7 @@ function initVerbalWeb(elementId: string, conf: VerbalWebConfiguration) {
                 import(/* webpackPrefetch: true */ "./VerbalWebUI"),
             ]),
         )
-            .then(([{ default: React }, { initI18n }, { createRoot: createRoot }, { default: VerbalWebUI }]) => {
+            .then(([{ default: React }, { initI18n }, { createRoot }, { default: VerbalWebUI }]) => {
                 initI18n(conf);
                 const root = createRoot(elem);
                 root.render(<VerbalWebUI conf={conf} />);
