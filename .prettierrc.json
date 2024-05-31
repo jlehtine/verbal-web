@@ -4,6 +4,12 @@
     "plugins": ["@trivago/prettier-plugin-sort-imports"],
     "overrides": [
         {
+            "files": "src/frontend/VerbalWebDialog.tsx",
+            "options": {
+                "plugins": []
+            }
+        },
+        {
             "files": "**/*.md",
             "options": {
                 "printWidth": 80,
