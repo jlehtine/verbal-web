@@ -5,7 +5,9 @@ export type VerbalWebLoadingPhase =
     /** Loading assistant button and associated dependencies */
     | "initial"
     /** Loading assistant chat dialog */
-    | "dialog";
+    | "dialog"
+    /** Loading extra features for the chat dialog */
+    | "extra";
 
 /** Verbal Web frontend configuration */
 export default interface VerbalWebConfiguration {

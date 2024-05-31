@@ -33,6 +33,8 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { logThrownError } from "./log";
 import { VerbalWebError } from "../shared/error";
+import load from "./load";
+import VerbalWebConfiguration from "./VerbalWebConfiguration";
 
 interface VerbalWebDialogProps extends DialogProps {
     open: boolean;
@@ -99,7 +101,7 @@ function getCssContent(module: unknown): string {
  *
  * @param mode palette mode
  */
-function setHighlightPaletteMode(mode: PaletteMode) {
+function setHighlightPaletteMode(mode: PaletteMode, conf: VerbalWebConfiguration) {
     // Check if mode changed
     if (mode !== highlightMode) {
         // Set mode
@@ -107,8 +109,18 @@ function setHighlightPaletteMode(mode: PaletteMode) {
 
         // Load highlight styles, if necessary
         (mode === "light"
-            ? import("highlight.js/styles/stackoverflow-light.min.css")
-            : import("highlight.js/styles/stackoverflow-dark.min.css")
+            ? load(
+                  "highligh.js/styles/light",
+                  conf,
+                  "extra",
+                  () => import("highlight.js/styles/stackoverflow-light.min.css"),
+              )
+            : load(
+                  "highligh.js/styles/dark",
+                  conf,
+                  "extra",
+                  () => import("highlight.js/styles/stackoverflow-dark.min.css"),
+              )
         )
             .then((module) => {
                 if (!highlightStyle) {
@@ -131,12 +143,12 @@ function setHighlightPaletteMode(mode: PaletteMode) {
  * @param nodes nodes to be highlighted
  * @param mode palette mode
  */
-function highlight(elem: HTMLElement, completed: boolean, mode: PaletteMode) {
+function highlight(elem: HTMLElement, completed: boolean, mode: PaletteMode, conf: VerbalWebConfiguration) {
     const selector = "pre code";
     const nodes = elem.querySelectorAll(selector);
     if (nodes.length > 0) {
-        setHighlightPaletteMode(mode);
-        import("highlight.js")
+        setHighlightPaletteMode(mode, conf);
+        load("highlight.js", conf, "extra", () => import("highlight.js"))
             .then(({ default: hljs }) => {
                 for (const n of elem.querySelectorAll(selector + ':not([data-highlighted="yes"]')) {
                     if (n instanceof HTMLElement) {
@@ -168,7 +180,7 @@ function MarkdownContent({ content, completed }: { content: string; completed: b
     useEffect(() => {
         if (conf.highlight !== false) {
             if (selfRef.current) {
-                highlight(selfRef.current, completed, theme.palette.mode);
+                highlight(selfRef.current, completed, theme.palette.mode, conf);
             }
         }
     }, [content, completed]);
@@ -289,7 +301,7 @@ export default function VerbalWebDialog({ open: open, onClose: onClose }: Verbal
     // Switch highlight palette on light/dark mode changes
     useEffect(() => {
         if (highlightMode !== undefined) {
-            setHighlightPaletteMode(theme.palette.mode);
+            setHighlightPaletteMode(theme.palette.mode, conf);
         }
     }, [theme.palette.mode]);
 
