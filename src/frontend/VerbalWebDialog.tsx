@@ -310,7 +310,7 @@ export default function VerbalWebDialog({ open: open, onClose: onClose }: Verbal
             {globalStyles}
             <VerbalWebDialogTitle onClose={onClose}>{t("dialog.title")}</VerbalWebDialogTitle>
             <DialogContent dividers>
-                <Suspense fallback={<LoadingIndicator conf={conf} />}>
+                <Suspense fallback={<LoadingIndicator />}>
                     <VerbalWebMessageList
                         messages={messages}
                         waitingForResponse={waitingForResponse}

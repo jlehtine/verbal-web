@@ -52,7 +52,7 @@ export default function VerbalWebUI({ conf }: VerbalWebUIProps) {
                 </Button>
             </Tooltip>
             {open ? (
-                <Suspense fallback={<LoadingIndicator conf={conf} />}>
+                <Suspense fallback={<LoadingIndicator />}>
                     <VerbalWebDialog
                         open={true}
                         onClose={() => {

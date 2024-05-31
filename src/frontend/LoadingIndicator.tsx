@@ -1,16 +1,14 @@
-import VerbalWebConfiguration, { DEFAULT_ON_LOADING_DELAY_MILLIS } from "./VerbalWebConfiguration";
+import { DEFAULT_ON_LOADING_DELAY_MILLIS } from "./VerbalWebConfiguration";
+import { ConfigContext } from "./context";
 import { Backdrop, CircularProgress } from "@mui/material";
-import React, { useEffect, useState } from "react";
-
-interface LoadingIndicatorProps {
-    conf: VerbalWebConfiguration;
-}
+import React, { useContext, useEffect, useState } from "react";
 
 /**
  * Displays a loading indicator dialog, unless custom indicators are active.
  * The dialog is displayed with a slight delay to avoid unnecessary flashes.
  */
-export default function LoadingIndicator({ conf: conf }: LoadingIndicatorProps) {
+export default function LoadingIndicator() {
+    const conf = useContext(ConfigContext);
     const [open, setOpen] = useState(false);
     useEffect(() => {
         const timeout = setTimeout(() => {
