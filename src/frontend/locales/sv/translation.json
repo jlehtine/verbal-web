@@ -1,0 +1,19 @@
+{
+    "dialog": {
+        "title": "AI-assistent"
+    },
+    "error": {
+        "backendConnection": "Anslutningsfel, försöker igen...",
+        "chat": "AI-assistenten misslyckades.",
+        "connection": "Misslyckades med att ansluta till AI-assistenten.",
+        "limit": "Meddelandet blockerades av gränser för chattanvändning.",
+        "moderation": "Meddelandet blockerades av moderering."
+    },
+    "input": {
+        "label": "Chatta med AI-assistenten"
+    },
+    "launch": {
+        "text": "AI-assistent",
+        "tooltip": "Fråga AI-assistenten"
+    }
+}
