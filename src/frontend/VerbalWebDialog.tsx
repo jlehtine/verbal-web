@@ -216,7 +216,7 @@ export default function VerbalWebDialog({ open: open, onClose: onClose }: Verbal
     const { t } = useTranslation();
     const theme = useTheme();
     const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
-    const tailRef = useRef<HTMLDivElement>();
+    const contentRef = useRef<HTMLDivElement>();
 
     // Chat client containing also state and model
     // This is not used directly for rendering but has the same lifecycle as the component
@@ -292,10 +292,12 @@ export default function VerbalWebDialog({ open: open, onClose: onClose }: Verbal
 
     // Scroll to the bottom when there is new content
     useEffect(() => {
-        tailRef.current?.scrollIntoView({
-            behavior: "instant",
-            block: "end",
-        });
+        const c = contentRef.current;
+        if (c) {
+            if (c.scrollTop + c.clientHeight < c.scrollHeight) {
+                c.scrollTop = c.scrollHeight - c.clientHeight;
+            }
+        }
     }, [messages, errorMessage, waitingForResponse]);
 
     // Switch highlight palette on light/dark mode changes
@@ -321,7 +323,7 @@ export default function VerbalWebDialog({ open: open, onClose: onClose }: Verbal
         >
             {globalStyles}
             <VerbalWebDialogTitle onClose={onClose}>{t("dialog.title")}</VerbalWebDialogTitle>
-            <DialogContent dividers>
+            <DialogContent dividers ref={contentRef}>
                 <Suspense fallback={<LoadingIndicator />}>
                     <VerbalWebMessageList
                         messages={messages}
@@ -363,7 +365,6 @@ export default function VerbalWebDialog({ open: open, onClose: onClose }: Verbal
                 {waitingForResponse ? (
                     <LinearProgress color={errorMessage ? "error" : "primary"} sx={{ marginTop: 1 }} />
                 ) : null}
-                <Box ref={tailRef} />
             </DialogContent>
         </Dialog>
     );
