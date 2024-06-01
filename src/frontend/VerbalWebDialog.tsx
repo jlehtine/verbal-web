@@ -341,10 +341,8 @@ function VerbalWebDialogContent() {
 
     // On mount and unmount
     useEffect(() => {
-        console.debug("Mounting...");
         ref.current?.addEventListener("scroll", onScroll);
         return () => {
-            console.debug("Unmounting...");
             ref.current?.removeEventListener("scroll", onScroll);
             client.close();
         };
@@ -352,10 +350,8 @@ function VerbalWebDialogContent() {
 
     let lastScrollTop = ref.current?.scrollTop ?? 0;
     const onScroll = () => {
-        console.debug("onScroll");
         const c = ref.current;
         if (c) {
-            console.debug("lastScrollTop = %d, scrollTop = %d", lastScrollTop, c.scrollTop);
             if (c.scrollTop < lastScrollTop) {
                 setUserScrolledUp(true);
             } else if (c.scrollTop > lastScrollTop && c.scrollTop + c.clientHeight > c.scrollHeight - 20) {
