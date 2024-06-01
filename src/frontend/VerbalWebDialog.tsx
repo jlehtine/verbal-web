@@ -1,7 +1,7 @@
 import { ChatMessage } from "../shared/api";
 import { ChatClient, ChatConnectionState } from "./ChatClient";
 import LoadingIndicator from "./LoadingIndicator";
-import { ConfigContext } from "./context";
+import { VerbalWebContext } from "./context";
 import { extract } from "./extract";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import AssistantIcon from "@mui/icons-material/Assistant";
@@ -172,7 +172,7 @@ function highlight(elem: HTMLElement, completed: boolean, mode: PaletteMode, con
  * Component for handling markdown and code snippet content.
  */
 function MarkdownContent({ content, completed }: { content: string; completed: boolean }) {
-    const conf = useContext(ConfigContext);
+    const { conf } = useContext(VerbalWebContext);
     const theme = useTheme();
     const selfRef = useRef<HTMLElement>();
 
@@ -212,7 +212,7 @@ function ChatMessage({ msg, completed }: PropsWithChildren<{ msg: ChatMessage; c
 }
 
 export default function VerbalWebDialog({ open: open, onClose: onClose }: VerbalWebDialogProps) {
-    const conf = useContext(ConfigContext);
+    const { conf } = useContext(VerbalWebContext);
     const { t } = useTranslation();
     const theme = useTheme();
     const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));

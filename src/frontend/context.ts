@@ -1,4 +1,11 @@
 import VerbalWebConfiguration from "./VerbalWebConfiguration";
 import { createContext } from "react";
 
-export const ConfigContext = createContext<VerbalWebConfiguration>({ backendURL: "" });
+/** General application state */
+export interface VerbalWebState {
+    /** Configuration */
+    conf: VerbalWebConfiguration;
+}
+
+/** Application context */
+export const VerbalWebContext = createContext<VerbalWebState>({ conf: { backendURL: "" } });

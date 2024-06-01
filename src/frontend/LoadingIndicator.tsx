@@ -1,5 +1,5 @@
 import { DEFAULT_ON_LOADING_DELAY_MILLIS } from "./VerbalWebConfiguration";
-import { ConfigContext } from "./context";
+import { VerbalWebContext } from "./context";
 import { Backdrop, CircularProgress } from "@mui/material";
 import React, { useContext, useEffect, useState } from "react";
 
@@ -8,7 +8,7 @@ import React, { useContext, useEffect, useState } from "react";
  * The dialog is displayed with a slight delay to avoid unnecessary flashes.
  */
 export default function LoadingIndicator() {
-    const conf = useContext(ConfigContext);
+    const { conf } = useContext(VerbalWebContext);
     const [open, setOpen] = useState(false);
     useEffect(() => {
         const timeout = setTimeout(() => {

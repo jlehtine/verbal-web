@@ -1,6 +1,6 @@
 import LoadingIndicator from "./LoadingIndicator";
 import VerbalWebConfiguration from "./VerbalWebConfiguration";
-import { ConfigContext } from "./context";
+import { VerbalWebContext } from "./context";
 import { defaultTheme } from "./defaultTheme";
 import load from "./load";
 import AssistantIcon from "@mui/icons-material/Assistant";
@@ -32,7 +32,7 @@ export default function VerbalWebUI({ conf }: VerbalWebUIProps) {
     function wrapProviders(elem: React.JSX.Element) {
         return (
             <ThemeProvider theme={defaultTheme()}>
-                <ConfigContext.Provider value={conf}>{elem}</ConfigContext.Provider>
+                <VerbalWebContext.Provider value={{ conf: conf }}>{elem}</VerbalWebContext.Provider>
             </ThemeProvider>
         );
     }
