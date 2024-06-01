@@ -212,11 +212,51 @@ function ChatMessage({ msg, completed }: PropsWithChildren<{ msg: ChatMessage; c
 }
 
 export default function VerbalWebDialog({ open: open, onClose: onClose }: VerbalWebDialogProps) {
-    const { conf } = useContext(VerbalWebContext);
     const { t } = useTranslation();
     const theme = useTheme();
     const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
-    const contentRef = useRef<HTMLDivElement>();
+
+    return (
+        <Dialog
+            open={open}
+            onClose={onClose}
+            {...(fullScreen ? { fullScreen: true } : { fullWidth: true, maxWidth: "lg" })}
+        >
+            {globalStyles}
+            <VerbalWebDialogTitle onClose={onClose}>{t("dialog.title")}</VerbalWebDialogTitle>
+            <VerbalWebDialogContent />
+        </Dialog>
+    );
+}
+
+function VerbalWebDialogTitle(props: VerbalWebDialogTitleProps) {
+    const { children, onClose } = props;
+
+    return (
+        <DialogTitle variant="subtitle1" sx={{ paddingRight: 4 }}>
+            {children}
+            {onClose ? (
+                <IconButton
+                    aria-label="close"
+                    onClick={onClose}
+                    sx={{
+                        position: "absolute",
+                        right: 8,
+                        top: 8,
+                    }}
+                >
+                    <CloseIcon />
+                </IconButton>
+            ) : null}
+        </DialogTitle>
+    );
+}
+
+function VerbalWebDialogContent() {
+    const { conf } = useContext(VerbalWebContext);
+    const { t } = useTranslation();
+    const theme = useTheme();
+    const ref = useRef<HTMLDivElement>();
 
     // Chat client containing also state and model
     // This is not used directly for rendering but has the same lifecycle as the component
@@ -238,6 +278,8 @@ export default function VerbalWebDialog({ open: open, onClose: onClose }: Verbal
     const [errorMessage, setErrorMessage] = useState<string>();
     // true when waiting for response from backend, used to disable submit-button and display progress circle
     const [waitingForResponse, setWaitingForResponse] = useState(false);
+    // whether user has scrolled the window up
+    const [userScrolledUp, setUserScrolledUp] = useState(false);
 
     // Check user input length
     const inputEmpty = userInput.trim().length == 0;
@@ -290,16 +332,6 @@ export default function VerbalWebDialog({ open: open, onClose: onClose }: Verbal
         setWaitingForResponse(client.chat.backendProcessing);
     }
 
-    // Scroll to the bottom when there is new content
-    useEffect(() => {
-        const c = contentRef.current;
-        if (c) {
-            if (c.scrollTop + c.clientHeight < c.scrollHeight) {
-                c.scrollTop = c.scrollHeight - c.clientHeight;
-            }
-        }
-    }, [messages, errorMessage, waitingForResponse]);
-
     // Switch highlight palette on light/dark mode changes
     useEffect(() => {
         if (highlightMode !== undefined) {
@@ -307,89 +339,86 @@ export default function VerbalWebDialog({ open: open, onClose: onClose }: Verbal
         }
     }, [theme.palette.mode]);
 
-    // Close chat client on unmount
-    useEffect(
-        () => () => {
+    // On mount and unmount
+    useEffect(() => {
+        console.debug("Mounting...");
+        ref.current?.addEventListener("scroll", onScroll);
+        return () => {
+            console.debug("Unmounting...");
+            ref.current?.removeEventListener("scroll", onScroll);
             client.close();
-        },
-        [],
-    );
+        };
+    }, []);
+
+    let lastScrollTop = ref.current?.scrollTop ?? 0;
+    const onScroll = () => {
+        console.debug("onScroll");
+        const c = ref.current;
+        if (c) {
+            console.debug("lastScrollTop = %d, scrollTop = %d", lastScrollTop, c.scrollTop);
+            if (c.scrollTop < lastScrollTop) {
+                setUserScrolledUp(true);
+            } else if (c.scrollTop > lastScrollTop && c.scrollTop + c.clientHeight > c.scrollHeight - 20) {
+                setUserScrolledUp(false);
+            }
+            lastScrollTop = c.scrollTop;
+        }
+    };
+
+    // Scroll to the bottom when there is new content, unless user has scrolled up
+    useEffect(() => {
+        const c = ref.current;
+        if (c && !userScrolledUp) {
+            if (c.scrollTop + c.clientHeight < c.scrollHeight) {
+                c.scrollTop = c.scrollHeight - c.clientHeight;
+            }
+        }
+    }, [messages, errorMessage, waitingForResponse]);
 
     return (
-        <Dialog
-            open={open}
-            onClose={onClose}
-            {...(fullScreen ? { fullScreen: true } : { fullWidth: true, maxWidth: "lg" })}
-        >
-            {globalStyles}
-            <VerbalWebDialogTitle onClose={onClose}>{t("dialog.title")}</VerbalWebDialogTitle>
-            <DialogContent dividers ref={contentRef}>
-                <Suspense fallback={<LoadingIndicator />}>
-                    <VerbalWebMessageList
-                        messages={messages}
-                        waitingForResponse={waitingForResponse}
-                    ></VerbalWebMessageList>
-                </Suspense>
-                {!waitingForResponse && errorMessage === undefined ? (
-                    <TextField
-                        fullWidth
-                        multiline
-                        label={t("input.label")}
-                        value={userInput} // Value stored in state userInput
-                        onChange={handleInputChange}
-                        onKeyDown={handleKeyDown}
-                        inputRef={(input: unknown) => {
-                            if (input instanceof HTMLTextAreaElement || input instanceof HTMLInputElement) {
-                                input.focus();
-                            }
-                        }}
-                        InputProps={{
-                            endAdornment: (
-                                <InputAdornment position="end">
-                                    <Tooltip title="Submit">
-                                        <IconButton color="primary" size="large" onClick={handleSubmit}>
-                                            <AssistantIcon />
-                                        </IconButton>
-                                    </Tooltip>
-                                </InputAdornment>
-                            ),
-                        }}
-                        sx={{ mt: 2 }}
-                    ></TextField>
-                ) : null}
-                {errorMessage ? (
-                    <Alert variant="filled" severity="error">
-                        {errorMessage}
-                    </Alert>
-                ) : null}
-                {waitingForResponse ? (
-                    <LinearProgress color={errorMessage ? "error" : "primary"} sx={{ marginTop: 1 }} />
-                ) : null}
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function VerbalWebDialogTitle(props: VerbalWebDialogTitleProps) {
-    const { children, onClose } = props;
-
-    return (
-        <DialogTitle variant="subtitle1" sx={{ paddingRight: 4 }}>
-            {children}
-            {onClose ? (
-                <IconButton
-                    aria-label="close"
-                    onClick={onClose}
-                    sx={{
-                        position: "absolute",
-                        right: 8,
-                        top: 8,
+        <DialogContent dividers ref={ref}>
+            <Suspense fallback={<LoadingIndicator />}>
+                <VerbalWebMessageList
+                    messages={messages}
+                    waitingForResponse={waitingForResponse}
+                ></VerbalWebMessageList>
+            </Suspense>
+            {!waitingForResponse && errorMessage === undefined ? (
+                <TextField
+                    fullWidth
+                    multiline
+                    label={t("input.label")}
+                    value={userInput} // Value stored in state userInput
+                    onChange={handleInputChange}
+                    onKeyDown={handleKeyDown}
+                    inputRef={(input: unknown) => {
+                        if (input instanceof HTMLTextAreaElement || input instanceof HTMLInputElement) {
+                            input.focus();
+                        }
                     }}
-                >
-                    <CloseIcon />
-                </IconButton>
+                    InputProps={{
+                        endAdornment: (
+                            <InputAdornment position="end">
+                                <Tooltip title="Submit">
+                                    <IconButton color="primary" size="large" onClick={handleSubmit}>
+                                        <AssistantIcon />
+                                    </IconButton>
+                                </Tooltip>
+                            </InputAdornment>
+                        ),
+                    }}
+                    sx={{ mt: 2 }}
+                ></TextField>
             ) : null}
-        </DialogTitle>
+            {errorMessage ? (
+                <Alert variant="filled" severity="error">
+                    {errorMessage}
+                </Alert>
+            ) : null}
+            {waitingForResponse ? (
+                <LinearProgress color={errorMessage ? "error" : "primary"} sx={{ marginTop: 1 }} />
+            ) : null}
+        </DialogContent>
     );
 }
 
