@@ -144,6 +144,9 @@ export default function MarkdownContentSupport({ children }: PropsWithChildren) 
                     ".vw-markdown-message table": {
                         color: "inherit",
                     },
+                    ".vw-markdown-message > *:not(pre)": {
+                        maxWidth: "50rem",
+                    },
                 }}
             />
             <MarkdownContentContext.Provider value={{ highlight: highlight }}>
