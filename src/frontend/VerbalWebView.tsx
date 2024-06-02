@@ -6,8 +6,9 @@ import LoginView from "./LoginView";
 import VerbalWebConfiguration from "./VerbalWebConfiguration";
 import { VerbalWebConfigurationProvider } from "./context";
 import { VERBAL_WEB_CLASS_NAME, extract } from "./extract";
+import load from "./load";
 import { Box } from "@mui/material";
-import React, { MutableRefObject, useEffect, useState } from "react";
+import React, { MutableRefObject, PropsWithChildren, Suspense, lazy, useEffect, useState } from "react";
 
 export interface VerbalWebViewProps {
     /** Verbal Web configuration */
@@ -25,6 +26,7 @@ export interface VerbalWebViewProps {
  */
 export default function VerbalWebView({ conf, fullHeight, scrollRef }: VerbalWebViewProps) {
     const [configuring, setConfiguring] = useState(true);
+    const [googleClientId, setGoogleClientId] = useState<string>();
     const [loginPending, setLoginPending] = useState(false);
     const [authPending, setAuthPending] = useState(false);
     const [authError, setAuthError] = useState<AuthError>();
@@ -40,9 +42,13 @@ export default function VerbalWebView({ conf, fullHeight, scrollRef }: VerbalWeb
             }),
     );
 
+    // Google OAuth provider
+    const GoogleOAuthProvider = getGoogleOAuthProvider(conf, googleClientId);
+
     function onInit() {
         setConfiguring(!client.sharedConfig);
         setLoginPending(client.sharedConfig?.auth !== undefined && !client.authenticated);
+        setGoogleClientId(client.sharedConfig?.auth?.googleId);
         setAuthPending(client.authPending);
         setAuthError(client.authError);
     }
@@ -61,12 +67,34 @@ export default function VerbalWebView({ conf, fullHeight, scrollRef }: VerbalWeb
             <VerbalWebConfigurationProvider conf={conf}>
                 {configuring ? (
                     <LoadingIndicator conf={conf} />
-                ) : loginPending ? (
-                    <LoginView client={client} authPending={authPending} authError={authError} />
                 ) : (
-                    <ChatView client={client} fullHeight={fullHeight} scrollRef={scrollRef} />
+                    <Suspense fallback={<LoadingIndicator conf={conf} />}>
+                        <GoogleOAuthProvider clientId={googleClientId ?? ""}>
+                            {" "}
+                            {loginPending ? (
+                                <LoginView
+                                    client={client}
+                                    googleClientId={googleClientId}
+                                    authPending={authPending}
+                                    authError={authError}
+                                />
+                            ) : (
+                                <ChatView client={client} fullHeight={fullHeight} scrollRef={scrollRef} />
+                            )}
+                        </GoogleOAuthProvider>
+                    </Suspense>
                 )}
             </VerbalWebConfigurationProvider>
         </Box>
     );
+}
+
+function getGoogleOAuthProvider(conf: VerbalWebConfiguration, googleClientId?: string) {
+    return googleClientId
+        ? lazy(() =>
+              load("GoogleOAuthProvider", conf, "extra", () => import("@react-oauth/google")).then(
+                  ({ GoogleOAuthProvider }) => ({ default: GoogleOAuthProvider }),
+              ),
+          )
+        : (props: PropsWithChildren<{ clientId: string }>) => props.children;
 }

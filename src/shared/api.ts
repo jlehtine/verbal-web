@@ -1,3 +1,5 @@
+import { CredentialResponse } from "@react-oauth/google";
+
 /** API messages */
 export type ApiMessage = ApiFrontendMessage | ApiBackendMessage;
 
@@ -25,7 +27,12 @@ export interface AuthRequest extends TypedMessage<"authreq"> {
 }
 
 /** Authentication information */
-export type AuthInfo = undefined;
+export type AuthInfo = GoogleAuthInfo;
+
+export interface GoogleAuthInfo {
+    type: "google";
+    creds: CredentialResponse;
+}
 
 /** Chat initialization by the frontend */
 export interface ChatInit extends TypedMessage<"init">, ChatState {}

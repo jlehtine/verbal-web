@@ -112,6 +112,19 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
         this.initializationEvent();
     }
 
+    /**
+     * Sets authentication error.
+     *
+     * @param error authentication error code
+     */
+    setAuthError(error?: AuthError) {
+        if (error !== undefined) {
+            this.authenticated = false;
+        }
+        this.authError = error;
+        this.initializationEvent();
+    }
+
     private ensureWebSocket(): boolean {
         let ready = false;
 

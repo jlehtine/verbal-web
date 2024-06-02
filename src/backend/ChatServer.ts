@@ -1,5 +1,7 @@
 import {
     ApiBackendMessage,
+    AuthError,
+    AuthRequest,
     AuthResponse,
     ChatMessageError,
     ChatMessageErrorCode,
@@ -10,12 +12,15 @@ import {
     isConfigRequest,
 } from "../shared/api";
 import { Chat, InitialChatStateOverrides } from "../shared/chat";
+import { VerbalWebError } from "../shared/error";
 import { ChatCompletionMessage, ChatCompletionProvider, ChatCompletionRequest } from "./ChatCompletionProvider";
 import { ModerationCache } from "./ModerationCache";
 import { ModerationProvider, ModerationRejectedError } from "./ModerationProvider";
 import { TextChunker, chunkText } from "./TextChunker";
-import { logDebug, logError, logInterfaceData, logThrownError } from "./log";
+import { logDebug, logError, logInfo, logInterfaceData, logThrownError } from "./log";
+import { CredentialResponse } from "@react-oauth/google";
 import { Request } from "express";
+import { OAuth2Client } from "google-auth-library";
 import { WebSocket } from "ws";
 
 /** Inactivity timeout is one minute */
@@ -84,6 +89,8 @@ export class ChatServer {
 
     private inactivityTimer?: NodeJS.Timeout;
 
+    private readonly googleClient = new OAuth2Client();
+
     constructor(
         req: Request,
         ws: WebSocket,
@@ -141,12 +148,7 @@ export class ChatServer {
                         processed = true;
                     } else if (isAuthRequest(amsg)) {
                         logInterfaceData("Received an authentication request [%s]", amsg, this.ip);
-                        const res: AuthResponse = {
-                            type: "authres",
-                            error: "failed",
-                        };
-                        logInterfaceData("Sending an authentication response [%s]", res, this.ip);
-                        this.sendMessage(res);
+                        this.handleAuthRequest(amsg);
                         processed = true;
                     } else {
                         logInterfaceData("Received a chat update [%s]", amsg, this.ip);
@@ -180,6 +182,65 @@ export class ChatServer {
     private onWebSocketClose() {
         logDebug("Web socket closed [%s]", this.ip);
         this.clearInactivityTimer();
+    }
+
+    private handleAuthRequest(req: AuthRequest) {
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        if (req.info.type === "google") {
+            let user: string | undefined;
+            let authError: AuthError | undefined;
+            this.checkGoogleAuthRequest(req.info.creds)
+                .then((u) => {
+                    user = u;
+                    const res: AuthResponse = {
+                        type: "authres",
+                        error: (authError = this.isAuthorized(u) ? undefined : "unauthorized"),
+                    };
+                    this.sendMessage(res);
+                })
+                .catch((err: unknown) => {
+                    logThrownError("Google login failed", err);
+                    this.sendMessage({ type: "authres", error: (authError = "failed") });
+                })
+                .finally(() => {
+                    if (authError) {
+                        logInfo("Google authentication failed [%s]", this.ip);
+                    } else {
+                        logInfo("Google authentication completed for %s [%s]", user, this.ip);
+                    }
+                });
+        } else {
+            throw new VerbalWebError("Unsupported authentication method");
+        }
+    }
+
+    private isAuthorized(user: string): boolean {
+        if (this.config?.allowUsers === undefined) {
+            return true;
+        } else {
+            const ulc = user.toLowerCase();
+            for (const au of this.config.allowUsers) {
+                const aulc = au.toLowerCase();
+                if (ulc == aulc || ulc.endsWith("@" + aulc)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private async checkGoogleAuthRequest(creds: CredentialResponse): Promise<string> {
+        if (creds.credential) {
+            const ticket = await this.googleClient.verifyIdToken({
+                idToken: creds.credential,
+                audience: this.config?.googleOAuthClientId,
+            });
+            const user = ticket.getPayload()?.email;
+            if (user) {
+                return user;
+            }
+        }
+        throw new VerbalWebError("Google authentication failed on missing information");
     }
 
     private initWebSocketInactivityTimeout() {
