@@ -233,16 +233,17 @@ function ChatMessageListView({
 function ChatMessageView({ msg, completed }: PropsWithChildren<{ msg: ChatMessage; completed: boolean }>) {
     const um = msg.role === "user";
     return (
-        <Box sx={um ? { pr: 4 } : { pl: 4 }}>
-            <Paper variant="outlined">
-                <Box sx={{ padding: 1, float: um ? "left" : "right" }}>
-                    <Avatar sx={{ bgcolor: "primary.main" }}>{um ? <AccountCircleIcon /> : <AssistantIcon />}</Avatar>
+        <Box sx={um ? { pl: 4 } : { pr: 4 }}>
+            <Stack direction="row" spacing={2} alignItems="flex-start" justifyContent={um ? "flex-end" : "flex-start"}>
+                <Box sx={{ pt: 1 }}>
+                    <Avatar {...(!um ? { sx: { bgcolor: "primary.main" } } : {})}>
+                        {um ? <AccountCircleIcon /> : <AssistantIcon />}
+                    </Avatar>
                 </Box>
-                <Box sx={{ pl: 2, pr: 2 }}>
+                <Paper variant="outlined" sx={{ pl: 2, pr: 2 }}>
                     <MarkdownContent content={msg.content} completed={completed} />
-                </Box>
-                <Box sx={{ clear: um ? "left" : "right" }} />
-            </Paper>
+                </Paper>
+            </Stack>
         </Box>
     );
 }
