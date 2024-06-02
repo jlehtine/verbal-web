@@ -5,22 +5,22 @@
         <link href="style.css" rel="stylesheet" />
     </head>
     <body>
-        <h1>Verbal Web Testing</h1>
-        <p>This is a simple test page for Verbal Web.</p>
-
-        <!-- Verbal Web assistant is installed here as an assistant icon -->
-        <p>Use the AI assistant to ask about the content of this page.</p>
-        <div id="verbal-web"></div>
-        <script src="frontend.js"></script>
-        <script>
-            initVerbalWeb("verbal-web", {
-                backendURL: "",
-                initialInstruction: "Use the following web content to answer user queries.",
-                pageContentSelector: "html"
-            });
-        </script>
-
         <div id="content">
+            <h1>Verbal Web Testing</h1>
+            <p>This is a simple test page for Verbal Web.</p>
+
+            <!-- Verbal Web assistant is installed here as an assistant icon -->
+            <p>Use the AI assistant to ask about the content of this page.</p>
+            <div id="verbal-web" class="float-right"></div>
+            <script src="frontend.js"></script>
+            <script>
+                initVerbalWebLauncher("verbal-web", {
+                    backendURL: "",
+                    initialInstruction: "Use the following web content to answer user queries.",
+                    pageContentSelector: "html"
+                });
+            </script>
+
             <h2>Artificial intelligence</h2>
 
             <p>

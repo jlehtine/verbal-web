@@ -1,24 +1,20 @@
 import LoadingIndicator from "./LoadingIndicator";
 import VerbalWebConfiguration from "./VerbalWebConfiguration";
-import { VerbalWebContext } from "./context";
-import { defaultTheme } from "./defaultTheme";
+import { VERBAL_WEB_CLASS_NAME } from "./extract";
 import load from "./load";
 import AssistantIcon from "@mui/icons-material/Assistant";
-import { Box, Button, ThemeProvider, Tooltip } from "@mui/material";
+import { Box, Button, Tooltip } from "@mui/material";
 import React, { Suspense, lazy, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-interface VerbalWebUIProps {
+export interface VerbalWebLauncherProps {
     conf: VerbalWebConfiguration;
 }
 
-/** HTML class name for the Verbal Web assistant */
-export const VERBAL_WEB_ASSISTANT_CLASS_NAME = "verbal-web-assistant";
-
-/** HTML class name for the Verbal Web assistant dialog */
-export const VERBAL_WEB_ASSISTANT_DIALOG_CLASS_NAME = "verbal-web-assistant-dialog";
-
-export default function VerbalWebUI({ conf }: VerbalWebUIProps) {
+/**
+ * Launcher button for the Verbal Web dialog.
+ */
+export default function VerbalWebLauncher({ conf }: VerbalWebLauncherProps) {
     const { t } = useTranslation();
 
     const [open, setOpen] = useState(false);
@@ -28,17 +24,8 @@ export default function VerbalWebUI({ conf }: VerbalWebUIProps) {
         load("VerbalWebDialog", conf, "dialog", () => import(/* webpackPrefetch: true */ "./VerbalWebDialog")),
     );
 
-    // Wrap elements by providers
-    function wrapProviders(elem: React.JSX.Element) {
-        return (
-            <ThemeProvider theme={defaultTheme()}>
-                <VerbalWebContext.Provider value={{ conf: conf }}>{elem}</VerbalWebContext.Provider>
-            </ThemeProvider>
-        );
-    }
-
-    return wrapProviders(
-        <Box className={VERBAL_WEB_ASSISTANT_CLASS_NAME}>
+    return (
+        <Box className={VERBAL_WEB_CLASS_NAME}>
             <Tooltip title={t("launch.tooltip")}>
                 <Button
                     variant="outlined"
@@ -52,16 +39,16 @@ export default function VerbalWebUI({ conf }: VerbalWebUIProps) {
                 </Button>
             </Tooltip>
             {open ? (
-                <Suspense fallback={<LoadingIndicator />}>
+                <Suspense fallback={<LoadingIndicator conf={conf} />}>
                     <VerbalWebDialog
+                        conf={conf}
                         open={true}
                         onClose={() => {
                             setOpen(false);
                         }}
-                        className={VERBAL_WEB_ASSISTANT_DIALOG_CLASS_NAME}
                     />
                 </Suspense>
             ) : null}
-        </Box>,
+        </Box>
     );
 }

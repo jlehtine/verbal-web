@@ -1,5 +1,5 @@
-import { PaletteMode, createTheme, useMediaQuery } from "@mui/material";
-import React from "react";
+import { PaletteMode, ThemeProvider, createTheme, useMediaQuery } from "@mui/material";
+import React, { PropsWithChildren } from "react";
 
 export function defaultTheme() {
     const prefersDarkMode = useMediaQuery("(prefers-color-scheme: dark)");
@@ -30,6 +30,10 @@ export function defaultTheme() {
                           }),
                 },
             }),
-        [prefersDarkMode],
+        [mode],
     );
+}
+
+export function DefaultThemed({ children }: PropsWithChildren) {
+    return <ThemeProvider theme={defaultTheme()}>{children}</ThemeProvider>;
 }

@@ -88,10 +88,13 @@ if (chdir !== undefined) {
 }
 
 // Initialize server configuration
+const envInitialInstruction = process.env.VW_INITIAL_INSTRUCTION;
+const envPageContent = process.env.VW_PAGE_CONTENT;
+const envChatModel = process.env.VW_CHAT_MODEL;
 const serverOverrides: InitialChatStateOverrides = {
-    initialInstruction: process.env.VW_INITIAL_INSTRUCTION,
-    pageContent: process.env.VW_PAGE_CONTENT,
-    model: process.env.VW_CHAT_MODEL,
+    ...(envInitialInstruction !== undefined ? { initialInstruction: envInitialInstruction } : {}),
+    ...(envPageContent !== undefined ? { pageContent: envPageContent } : {}),
+    ...(envChatModel !== undefined ? { model: envChatModel } : {}),
 };
 
 // Initialize AI engine

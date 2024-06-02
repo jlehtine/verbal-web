@@ -5,17 +5,18 @@
         <link href="style.css" rel="stylesheet" />
     </head>
     <body>
-        <h1>Verbal Web Testing</h1>
-        <p>This is a simple test page for Verbal Web.</p>
+        <div id="content">
+            <h1>Verbal Web Testing</h1>
+            <p>This is a simple test page for Verbal Web chat view.</p>
 
-        <!-- Verbal Web assistant is installed here as an assistant icon -->
-        <p>Chat with the AI assistant.</p>
-        <div id="verbal-web"></div>
-        <script src="frontend.js"></script>
-        <script>
-            initVerbalWeb("verbal-web", {
-                backendURL: ""
-            });
-        </script>
+            <!-- Verbal Web assistant is installed here as an assistant icon -->
+            <div id="verbal-web"></div>
+            <script src="frontend.js"></script>
+            <script>
+                initVerbalWebView("verbal-web", {
+                    backendURL: ""
+                });
+            </script>
+        </div>
     </body>
 </html>

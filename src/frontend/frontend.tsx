@@ -1,12 +1,48 @@
 import { describeError } from "../shared/error";
 import VerbalWebConfiguration from "./VerbalWebConfiguration";
 import load from "./load";
+import { FunctionComponent } from "react";
 
 declare global {
-    var initVerbalWeb: (elementId: string, conf: VerbalWebConfiguration) => void; // eslint-disable-line
+    /**
+     * Initialize Verbal Web launcher.
+     *
+     * @param elementId identifier of the containing element
+     * @param conf configuration
+     */
+    // eslint-disable-next-line no-var
+    var initVerbalWebLauncher: (elementId: string, conf: VerbalWebConfiguration) => void;
+
+    /**
+     * Initialize Verbal Web view.
+     *
+     * @param elementId identifier of the containing element
+     * @param conf configuration
+     * @param scrollElemId identifier of the scrolling element, or undefined for document level scrolling
+     */
+    // eslint-disable-next-line no-var
+    var initVerbalWebView: (elementId: string, conf: VerbalWebConfiguration, scrollElemId?: string) => void;
 }
 
-function initVerbalWeb(elementId: string, conf: VerbalWebConfiguration) {
+function initVerbalWebLauncher(elementId: string, conf: VerbalWebConfiguration) {
+    initVerbalWebElement(elementId, conf, import(/* webpackPrefetch: true */ "./VerbalWebLauncher"), { conf: conf });
+}
+
+function initVerbalWebView(elementId: string, conf: VerbalWebConfiguration, scrollElemId?: string) {
+    const scrollElem = scrollElemId !== undefined ? document.getElementById(scrollElemId) : undefined;
+    const scrollRef = scrollElem ? { current: scrollElem } : undefined;
+    initVerbalWebElement(elementId, conf, import(/* webpackPrefetch: true */ "./VerbalWebView"), {
+        conf: conf,
+        scrollRef: scrollRef,
+    });
+}
+
+function initVerbalWebElement<P extends Record<string, unknown>>(
+    elementId: string,
+    conf: VerbalWebConfiguration,
+    compImport: Promise<{ default: FunctionComponent<P> }>,
+    props: P,
+) {
     const elem = document.getElementById(elementId);
     if (elem !== null) {
         load("initial", conf, "initial", () =>
@@ -14,14 +50,27 @@ function initVerbalWeb(elementId: string, conf: VerbalWebConfiguration) {
                 import(/* webpackPrefetch: true */ "react"),
                 import(/* webpackPrefetch: true */ "./i18n"),
                 import(/* webpackPrefetch: true */ "react-dom/client"),
-                import(/* webpackPrefetch: true */ "./VerbalWebUI"),
+                import(/* webpackPrefetch: true */ "./defaultTheme"),
+                compImport,
             ]),
         )
-            .then(([{ default: React }, { initI18n }, { createRoot }, { default: VerbalWebUI }]) => {
-                initI18n(conf);
-                const root = createRoot(elem);
-                root.render(<VerbalWebUI conf={conf} />);
-            })
+            .then(
+                ([
+                    { default: React },
+                    { initI18n },
+                    { createRoot },
+                    { DefaultThemed: DefaultThemed },
+                    { default: MainComponent },
+                ]) => {
+                    initI18n(conf);
+                    const root = createRoot(elem);
+                    root.render(
+                        <DefaultThemed>
+                            <MainComponent {...props} />
+                        </DefaultThemed>,
+                    );
+                },
+            )
             .catch((err: unknown) => {
                 console.error(describeError(err, false, "Verbal Web initialization failed"));
                 throw err;
@@ -31,4 +80,5 @@ function initVerbalWeb(elementId: string, conf: VerbalWebConfiguration) {
     }
 }
 
-globalThis.initVerbalWeb = initVerbalWeb;
+globalThis.initVerbalWebLauncher = initVerbalWebLauncher;
+globalThis.initVerbalWebView = initVerbalWebView;

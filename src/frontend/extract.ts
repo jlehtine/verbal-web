@@ -1,5 +1,7 @@
 import { VerbalWebConfigurationError } from "../shared/error";
-import { VERBAL_WEB_ASSISTANT_CLASS_NAME, VERBAL_WEB_ASSISTANT_DIALOG_CLASS_NAME } from "./VerbalWebUI";
+
+/** HTML class name for Verbal Web components */
+export const VERBAL_WEB_CLASS_NAME = "verbal-web";
 
 export function extract(pageContentSelector?: string): string | undefined {
     if (!pageContentSelector) {
@@ -27,9 +29,7 @@ export function extract(pageContentSelector?: string): string | undefined {
     }
 
     // Remove content from the assistant elements
-    for (const elem of document.querySelectorAll(
-        "." + VERBAL_WEB_ASSISTANT_CLASS_NAME + ", ." + VERBAL_WEB_ASSISTANT_DIALOG_CLASS_NAME,
-    )) {
+    for (const elem of document.querySelectorAll("." + VERBAL_WEB_CLASS_NAME)) {
         if (elem instanceof HTMLElement && isContainedIn(elem, processedElems)) {
             pc = pc.replace(elem.innerText, "");
         }

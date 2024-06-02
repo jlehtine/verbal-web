@@ -25,3 +25,12 @@ a:visited {
         color: #bb86fc;
     }
 }
+
+#content {
+    max-width: 60rem;
+    margin: 0 auto;
+}
+
+.float-right {
+    float: right;
+}
