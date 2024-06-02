@@ -3,27 +3,6 @@ import VerbalWebConfiguration from "./VerbalWebConfiguration";
 import load from "./load";
 import { FunctionComponent } from "react";
 
-declare global {
-    /**
-     * Initialize Verbal Web launcher.
-     *
-     * @param elementId identifier of the containing element
-     * @param conf configuration
-     */
-    // eslint-disable-next-line no-var
-    var initVerbalWebLauncher: (elementId: string, conf: VerbalWebConfiguration) => void;
-
-    /**
-     * Initialize Verbal Web view.
-     *
-     * @param elementId identifier of the containing element
-     * @param conf configuration
-     * @param scrollElemId identifier of the scrolling element, or undefined for document level scrolling
-     */
-    // eslint-disable-next-line no-var
-    var initVerbalWebView: (elementId: string, conf: VerbalWebConfiguration, scrollElemId?: string) => void;
-}
-
 function initVerbalWebLauncher(elementId: string, conf: VerbalWebConfiguration) {
     initVerbalWebElement(elementId, conf, import(/* webpackPrefetch: true */ "./VerbalWebLauncher"), { conf: conf });
 }
