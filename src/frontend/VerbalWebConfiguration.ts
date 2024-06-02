@@ -35,6 +35,9 @@ export default interface VerbalWebConfiguration {
     /** Override localized text resources */
     resources?: Resource;
 
+    /** URL to the terms of service page (absolute or relative)*/
+    termsOfServiceUrl?: string;
+
     /** Whether to enable syntax highlighting */
     highlight?: boolean;
 

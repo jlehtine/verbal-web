@@ -3,6 +3,7 @@ import { ChatClient, ChatConnectionState } from "./ChatClient";
 import LoadingIndicator from "./LoadingIndicator";
 import MarkdownContent from "./MarkdownContent";
 import MarkdownContentSupport from "./MarkdownContentSupport";
+import WelcomeView from "./WelcomeView";
 import { useConfiguration } from "./context";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import AssistantIcon from "@mui/icons-material/Assistant";
@@ -221,6 +222,9 @@ function ChatMessageListView({
 }) {
     return (
         <Box ref={msgsRef}>
+            <Stack direction="row" justifyContent="center">
+                <WelcomeView />
+            </Stack>
             <Stack spacing={2}>
                 {messages.map((m, idx, array) => (
                     <ChatMessageView key={idx} msg={m} completed={!waitingForResponse || idx < array.length - 1} />
@@ -240,7 +244,7 @@ function ChatMessageView({ msg, completed }: PropsWithChildren<{ msg: ChatMessag
                         {um ? <AccountCircleIcon /> : <AssistantIcon />}
                     </Avatar>
                 </Box>
-                <Paper variant="outlined" sx={{ pl: 2, pr: 2 }}>
+                <Paper sx={{ pl: 2, pr: 2 }}>
                     <MarkdownContent content={msg.content} completed={completed} />
                 </Paper>
             </Stack>

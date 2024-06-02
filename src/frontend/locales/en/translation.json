@@ -16,5 +16,10 @@
     "launch": {
         "text": "AI assistant",
         "tooltip": "Ask the AI assistant"
+    },
+    "welcome": {
+        "terms": "Terms of use and privacy policy",
+        "text": "Here you can chat with the AI assistant. Feel free to ask questions or engage in a discussion.",
+        "title": "AI assistant"
     }
 }

@@ -16,5 +16,10 @@
     "launch": {
         "text": "Tekoälyavustaja",
         "tooltip": "Kysy tekoälyavustajalta"
+    },
+    "welcome": {
+        "terms": "Käyttöehdot ja tietosuojakäytäntö",
+        "text": "Täällä voit keskustella tekoälyavustajan kanssa. Kysy rohkeasti kysymyksiä tai osallistu keskusteluun.",
+        "title": "Tekoälyavustaja"
     }
 }

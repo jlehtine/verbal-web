@@ -16,5 +16,10 @@
     "launch": {
         "text": "AI-assistent",
         "tooltip": "Fråga AI-assistenten"
+    },
+    "welcome": {
+        "terms": "Användarvillkor och integritetspolicy",
+        "text": "Här kan du chatta med AI-assistenten. Känn dig fri att ställa frågor eller delta i en diskussion.",
+        "title": "AI-assistent"
     }
 }
