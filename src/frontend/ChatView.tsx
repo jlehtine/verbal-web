@@ -222,9 +222,7 @@ function ChatMessageListView({
 }) {
     return (
         <Box ref={msgsRef}>
-            <Stack direction="row" justifyContent="center">
-                <WelcomeView />
-            </Stack>
+            <WelcomeView />
             <Stack spacing={2}>
                 {messages.map((m, idx, array) => (
                     <ChatMessageView key={idx} msg={m} completed={!waitingForResponse || idx < array.length - 1} />
