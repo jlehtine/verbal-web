@@ -1,6 +1,7 @@
 import VerbalWebConfiguration from "./VerbalWebConfiguration";
 import enTranslation from "./locales/en/translation.json";
 import fiTranslation from "./locales/fi/translation.json";
+import svTranslation from "./locales/sv/translation.json";
 import { logThrownError } from "./log";
 import i18n, { Resource } from "i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
@@ -12,6 +13,9 @@ const resources = {
     },
     fi: {
         translation: fiTranslation,
+    },
+    sv: {
+        translation: svTranslation,
     },
 };
 
