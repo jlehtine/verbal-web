@@ -122,7 +122,7 @@ export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProp
 
     // On mount and unmount
     useEffect(() => {
-        client.addEventListener("change", onChatChange);
+        client.addEventListener("chat", onChatChange);
         [scrollRef?.current, overflowRef.current, window].forEach((r) => {
             if (r) {
                 r.addEventListener("scroll", onScroll);
@@ -134,6 +134,7 @@ export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProp
                     r.removeEventListener("scroll", onScroll);
                 }
             });
+            client.removeEventListener("chat", onChatChange);
         };
     }, []);
 

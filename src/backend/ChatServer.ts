@@ -1,4 +1,14 @@
-import { ChatMessageError, ChatMessageErrorCode, ChatMessagePart, isApiFrontendMessage } from "../shared/api";
+import {
+    ApiBackendMessage,
+    AuthResponse,
+    ChatMessageError,
+    ChatMessageErrorCode,
+    ChatMessagePart,
+    ConfigResponse,
+    isApiFrontendMessage,
+    isAuthRequest,
+    isConfigRequest,
+} from "../shared/api";
 import { Chat, InitialChatStateOverrides } from "../shared/chat";
 import { ChatCompletionMessage, ChatCompletionProvider, ChatCompletionRequest } from "./ChatCompletionProvider";
 import { ModerationCache } from "./ModerationCache";
@@ -13,6 +23,18 @@ const INACTIVITY_TIMEOUT_MILLIS = 60 * 1000;
 
 /** Interval for sending checks */
 const SEND_INTERVAL_MILLIS = 200;
+
+/** Server configuration details */
+export interface ChatServerConfig {
+    /**
+     * Allowed user emails addresses or email domains.
+     * If undefined then authentication is not required.
+     */
+    allowUsers?: string[];
+
+    /** Google OAuth client id, if Google login enabled */
+    googleOAuthClientId?: string;
+}
 
 /** Internal chat completion state */
 interface ChatCompletionState {
@@ -42,6 +64,9 @@ interface ChatCompletionState {
  * A server serving a single chat client web socket session.
  */
 export class ChatServer {
+    /** Server configuration */
+    private readonly config;
+
     /** Client ip */
     private readonly ip;
 
@@ -64,8 +89,10 @@ export class ChatServer {
         ws: WebSocket,
         moderation: ModerationProvider,
         chatCompletion: ChatCompletionProvider,
+        config?: ChatServerConfig,
         serverOverrides?: InitialChatStateOverrides,
     ) {
+        this.config = config;
         this.ip = req.ip;
         logDebug("Chat server initialization [%s]", this.ip);
         this.chat = new Chat(undefined, serverOverrides);
@@ -85,6 +112,10 @@ export class ChatServer {
         });
     }
 
+    private sendMessage(msg: ApiBackendMessage) {
+        this.ws.send(JSON.stringify(msg));
+    }
+
     // On web socket message
     private onWebSocketMessage(data: unknown, isBinary: boolean) {
         let processed = false;
@@ -92,9 +123,36 @@ export class ChatServer {
             if (!isBinary && (typeof data === "string" || Buffer.isBuffer(data))) {
                 const amsg: unknown = JSON.parse(data.toString());
                 if (isApiFrontendMessage(amsg)) {
-                    logInterfaceData("Received a chat update [%s]", amsg, this.ip);
-                    this.chat.update(amsg);
-                    processed = true;
+                    if (isConfigRequest(amsg)) {
+                        logInterfaceData("Received a configuration request [%s]", amsg, this.ip);
+                        const res: ConfigResponse = {
+                            type: "cfgres",
+                            ...(this.config?.allowUsers !== undefined || this.config?.googleOAuthClientId !== undefined
+                                ? {
+                                      auth: {
+                                          required: this.config.allowUsers !== undefined,
+                                          googleId: this.config.googleOAuthClientId,
+                                      },
+                                  }
+                                : {}),
+                        };
+                        logInterfaceData("Sending a configuration response [%s]", res, this.ip);
+                        this.sendMessage(res);
+                        processed = true;
+                    } else if (isAuthRequest(amsg)) {
+                        logInterfaceData("Received an authentication request [%s]", amsg, this.ip);
+                        const res: AuthResponse = {
+                            type: "authres",
+                            error: "failed",
+                        };
+                        logInterfaceData("Sending an authentication response [%s]", res, this.ip);
+                        this.sendMessage(res);
+                        processed = true;
+                    } else {
+                        logInterfaceData("Received a chat update [%s]", amsg, this.ip);
+                        this.chat.update(amsg);
+                        processed = true;
+                    }
                     if (this.chat.backendProcessing) {
                         this.clearInactivityTimer();
                         this.doChatCompletion();
@@ -271,7 +329,7 @@ export class ChatServer {
             done: allDone,
         };
         logInterfaceData("Sending a chat update [%s]", msg, this.ip);
-        this.ws.send(JSON.stringify(msg));
+        this.sendMessage(msg);
         state.sent = state.completion.length;
         this.clearSendTimeout(state);
     }
@@ -294,7 +352,8 @@ export class ChatServer {
         logThrownError(errorMessage + " [%s]", err, this.ip);
         if (this.ws.readyState === WebSocket.OPEN) {
             const msg: ChatMessageError = { type: "msgerror", code: errorCode, message: errorMessage };
-            this.ws.send(JSON.stringify(msg));
+            logInterfaceData("Sending a chat error [%s]", msg, this.ip);
+            this.sendMessage(msg);
             this.ws.close();
         }
     }

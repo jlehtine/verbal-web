@@ -1,5 +1,5 @@
 import {
-    ApiMessage,
+    ApiChatMessage,
     ChatMessage,
     ChatMessageErrorCode,
     ChatState,
@@ -42,7 +42,7 @@ export class Chat {
      *
      * @param amsg API message
      */
-    update(amsg: ApiMessage): void {
+    update(amsg: ApiChatMessage): void {
         if (isChatInit(amsg)) {
             this.state = { ...amsg, ...this.serverOverrides };
             this.error = undefined;

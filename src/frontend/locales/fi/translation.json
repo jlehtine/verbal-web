@@ -17,6 +17,14 @@
         "text": "Tekoälyavustaja",
         "tooltip": "Kysy tekoälyavustajalta"
     },
+    "login": {
+        "error": {
+            "failed": "Tunnistautuminen epäonnistui",
+            "unauthorized": "Ei käyttöoikeutta tähän palveluun"
+        },
+        "text": "Valitse tunnistautumistapa.",
+        "title": "Tunnistautuminen tarvitaan"
+    },
     "welcome": {
         "terms": "Käyttöehdot ja tietosuojakäytäntö",
         "text": "Täällä voit keskustella tekoälyavustajan kanssa. Kysy rohkeasti kysymyksiä tai osallistu keskusteluun.",

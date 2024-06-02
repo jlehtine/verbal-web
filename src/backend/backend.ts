@@ -1,6 +1,6 @@
 import { InitialChatStateOverrides } from "../shared/chat";
 import { ChatCompletionProvider } from "./ChatCompletionProvider";
-import { ChatServer } from "./ChatServer";
+import { ChatServer, ChatServerConfig } from "./ChatServer";
 import { ModerationProvider } from "./ModerationProvider";
 import { OpenAIEngine } from "./OpenAIEngine";
 import { logFatal, logInfo, logThrownError, setLogLevel } from "./log";
@@ -31,7 +31,11 @@ options:
     --static [/PATH:]DIR
         serve static content from DIR either as /PATH or at root,
         repeat the option to serve content from multiple directories
-  -v, --verbose
+    --allow-users (EMAIL|DOMAIN)[,(EMAIL|DOMAIN)]...
+        allow users with specified email addresses or domains
+    --google-oauth-client-id ID
+        enable Google login using the specified OAuth client id
+    -v, --verbose
         increase logging, use multiple times for even more verbose logging
 `);
 }
@@ -40,6 +44,8 @@ options:
 let port = process.env.VW_PORT ? parseInt(process.env.VW_PORT) : DEFAULT_PORT;
 let chdir = process.env.VW_CHDIR;
 const staticContent: StaticContent[] = [];
+let allowUsers = parseAllowUsers(process.env.VW_ALLOW_USERS);
+let googleOAuthClientId = process.env.VW_GOOGLE_OAUTH_CLIENT_ID;
 let logLevel = process.env.VW_LOG_LEVEL ? parseInt(process.env.VW_LOG_LEVEL) : 0;
 for (let i = 2; i < process.argv.length; i++) {
     const a = process.argv[i];
@@ -53,6 +59,10 @@ for (let i = 2; i < process.argv.length; i++) {
         chdir = safeNextArg(process.argv, ++i);
     } else if (a === "--static") {
         staticContent.push(parseStatic(safeNextArg(process.argv, ++i)));
+    } else if (a === "--allow-users") {
+        allowUsers = parseAllowUsers(safeNextArg(process.argv, ++i));
+    } else if (a === "--google-oauth-client-id") {
+        googleOAuthClientId = safeNextArg(process.argv, ++i);
     } else if (a === "-v" || a === "--verbose") {
         logLevel++;
     } else {
@@ -63,6 +73,12 @@ setLogLevel(logLevel);
 if (process.env.VW_STATIC) {
     staticContent.push(...process.env.VW_STATIC.split(";").map(parseStatic));
 }
+
+// Initialize configuration
+const config: ChatServerConfig = {
+    allowUsers: allowUsers,
+    googleOAuthClientId: googleOAuthClientId,
+};
 
 function safeNextArg(argv: string[], i: number) {
     if (i < argv.length) {
@@ -78,6 +94,18 @@ function parseStatic(arg: string): StaticContent {
         return { path: arg.substring(0, ic), dir: arg.substring(ic + 1) };
     } else {
         return { dir: arg };
+    }
+}
+
+function parseAllowUsers(allowUsers?: string) {
+    if (allowUsers !== undefined) {
+        if (allowUsers.length > 0) {
+            return allowUsers.split(/(\s*,\s*|\s+)/);
+        } else {
+            return [];
+        }
+    } else {
+        return undefined;
     }
 }
 
@@ -119,7 +147,7 @@ backend.ws("/chatws", (req, res) => {
     logInfo("Accepting web socket connection [%s]", req.ip);
     res.accept()
         .then((ws) => {
-            new ChatServer(req, ws, moderation, chatCompletion, serverOverrides);
+            new ChatServer(req, ws, moderation, chatCompletion, config, serverOverrides);
         })
         .catch((err: unknown) => {
             logThrownError("Failed to accept web socket connection [%s]", err, req.ip);
