@@ -91,6 +91,8 @@ export class ChatServer {
 
     private readonly googleClient = new OAuth2Client();
 
+    private authenticated = false;
+
     constructor(
         req: Request,
         ws: WebSocket,
@@ -143,6 +145,12 @@ export class ChatServer {
                                   }
                                 : {}),
                         };
+
+                        // Mark authenticated if authentication not required
+                        if (this.config?.allowUsers === undefined) {
+                            this.authenticated = true;
+                        }
+
                         logInterfaceData("Sending a configuration response [%s]", res, this.ip);
                         this.sendMessage(res);
                         processed = true;
@@ -150,6 +158,8 @@ export class ChatServer {
                         logInterfaceData("Received an authentication request [%s]", amsg, this.ip);
                         this.handleAuthRequest(amsg);
                         processed = true;
+                    } else if (!this.authenticated) {
+                        throw new VerbalWebError(`Unauthorized request from ${this.ip?.toString() ?? "<unknown>"}`);
                     } else {
                         logInterfaceData("Received a chat update [%s]", amsg, this.ip);
                         this.chat.update(amsg);
@@ -192,14 +202,17 @@ export class ChatServer {
             this.checkGoogleAuthRequest(req.info.creds)
                 .then((u) => {
                     user = u;
+                    const authorized = this.isAuthorized(u);
                     const res: AuthResponse = {
                         type: "authres",
-                        error: (authError = this.isAuthorized(u) ? undefined : "unauthorized"),
+                        error: (authError = authorized ? undefined : "unauthorized"),
                     };
+                    this.authenticated = authorized;
                     this.sendMessage(res);
                 })
                 .catch((err: unknown) => {
                     logThrownError("Google login failed", err);
+                    this.authenticated = false;
                     this.sendMessage({ type: "authres", error: (authError = "failed") });
                 })
                 .finally(() => {
