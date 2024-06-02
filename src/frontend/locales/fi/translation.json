@@ -10,7 +10,8 @@
         "moderation": "Viesti estettiin moderoinnin takia."
     },
     "input": {
-        "label": "Keskustele tekoälyavustajan kanssa"
+        "label": "Keskustele tekoälyavustajan kanssa",
+        "submit": "Lähetä"
     },
     "launch": {
         "text": "Tekoälyavustaja",

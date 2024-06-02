@@ -10,7 +10,8 @@
         "moderation": "Message was blocked by moderation."
     },
     "input": {
-        "label": "Chat with the AI assistant"
+        "label": "Chat with the AI assistant",
+        "submit": "Submit"
     },
     "launch": {
         "text": "AI assistant",

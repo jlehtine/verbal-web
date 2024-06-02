@@ -10,7 +10,8 @@
         "moderation": "Meddelandet blockerades av moderering."
     },
     "input": {
-        "label": "Chatta med AI-assistenten"
+        "label": "Chatta med AI-assistenten",
+        "submit": "Skicka in"
     },
     "launch": {
         "text": "AI-assistent",

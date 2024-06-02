@@ -186,7 +186,7 @@ export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProp
                         InputProps={{
                             endAdornment: (
                                 <InputAdornment position="end">
-                                    <Tooltip title="Submit">
+                                    <Tooltip title={t("input.submit")}>
                                         <IconButton color="primary" size="large" onClick={handleSubmit}>
                                             <AssistantIcon />
                                         </IconButton>
