@@ -23,13 +23,16 @@ import { useTranslation } from "react-i18next";
 
 export interface ChatViewProps {
     client: ChatClient;
+    fullHeight?: boolean;
     scrollRef?: MutableRefObject<HTMLElement | undefined>;
 }
 
-export default function ChatView({ client, scrollRef }: ChatViewProps) {
+export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProps) {
     const { t } = useTranslation();
     const conf = useConfiguration();
     const ref = useRef<HTMLElement>();
+    const overflowRef = useRef<HTMLElement>();
+    const msgsRef = useRef<HTMLElement>();
 
     // userInput stores value of textField
     const [userInput, setUserInput] = useState("");
@@ -94,9 +97,9 @@ export default function ChatView({ client, scrollRef }: ChatViewProps) {
     }
 
     // Detect user scrolling up
-    let lastTop = ref.current?.getBoundingClientRect().top;
+    let lastTop = msgsRef.current?.getBoundingClientRect().top;
     function onScroll() {
-        const br = ref.current?.getBoundingClientRect();
+        const br = msgsRef.current?.getBoundingClientRect();
         const nowTop = br?.top;
         if (br && lastTop !== undefined && nowTop !== undefined) {
             if (nowTop > lastTop) {
@@ -111,6 +114,7 @@ export default function ChatView({ client, scrollRef }: ChatViewProps) {
     // Scroll to the bottom when there is new content, unless user has scrolled up
     useEffect(() => {
         if (!userScrolledUp) {
+            msgsRef.current?.scrollIntoView({ block: "end", behavior: "instant" });
             ref.current?.scrollIntoView({ block: "end", behavior: "instant" });
         }
     }, [messages, errorMessage, waitingForResponse, userScrolledUp]);
@@ -118,77 +122,111 @@ export default function ChatView({ client, scrollRef }: ChatViewProps) {
     // On mount and unmount
     useEffect(() => {
         client.addEventListener("change", onChatChange);
-        scrollRef?.current?.addEventListener("scroll", onScroll);
-        addEventListener("scroll", onScroll);
+        [scrollRef?.current, overflowRef.current, window].forEach((r) => {
+            if (r) {
+                r.addEventListener("scroll", onScroll);
+            }
+        });
         return () => {
-            removeEventListener("scroll", onScroll);
-            scrollRef?.current?.removeEventListener("scroll", onScroll);
-            client.removeEventListener("change", onChatChange);
+            [window, overflowRef.current, scrollRef?.current].forEach((r) => {
+                if (r) {
+                    r.removeEventListener("scroll", onScroll);
+                }
+            });
         };
     }, []);
 
     return (
-        <Box ref={ref}>
+        <Box
+            ref={ref}
+            {...(fullHeight
+                ? { sx: { height: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-end" } }
+                : {})}
+        >
             <Suspense fallback={<LoadingIndicator conf={conf} />}>
-                <MarkdownContentSupport>
-                    <ChatMessageListView
-                        messages={messages}
-                        waitingForResponse={waitingForResponse}
-                    ></ChatMessageListView>
-                </MarkdownContentSupport>
+                <Box
+                    {...(fullHeight
+                        ? {
+                              sx: {
+                                  flex: "0 1 auto",
+                                  overflowY: "auto",
+                                  "&::-webkit-scrollbar": {
+                                      display: "none",
+                                  },
+                                  msOverflowStyle: "none",
+                                  scrollbarWidth: "none",
+                              },
+                              ref: overflowRef,
+                          }
+                        : {})}
+                >
+                    <MarkdownContentSupport>
+                        <ChatMessageListView
+                            messages={messages}
+                            waitingForResponse={waitingForResponse}
+                            msgsRef={msgsRef}
+                        />
+                    </MarkdownContentSupport>
+                </Box>
             </Suspense>
-            {!waitingForResponse && errorMessage === undefined ? (
-                <TextField
-                    fullWidth
-                    multiline
-                    label={t("input.label")}
-                    value={userInput} // Value stored in state userInput
-                    onChange={handleInputChange}
-                    onKeyDown={handleKeyDown}
-                    inputRef={(input: unknown) => {
-                        if (input instanceof HTMLTextAreaElement || input instanceof HTMLInputElement) {
-                            input.focus();
-                        }
-                    }}
-                    InputProps={{
-                        endAdornment: (
-                            <InputAdornment position="end">
-                                <Tooltip title="Submit">
-                                    <IconButton color="primary" size="large" onClick={handleSubmit}>
-                                        <AssistantIcon />
-                                    </IconButton>
-                                </Tooltip>
-                            </InputAdornment>
-                        ),
-                    }}
-                    sx={{ mt: 2 }}
-                ></TextField>
-            ) : null}
-            {errorMessage ? (
-                <Alert variant="filled" severity="error">
-                    {errorMessage}
-                </Alert>
-            ) : null}
-            {waitingForResponse ? (
-                <LinearProgress color={errorMessage ? "error" : "primary"} sx={{ marginTop: 1 }} />
-            ) : null}
+            <Box {...(fullHeight ? { sx: { flex: "0 0 auto" } } : {})}>
+                {!waitingForResponse && errorMessage === undefined ? (
+                    <TextField
+                        fullWidth
+                        multiline
+                        label={t("input.label")}
+                        value={userInput} // Value stored in state userInput
+                        onChange={handleInputChange}
+                        onKeyDown={handleKeyDown}
+                        inputRef={(input: unknown) => {
+                            if (input instanceof HTMLTextAreaElement || input instanceof HTMLInputElement) {
+                                input.focus();
+                            }
+                        }}
+                        InputProps={{
+                            endAdornment: (
+                                <InputAdornment position="end">
+                                    <Tooltip title="Submit">
+                                        <IconButton color="primary" size="large" onClick={handleSubmit}>
+                                            <AssistantIcon />
+                                        </IconButton>
+                                    </Tooltip>
+                                </InputAdornment>
+                            ),
+                        }}
+                        sx={{ mt: 2 }}
+                    ></TextField>
+                ) : null}
+                {errorMessage ? (
+                    <Alert variant="filled" severity="error">
+                        {errorMessage}
+                    </Alert>
+                ) : null}
+                {waitingForResponse ? (
+                    <LinearProgress color={errorMessage ? "error" : "primary"} sx={{ marginTop: 1 }} />
+                ) : null}
+            </Box>
         </Box>
     );
 }
 
 function ChatMessageListView({
     messages,
+    msgsRef,
     waitingForResponse,
 }: {
     messages: ChatMessage[];
+    msgsRef?: React.Ref<unknown>;
     waitingForResponse: boolean;
 }) {
     return (
-        <Stack spacing={2}>
-            {messages.map((m, idx, array) => (
-                <ChatMessageView key={idx} msg={m} completed={!waitingForResponse || idx < array.length - 1} />
-            ))}
-        </Stack>
+        <Box ref={msgsRef}>
+            <Stack spacing={2}>
+                {messages.map((m, idx, array) => (
+                    <ChatMessageView key={idx} msg={m} completed={!waitingForResponse || idx < array.length - 1} />
+                ))}
+            </Stack>
+        </Box>
     );
 }
 

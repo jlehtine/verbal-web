@@ -7,11 +7,17 @@ function initVerbalWebLauncher(elementId: string, conf: VerbalWebConfiguration) 
     initVerbalWebElement(elementId, conf, import(/* webpackPrefetch: true */ "./VerbalWebLauncher"), { conf: conf });
 }
 
-function initVerbalWebView(elementId: string, conf: VerbalWebConfiguration, scrollElemId?: string) {
+function initVerbalWebView(
+    elementId: string,
+    conf: VerbalWebConfiguration,
+    fullHeight?: boolean,
+    scrollElemId?: string,
+) {
     const scrollElem = scrollElemId !== undefined ? document.getElementById(scrollElemId) : undefined;
     const scrollRef = scrollElem ? { current: scrollElem } : undefined;
     initVerbalWebElement(elementId, conf, import(/* webpackPrefetch: true */ "./VerbalWebView"), {
         conf: conf,
+        fullHeight: fullHeight,
         scrollRef: scrollRef,
     });
 }

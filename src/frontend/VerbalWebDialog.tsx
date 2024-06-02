@@ -34,10 +34,11 @@ export default function VerbalWebDialog({ conf, ...dialogProps }: VerbalWebDialo
             {...dialogProps}
             {...(fullScreen ? { fullScreen: true } : { fullWidth: true, maxWidth: "lg" })}
             className={VERBAL_WEB_CLASS_NAME}
+            PaperProps={fullScreen ? {} : { sx: { height: "90%" } }}
         >
             <VerbalWebDialogTitle onClose={dialogProps.onClose}>{t("dialog.title")}</VerbalWebDialogTitle>
             <DialogContent dividers ref={contentRef}>
-                <VerbalWebView conf={conf} scrollRef={contentRef} />
+                <VerbalWebView conf={conf} fullHeight scrollRef={contentRef} />
             </DialogContent>
         </Dialog>
     );
