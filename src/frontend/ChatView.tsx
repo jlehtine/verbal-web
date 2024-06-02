@@ -18,17 +18,18 @@ import {
     TextField,
     Tooltip,
 } from "@mui/material";
-import React, { MutableRefObject, PropsWithChildren, Suspense, useEffect, useState } from "react";
+import React, { MutableRefObject, PropsWithChildren, Suspense, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 export interface ChatViewProps {
     client: ChatClient;
-    scrollRef: MutableRefObject<HTMLElement | undefined>;
+    scrollRef?: MutableRefObject<HTMLElement | undefined>;
 }
 
 export default function ChatView({ client, scrollRef }: ChatViewProps) {
     const { t } = useTranslation();
     const conf = useConfiguration();
+    const ref = useRef<HTMLElement>();
 
     // userInput stores value of textField
     const [userInput, setUserInput] = useState("");
@@ -92,41 +93,42 @@ export default function ChatView({ client, scrollRef }: ChatViewProps) {
         setWaitingForResponse(client.chat.backendProcessing);
     }
 
-    // On mount and unmount
-    useEffect(() => {
-        client.addEventListener("change", onChatChange);
-        scrollRef.current?.addEventListener("scroll", onScroll);
-        return () => {
-            client.removeEventListener("change", onChatChange);
-            scrollRef.current?.removeEventListener("scroll", onScroll);
-        };
-    }, []);
-
-    let lastScrollTop = scrollRef.current?.scrollTop ?? 0;
-    const onScroll = () => {
-        const c = scrollRef.current;
-        if (c) {
-            if (c.scrollTop < lastScrollTop) {
+    // Detect user scrolling up
+    let lastTop = ref.current?.getBoundingClientRect().top;
+    function onScroll() {
+        const br = ref.current?.getBoundingClientRect();
+        const nowTop = br?.top;
+        if (br && lastTop !== undefined && nowTop !== undefined) {
+            if (nowTop > lastTop) {
                 setUserScrolledUp(true);
-            } else if (c.scrollTop > lastScrollTop && c.scrollTop + c.clientHeight > c.scrollHeight - 20) {
+            } else if (nowTop < lastTop && br.bottom < innerHeight + 20) {
                 setUserScrolledUp(false);
             }
-            lastScrollTop = c.scrollTop;
         }
-    };
+        lastTop = nowTop;
+    }
 
     // Scroll to the bottom when there is new content, unless user has scrolled up
     useEffect(() => {
-        const c = scrollRef.current;
-        if (c && !userScrolledUp) {
-            if (c.scrollTop + c.clientHeight < c.scrollHeight) {
-                c.scrollTop = c.scrollHeight - c.clientHeight;
-            }
+        if (!userScrolledUp) {
+            ref.current?.scrollIntoView({ block: "end", behavior: "instant" });
         }
-    }, [messages, errorMessage, waitingForResponse]);
+    }, [messages, errorMessage, waitingForResponse, userScrolledUp]);
+
+    // On mount and unmount
+    useEffect(() => {
+        client.addEventListener("change", onChatChange);
+        scrollRef?.current?.addEventListener("scroll", onScroll);
+        addEventListener("scroll", onScroll);
+        return () => {
+            removeEventListener("scroll", onScroll);
+            scrollRef?.current?.removeEventListener("scroll", onScroll);
+            client.removeEventListener("change", onChatChange);
+        };
+    }, []);
 
     return (
-        <>
+        <Box ref={ref}>
             <Suspense fallback={<LoadingIndicator conf={conf} />}>
                 <MarkdownContentSupport>
                     <ChatMessageListView
@@ -170,7 +172,7 @@ export default function ChatView({ client, scrollRef }: ChatViewProps) {
             {waitingForResponse ? (
                 <LinearProgress color={errorMessage ? "error" : "primary"} sx={{ marginTop: 1 }} />
             ) : null}
-        </>
+        </Box>
     );
 }
 

@@ -10,7 +10,7 @@ export interface VerbalWebViewProps {
     /** Verbal Web configuration */
     conf: VerbalWebConfiguration;
 
-    /** Reference to the scrolling element, defaults to document level scrolling */
+    /** Reference to the containing scrolling element, defaults to window scrolling */
     scrollRef?: MutableRefObject<HTMLElement | undefined>;
 }
 
@@ -28,11 +28,6 @@ export default function VerbalWebView({ conf, scrollRef }: VerbalWebViewProps) {
                 model: conf.useModel,
             }),
     );
-
-    // Choose correct scroll reference
-    if (scrollRef === undefined) {
-        scrollRef = { current: document.documentElement };
-    }
 
     // Close chat client on unmount
     useEffect(() => () => {
