@@ -1,3 +1,4 @@
+import { isObject } from "./util";
 import { CredentialResponse } from "@react-oauth/google";
 
 /** API messages */
@@ -111,10 +112,6 @@ export interface ChatMessageError extends TypedMessage<"msgerror"> {
 
     /** Error message as human readable text */
     message: string;
-}
-
-function isObject(v: unknown): v is Record<string, unknown> {
-    return v !== null && typeof v === "object";
 }
 
 function isTypedMessage(v: unknown): v is TypedMessage<string> {

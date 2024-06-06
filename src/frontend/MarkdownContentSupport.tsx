@@ -1,4 +1,5 @@
 import { VerbalWebError } from "../shared/error";
+import { isObject } from "../shared/util";
 import VerbalWebConfiguration from "./VerbalWebConfiguration";
 import { useConfiguration } from "./context";
 import load from "./load";
@@ -9,10 +10,6 @@ import React from "react";
 
 let highlightStyle: HTMLStyleElement | undefined;
 let highlightMode: PaletteMode | undefined;
-
-function isObject(v: unknown): v is Record<string, unknown> {
-    return typeof v === "object" && v !== null;
-}
 
 interface CssModule {
     default: [[unknown, string]];

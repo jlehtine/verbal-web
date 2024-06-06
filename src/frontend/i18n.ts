@@ -1,3 +1,4 @@
+import { isObject } from "../shared/util";
 import VerbalWebConfiguration from "./VerbalWebConfiguration";
 import enTranslation from "./locales/en/translation.json";
 import fiTranslation from "./locales/fi/translation.json";
@@ -18,10 +19,6 @@ const resources = {
         translation: svTranslation,
     },
 };
-
-function isObject(v: unknown): v is Record<string, unknown> {
-    return v !== null && typeof v === "object";
-}
 
 function mergeObjects(target: Record<string, unknown>, ...other: Record<string, unknown>[]) {
     for (const r of other) {
