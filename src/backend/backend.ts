@@ -31,6 +31,8 @@ options:
     --static [/PATH:]DIR
         serve static content from DIR either as /PATH or at root,
         repeat the option to serve content from multiple directories
+    --trust-proxy TRUST_PROXY_SETTING
+        Express.js "trust proxy" setting 
     --allow-users (EMAIL|DOMAIN)[,(EMAIL|DOMAIN)]...
         allow users with specified email addresses or domains
     --google-oauth-client-id ID
@@ -44,6 +46,7 @@ options:
 let port = process.env.VW_PORT ? parseInt(process.env.VW_PORT) : DEFAULT_PORT;
 let chdir = process.env.VW_CHDIR;
 const staticContent: StaticContent[] = [];
+let trustProxy = parseTrustProxy(process.env.VW_TRUST_PROXY);
 let allowUsers = parseAllowUsers(process.env.VW_ALLOW_USERS);
 let googleOAuthClientId = process.env.VW_GOOGLE_OAUTH_CLIENT_ID;
 let logLevel = process.env.VW_LOG_LEVEL ? parseInt(process.env.VW_LOG_LEVEL) : 0;
@@ -59,6 +62,8 @@ for (let i = 2; i < process.argv.length; i++) {
         chdir = safeNextArg(process.argv, ++i);
     } else if (a === "--static") {
         staticContent.push(parseStatic(safeNextArg(process.argv, ++i)));
+    } else if (a === "--trust-proxy") {
+        trustProxy = parseTrustProxy(safeNextArg(process.argv, ++i));
     } else if (a === "--allow-users") {
         allowUsers = parseAllowUsers(safeNextArg(process.argv, ++i));
     } else if (a === "--google-oauth-client-id") {
@@ -109,6 +114,18 @@ function parseAllowUsers(allowUsers?: string) {
     }
 }
 
+function parseTrustProxy(arg: string | undefined) {
+    if (arg === undefined) {
+        return false;
+    } else if (arg === "true" || arg === "false") {
+        return Boolean(arg);
+    } else if (arg.match(/^(0|[1-9][0-9]*)$/)) {
+        return Number(arg);
+    } else {
+        return arg;
+    }
+}
+
 // Switch to specified directory
 if (chdir !== undefined) {
     logInfo("Changing directory to %s", chdir);
@@ -141,6 +158,9 @@ backend.use((req, res, next) => {
 
 // Set CORS headers for all responses
 backend.use(cors({ origin: process.env.VW_ALLOW_ORIGIN }));
+
+// Set trust proxy setting
+backend.set("trust proxy", trustProxy);
 
 // Client API web socket endpoint
 backend.ws("/chatws", (req, res) => {
