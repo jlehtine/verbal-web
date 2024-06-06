@@ -91,7 +91,7 @@ export class ChatServer {
 
     private readonly googleClient = new OAuth2Client();
 
-    private authenticated = false;
+    private authenticated;
 
     constructor(
         req: Request,
@@ -108,6 +108,7 @@ export class ChatServer {
         this.ws = ws;
         this.moderation = new ModerationCache(moderation);
         this.chatCompletion = chatCompletion;
+        this.authenticated = this.config?.allowUsers === undefined;
         this.initWebSocketInactivityTimeout();
 
         this.ws.on("message", (data, isBinary) => {
@@ -145,12 +146,6 @@ export class ChatServer {
                                   }
                                 : {}),
                         };
-
-                        // Mark authenticated if authentication not required
-                        if (this.config?.allowUsers === undefined) {
-                            this.authenticated = true;
-                        }
-
                         logInterfaceData("Sending a configuration response [%s]", res, this.ip);
                         this.sendMessage(res);
                         processed = true;
@@ -392,6 +387,10 @@ export class ChatServer {
             state.sendTimeout = setTimeout(() => {
                 this.sendCheck(state);
             }, SEND_INTERVAL_MILLIS);
+        }
+
+        if (allDone) {
+            this.initWebSocketInactivityTimeout();
         }
     }
 

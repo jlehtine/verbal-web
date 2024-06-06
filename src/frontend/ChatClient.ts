@@ -2,8 +2,6 @@ import {
     ApiFrontendMessage,
     AuthError,
     AuthInfo,
-    AuthRequest,
-    ChatInit,
     ChatMessageNew,
     SharedConfig,
     isApiBackendMessage,
@@ -37,11 +35,13 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
 
     /** Whether authentication is currently pending */
     get authPending() {
-        return this.pendingAuth !== undefined;
+        return this.authInfo !== undefined && !this.authInitialized;
     }
 
     /** Is user authenticated */
-    authenticated: boolean;
+    get authenticated() {
+        return this.authInitialized;
+    }
 
     /** Authentication error */
     authError?: AuthError;
@@ -63,12 +63,15 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
 
     private inactivityTimer?: number;
 
-    private pendingAuth?: AuthRequest;
+    private authInfo?: AuthInfo;
+
+    private authInitialized = false;
+
+    private chatInitialized = false;
 
     constructor(backendUrl: string, initialState: InitialChatState) {
         logDebug("Chat client initialization");
         super();
-        this.authenticated = false;
         this.chat = new Chat(initialState);
         this.wsUrl = getWebSocketUrl(backendUrl);
         this.ws = this.initWebSocket();
@@ -84,11 +87,8 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
         const amsg: ChatMessageNew = { type: "msgnew", content: content };
         this.chat.update(amsg);
 
-        // Send the API message if already connected
-        if (this.ensureWebSocket()) {
-            logDebug("Sending a chat update");
-            this.sendMessage(amsg);
-        }
+        // Send the API message, if possible
+        this.handlePendingUpdate(amsg);
 
         this.chatEvent();
     }
@@ -100,14 +100,11 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
      */
     submitAuthentication(info: AuthInfo) {
         // Authentication request
-        this.authenticated = false;
-        this.pendingAuth = { type: "authreq", info: info };
+        this.authInfo = info;
+        this.authInitialized = false;
 
-        // Send the API message if already connected
-        if (this.ensureWebSocket()) {
-            logDebug("Sending an authentication request");
-            this.sendMessage(this.pendingAuth);
-        }
+        // Send the API message, if possible
+        this.handlePendingUpdate();
 
         this.initializationEvent();
     }
@@ -119,12 +116,65 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
      */
     setAuthError(error?: AuthError) {
         if (error !== undefined) {
-            this.authenticated = false;
+            this.authInfo = undefined;
+            this.authInitialized = false;
         }
         this.authError = error;
         this.initializationEvent();
     }
 
+    /**
+     * Handles the next pending update depending on the client state.
+     *
+     * @param msg Optional chat message update to be sent, if ready for it
+     */
+    private handlePendingUpdate(msg?: ChatMessageNew) {
+        // Need configuration details?
+        if (!this.sharedConfig) {
+            if (this.ensureWebSocket()) {
+                logDebug("Requesting configuration");
+                this.sendMessage({ type: "cfgreq" });
+            }
+        }
+
+        // Authentication request pending?
+        else if (this.authInfo && !this.authInitialized) {
+            if (this.ensureWebSocket()) {
+                logDebug("Sending an authentication request");
+                this.sendMessage({ type: "authreq", info: this.authInfo });
+            }
+        }
+
+        // Ready to send chat content?
+        else if (!this.sharedConfig.auth?.required || this.authInitialized) {
+            // Need chat initialization?
+            if (!this.chatInitialized && this.chat.backendProcessing) {
+                if (this.ensureWebSocket()) {
+                    logDebug("Sending the chat initialization");
+                    this.sendMessage({ ...this.chat.state, type: "init" });
+                }
+            }
+
+            // Can send the supplied message?
+            else if (msg) {
+                if (this.ensureWebSocket()) {
+                    logDebug("Sending a chat update");
+                    this.sendMessage(msg);
+                }
+            }
+
+            // Idle?
+            else {
+                this.initWebSocketInactivityTimeout();
+            }
+        }
+    }
+
+    /**
+     * Ensure that web socket is available, or initialize it if it is not.
+     *
+     * @returns whether the web socket i currently available
+     */
     private ensureWebSocket(): boolean {
         let ready = false;
 
@@ -134,7 +184,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
         }
 
         // Or if already connected
-        else if (this.connectionState === ChatConnectionState.CONNECTED) {
+        else if (this.ws.readyState === WebSocket.OPEN) {
             ready = true;
         }
 
@@ -143,6 +193,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
 
     private sendMessage(msg: ApiFrontendMessage) {
         this.ws.send(JSON.stringify(msg));
+        this.clearInactivityTimer();
     }
 
     /**
@@ -179,16 +230,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
             logDebug("Connection established");
             this.connectionState = ChatConnectionState.CONNECTED;
             this.clearRetryTimer();
-            if (this.sharedConfig === undefined) {
-                logDebug("Requesting configuration");
-                ws.send(JSON.stringify({ type: "cfgreq" }));
-            }
-            if (this.chat.backendProcessing) {
-                const initMsg: ChatInit = { ...this.chat.state, type: "init" };
-                logDebug("Sending the chat initialization");
-                ws.send(JSON.stringify(initMsg));
-            }
-            this.initWebSocketInactivityTimeout();
+            this.handlePendingUpdate();
             this.chatEvent();
         }
     }
@@ -205,24 +247,26 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
                         if (isConfigResponse(amsg)) {
                             logDebug("Received configuration");
                             this.sharedConfig = amsg;
+                            this.handlePendingUpdate();
                             this.initializationEvent();
-                            if (this.pendingAuth && this.connectionState === ChatConnectionState.CONNECTED) {
-                                this.sendMessage(this.pendingAuth);
-                            }
                         } else if (isAuthResponse(amsg)) {
                             logDebug("Received an authentication response");
-                            this.pendingAuth = undefined;
-                            this.authenticated = amsg.error === undefined;
+                            this.authInitialized = amsg.error === undefined;
                             this.authError = amsg.error;
+                            if (!this.authInitialized) {
+                                this.authInfo = undefined;
+                            }
+                            this.handlePendingUpdate();
                             this.initializationEvent();
                         } else {
                             logDebug("Received a chat update");
                             this.chat.update(amsg);
                             this.numErrors = 0;
+                            this.chatInitialized = true;
                             this.chatEvent();
+                            this.initWebSocketInactivityTimeout();
                         }
                         processed = true;
-                        this.initWebSocketInactivityTimeout();
                     }
                 }
                 if (!processed) {
@@ -239,6 +283,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
         if (ws === this.ws) {
             logThrownError("Connection error", ev);
             this.connectionState = ChatConnectionState.ERROR;
+            this.resetConnectionState();
             this.retryWebSocket();
             this.chatEvent();
         }
@@ -249,9 +294,15 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
         if (ws === this.ws) {
             logDebug("Connection closed");
             this.connectionState = ChatConnectionState.UNCONNECTED;
-            this.clearInactivityTimer();
+            this.resetConnectionState();
             this.chatEvent();
         }
+    }
+
+    private resetConnectionState() {
+        this.clearInactivityTimer();
+        this.authInitialized = false;
+        this.chatInitialized = false;
     }
 
     /**

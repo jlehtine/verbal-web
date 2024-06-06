@@ -47,7 +47,7 @@ export default function VerbalWebView({ conf, fullHeight, scrollRef }: VerbalWeb
 
     function onInit() {
         setConfiguring(!client.sharedConfig);
-        setLoginPending(client.sharedConfig?.auth !== undefined && !client.authenticated);
+        setLoginPending(client.sharedConfig?.auth?.required === true && !client.authenticated);
         setGoogleClientId(client.sharedConfig?.auth?.googleId);
         setAuthPending(client.authPending);
         setAuthError(client.authError);
