@@ -150,6 +150,9 @@ const chatCompletion: ChatCompletionProvider = engine;
 // Use WebSocket Express
 const backend = new WebSocketExpress();
 
+// Set trust proxy setting
+backend.set("trust proxy", trustProxy);
+
 // Log all requests
 backend.use((req, res, next) => {
     logRequest(req);
@@ -158,9 +161,6 @@ backend.use((req, res, next) => {
 
 // Set CORS headers for all responses
 backend.use(cors({ origin: process.env.VW_ALLOW_ORIGIN }));
-
-// Set trust proxy setting
-backend.set("trust proxy", trustProxy);
 
 // Client API web socket endpoint
 backend.ws("/chatws", (req, res) => {
