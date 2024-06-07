@@ -1,3 +1,4 @@
+import { VerbalWebError } from "../shared/error";
 import { retryWithBackoff } from "../shared/retry";
 import { ChatCompletionProvider, ChatCompletionRequest } from "./ChatCompletionProvider";
 import { ModerationProvider, ModerationResult } from "./ModerationProvider";
@@ -46,10 +47,22 @@ export class OpenAIEngine implements ChatCompletionProvider, ModerationProvider 
                     () =>
                         this.openai.moderations.create(request).then((response) => {
                             logInterfaceData("Received moderation response", requestContext, response);
-                            const flagged = response.results
-                                .map((r) => r.flagged)
-                                .reduce((accumulator, currentValue) => accumulator || currentValue, false);
-                            return { content: c, flagged: flagged };
+                            if (response.results.length !== 1) {
+                                throw new VerbalWebError("Expected a single moderation result");
+                            }
+                            const r = response.results[0];
+                            return {
+                                content: c,
+                                flagged: r.flagged,
+                                ...(r.flagged
+                                    ? {
+                                          reason: Object.entries(r.categories)
+                                              .filter((e) => e[1] === true)
+                                              .map((e) => e[0])
+                                              .join(", "),
+                                      }
+                                    : {}),
+                            };
                         }),
                     (err) => {
                         logThrownError("Moderation failed, retrying...", err, requestContext);

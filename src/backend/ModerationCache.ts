@@ -12,7 +12,7 @@ const MODERATION_CACHE_CLEAN_ENTRIES = 1.1 * MODERATION_CACHE_EXPIRE_ENTRIES;
 
 interface CachedModeration {
     created: number;
-    flagged: boolean;
+    result: ModerationResult;
 }
 
 /**
@@ -42,7 +42,7 @@ export class ModerationCache implements ModerationProvider {
         return this.moderation(requestContext, ...content).then((mrs) => {
             for (const mr of mrs) {
                 if (mr.flagged) {
-                    throw new ModerationRejectedError(mr.content);
+                    throw new ModerationRejectedError(mr.reason);
                 }
             }
         });
@@ -50,27 +50,29 @@ export class ModerationCache implements ModerationProvider {
 
     moderation(requestContext: RequestContext, ...content: string[]): Promise<ModerationResult[]> {
         this.cleanModerationCache();
-        const cachedResults = new Map(content.map((c) => [c, this.cache.get(c)?.flagged]));
+        const cachedResults = new Map(content.map((c) => [c, this.cache.get(c)?.result]));
+        const res: ModerationResult[] = [];
         for (const r of cachedResults) {
-            if (r[1]) {
-                return Promise.reject(new ModerationRejectedError(r[0]));
+            const mr = r[1];
+            if (mr) {
+                res.push(mr);
+                if (mr.flagged) {
+                    return Promise.resolve(res);
+                }
             }
         }
         const contentToCheck = [
             ...new Set([...cachedResults.entries()].filter((r) => r[1] === undefined).map((r) => r[0])),
         ];
         return this.moderationProvider.moderation(requestContext, ...contentToCheck).then((results) => {
-            results.forEach((r) => this.cache.set(r.content, { created: Date.now(), flagged: r.flagged }));
-            const resultsMap = new Map(results.map((r) => [r.content, r.flagged]));
-            return content
-                .map((c) => {
-                    const flagged = cachedResults.get(c) ?? resultsMap.get(c);
-                    return {
-                        content: c,
-                        flagged: flagged,
-                    };
-                })
-                .filter((mr): mr is ModerationResult => mr.flagged !== undefined);
+            results.forEach((r) => this.cache.set(r.content, { created: Date.now(), result: r }));
+            const resultsMap = new Map(results.map((r) => [r.content, r]));
+            return [
+                ...res,
+                ...contentToCheck
+                    .map((c) => resultsMap.get(c))
+                    .filter((mr): mr is ModerationResult => mr !== undefined),
+            ];
         });
     }
 
