@@ -66,7 +66,7 @@ export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProp
 
     const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
         // Enter submits user input but enter+shift doesn't
-        if (event.which === 13 && !event.shiftKey) {
+        if (event.code === "Enter" && !event.shiftKey) {
             handleSubmit();
             event.preventDefault();
         }
