@@ -7,7 +7,7 @@
         "chat": "Tekoälyavustaja epäonnistui.",
         "connection": "Tekoälyavustajaan ei saatu yhteyttä.",
         "limit": "Viesti estettiin käyttörajojen takia.",
-        "moderation": "Viesti estettiin moderoinnin takia."
+        "moderation": "Viesti estettiin sisällön takia."
     },
     "input": {
         "label": "Keskustele tekoälyavustajan kanssa",

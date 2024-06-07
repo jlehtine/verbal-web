@@ -6,8 +6,8 @@
         "backendConnection": "Connection error, retrying...",
         "chat": "The AI assistant failed.",
         "connection": "Failed to connect to the AI assistant.",
-        "limit": "Message was blocked by chat usage limits.",
-        "moderation": "Message was blocked by moderation."
+        "limit": "The message was blocked due to chat usage limits.",
+        "moderation": "The message was blocked due to content."
     },
     "input": {
         "label": "Chat with the AI assistant",

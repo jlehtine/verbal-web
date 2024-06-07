@@ -4,10 +4,10 @@
     },
     "error": {
         "backendConnection": "Anslutningsfel, försöker igen...",
-        "chat": "AI-assistenten misslyckades.",
+        "chat": "Den AI-assistenten misslyckades.",
         "connection": "Misslyckades med att ansluta till AI-assistenten.",
-        "limit": "Meddelandet blockerades av gränser för chattanvändning.",
-        "moderation": "Meddelandet blockerades av moderering."
+        "limit": "Meddelandet blockerades på grund av chattanvändningsbegränsningar.",
+        "moderation": "Meddelandet blockerades på grund av innehåll."
     },
     "input": {
         "label": "Chatta med AI-assistenten",
