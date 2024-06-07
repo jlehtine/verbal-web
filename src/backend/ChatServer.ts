@@ -438,6 +438,7 @@ export class ChatServer {
             content: state.completion.slice(state.sent),
             done: allDone,
         };
+        this.chat.update(msg);
         this.sendMessage(msg, "a chat update");
         state.sent = state.completion.length;
         this.clearSendTimeout(state);
