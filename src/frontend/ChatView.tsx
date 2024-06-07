@@ -18,6 +18,8 @@ import {
     Stack,
     TextField,
     Tooltip,
+    useMediaQuery,
+    useTheme,
 } from "@mui/material";
 import React, { MutableRefObject, PropsWithChildren, Suspense, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -34,6 +36,8 @@ export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProp
     const ref = useRef<HTMLElement>();
     const overflowRef = useRef<HTMLElement>();
     const msgsRef = useRef<HTMLElement>();
+    const theme = useTheme();
+    const isSmallScreen = useMediaQuery(theme.breakpoints.down("sm"));
 
     // userInput stores value of textField
     const [userInput, setUserInput] = useState("");
@@ -167,37 +171,40 @@ export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProp
                             messages={messages}
                             waitingForResponse={waitingForResponse}
                             msgsRef={msgsRef}
+                            isSmallScreen={isSmallScreen}
                         />
                     </MarkdownContentSupport>
                 </Box>
             </Suspense>
             <Box {...(fullHeight ? { sx: { flex: "0 0 auto" } } : {})}>
                 {!waitingForResponse && errorMessage === undefined ? (
-                    <TextField
-                        fullWidth
-                        multiline
-                        label={t("input.label")}
-                        value={userInput} // Value stored in state userInput
-                        onChange={handleInputChange}
-                        onKeyDown={handleKeyDown}
-                        inputRef={(input: unknown) => {
-                            if (input instanceof HTMLTextAreaElement || input instanceof HTMLInputElement) {
-                                input.focus();
-                            }
-                        }}
-                        InputProps={{
-                            endAdornment: (
-                                <InputAdornment position="end">
-                                    <Tooltip title={t("input.submit")}>
-                                        <IconButton color="primary" size="large" onClick={handleSubmit}>
-                                            <AssistantIcon />
-                                        </IconButton>
-                                    </Tooltip>
-                                </InputAdornment>
-                            ),
-                        }}
-                        sx={{ mt: 2 }}
-                    ></TextField>
+                    <Box {...(isSmallScreen ? {} : { pl: 12 })}>
+                        <TextField
+                            fullWidth
+                            multiline
+                            label={t("input.label")}
+                            value={userInput} // Value stored in state userInput
+                            onChange={handleInputChange}
+                            onKeyDown={handleKeyDown}
+                            inputRef={(input: unknown) => {
+                                if (input instanceof HTMLTextAreaElement || input instanceof HTMLInputElement) {
+                                    input.focus();
+                                }
+                            }}
+                            InputProps={{
+                                endAdornment: (
+                                    <InputAdornment position="end">
+                                        <Tooltip title={t("input.submit")}>
+                                            <IconButton color="primary" size="large" onClick={handleSubmit}>
+                                                <AssistantIcon />
+                                            </IconButton>
+                                        </Tooltip>
+                                    </InputAdornment>
+                                ),
+                            }}
+                            sx={{ mt: 2 }}
+                        ></TextField>
+                    </Box>
                 ) : null}
                 {errorMessage ? (
                     <Alert variant="filled" severity="error">
@@ -216,27 +223,38 @@ function ChatMessageListView({
     messages,
     msgsRef,
     waitingForResponse,
+    isSmallScreen,
 }: {
     messages: ChatMessage[];
     msgsRef?: React.Ref<unknown>;
     waitingForResponse: boolean;
+    isSmallScreen: boolean;
 }) {
     return (
         <Box ref={msgsRef}>
             <WelcomeView />
             <Stack spacing={2}>
                 {messages.map((m, idx, array) => (
-                    <ChatMessageView key={idx} msg={m} completed={!waitingForResponse || idx < array.length - 1} />
+                    <ChatMessageView
+                        key={idx}
+                        msg={m}
+                        completed={!waitingForResponse || idx < array.length - 1}
+                        isSmallScreen={isSmallScreen}
+                    />
                 ))}
             </Stack>
         </Box>
     );
 }
 
-function ChatMessageView({ msg, completed }: PropsWithChildren<{ msg: ChatMessage; completed: boolean }>) {
+function ChatMessageView({
+    msg,
+    completed,
+    isSmallScreen,
+}: PropsWithChildren<{ msg: ChatMessage; completed: boolean; isSmallScreen: boolean }>) {
     const um = msg.role === "user";
     return (
-        <Box sx={um ? { pl: 4 } : { pr: 4 }}>
+        <Box sx={isSmallScreen ? {} : um ? { pl: 4 } : { pr: 4 }}>
             <Stack direction="row" spacing={2} alignItems="flex-start" justifyContent={um ? "flex-end" : "flex-start"}>
                 <Box sx={{ pt: 1 }}>
                     <Avatar {...(!um ? { sx: { bgcolor: "primary.main" } } : {})}>
