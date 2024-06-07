@@ -109,7 +109,7 @@ export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProp
         if (br && lastTop !== undefined && nowTop !== undefined) {
             if (nowTop > lastTop) {
                 setUserScrolledUp(true);
-            } else if (nowTop < lastTop && br.bottom < innerHeight + 20) {
+            } else if (nowTop < lastTop && br.bottom < innerHeight + 50) {
                 setUserScrolledUp(false);
             }
         }
@@ -254,13 +254,15 @@ function ChatMessageView({
 }: PropsWithChildren<{ msg: ChatMessage; completed: boolean; isSmallScreen: boolean }>) {
     const um = msg.role === "user";
     return (
-        <Box sx={isSmallScreen ? {} : um ? { pl: 4 } : { pr: 4 }}>
+        <Box sx={um ? { pl: 4 } : { pr: 4 }}>
             <Stack direction="row" spacing={2} alignItems="flex-start" justifyContent={um ? "flex-end" : "flex-start"}>
-                <Box sx={{ pt: 1 }}>
-                    <Avatar {...(!um ? { sx: { bgcolor: "primary.main" } } : {})}>
-                        {um ? <AccountCircleIcon /> : <AssistantIcon />}
-                    </Avatar>
-                </Box>
+                {!isSmallScreen && (
+                    <Box sx={{ pt: 1 }}>
+                        <Avatar {...(!um ? { sx: { bgcolor: "primary.main" } } : {})}>
+                            {um ? <AccountCircleIcon /> : <AssistantIcon />}
+                        </Avatar>
+                    </Box>
+                )}
                 <Paper sx={{ pl: 2, pr: 2 }}>
                     <MarkdownContent content={msg.content} completed={completed} />
                 </Paper>
