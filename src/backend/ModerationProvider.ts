@@ -1,4 +1,5 @@
 import { VerbalWebError } from "../shared/error";
+import { RequestContext } from "./RequestContext";
 import { TextChunkerParams } from "./TextChunker";
 
 /** Signals that content was rejected by moderation */
@@ -31,7 +32,8 @@ export interface ModerationProvider {
      * either `true` if accepted or `false` if rejected. Results array
      * may stop after the first flagged content.
      *
+     * @param requestContext Context details for the request
      * @param content content to be checked
      */
-    moderation(...content: string[]): Promise<ModerationResult[]>;
+    moderation(requestContext: RequestContext, ...content: string[]): Promise<ModerationResult[]>;
 }

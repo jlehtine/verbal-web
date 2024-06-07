@@ -128,7 +128,7 @@ function parseTrustProxy(arg: string | undefined) {
 
 // Switch to specified directory
 if (chdir !== undefined) {
-    logInfo("Changing directory to %s", chdir);
+    logInfo("Changing directory to %s", undefined, chdir);
     process.chdir(chdir);
 }
 
@@ -164,13 +164,12 @@ backend.use(cors({ origin: process.env.VW_ALLOW_ORIGIN }));
 
 // Client API web socket endpoint
 backend.ws("/chatws", (req, res) => {
-    logInfo("Accepting web socket connection [%s]", req.ip);
     res.accept()
         .then((ws) => {
             new ChatServer(req, ws, moderation, chatCompletion, config, serverOverrides);
         })
         .catch((err: unknown) => {
-            logThrownError("Failed to accept web socket connection [%s]", err, req.ip);
+            logThrownError("Failed to accept web socket connection [%s]", err, undefined, req.ip);
         });
 });
 
@@ -180,17 +179,17 @@ backend.use("/", express.static(path.resolve(__dirname, "assets")));
 // Serve other static files, if so instructed
 for (const sc of staticContent) {
     const path = sc.path ?? "/";
-    logInfo("Serving static content from %s at path %s", sc.dir, path);
+    logInfo("Serving static content from %s at path %s", undefined, sc.dir, path);
     backend.use(path, express.static(sc.dir));
 }
 
 function logRequest(req: Request) {
     if (req.method && req.url) {
-        logInfo("Processing request [%s]: %s %s", req.ip, req.method, req.url);
+        logInfo("Processing request [%s]: %s %s", undefined, req.ip, req.method, req.url);
     }
 }
 
 // Start listening for requests
 backend.listen(port, () => {
-    logInfo("Started listening on port %d", port);
+    logInfo("Started listening on port %d", undefined, port);
 });

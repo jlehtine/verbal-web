@@ -16,11 +16,13 @@ import { VerbalWebError } from "../shared/error";
 import { ChatCompletionMessage, ChatCompletionProvider, ChatCompletionRequest } from "./ChatCompletionProvider";
 import { ModerationCache } from "./ModerationCache";
 import { ModerationProvider, ModerationRejectedError } from "./ModerationProvider";
+import { RequestContext } from "./RequestContext";
 import { TextChunker, chunkText } from "./TextChunker";
 import { logDebug, logError, logInfo, logInterfaceData, logThrownError } from "./log";
 import { CredentialResponse } from "@react-oauth/google";
 import { Request } from "express";
 import { OAuth2Client } from "google-auth-library";
+import { v4 as uuidv4 } from "uuid";
 import { WebSocket } from "ws";
 
 /** Inactivity timeout is one minute */
@@ -69,11 +71,11 @@ interface ChatCompletionState {
  * A server serving a single chat client web socket session.
  */
 export class ChatServer {
+    /** Request context */
+    private readonly requestContext: RequestContext;
+
     /** Server configuration */
     private readonly config;
-
-    /** Client ip */
-    private readonly ip;
 
     /** Chat model */
     private readonly chat;
@@ -101,9 +103,9 @@ export class ChatServer {
         config?: ChatServerConfig,
         serverOverrides?: InitialChatStateOverrides,
     ) {
+        this.requestContext = { chatId: uuidv4(), sourceIp: req.ip };
         this.config = config;
-        this.ip = req.ip;
-        logDebug("Chat server initialization [%s]", this.ip);
+        this.debug("Accepted a web socket connection");
         this.chat = new Chat(undefined, serverOverrides);
         this.ws = ws;
         this.moderation = new ModerationCache(moderation);
@@ -122,7 +124,28 @@ export class ChatServer {
         });
     }
 
-    private sendMessage(msg: ApiBackendMessage) {
+    private error(msg: string, ...params: unknown[]) {
+        logError(msg, this.requestContext, ...params);
+    }
+
+    private thrownError(msg: string, err: unknown, ...params: unknown[]) {
+        logThrownError(msg, err, this.requestContext, ...params);
+    }
+
+    private info(msg: string, ...params: unknown[]) {
+        logInfo(msg, this.requestContext, ...params);
+    }
+
+    private debug(msg: string, ...params: unknown[]) {
+        logDebug(msg, this.requestContext, ...params);
+    }
+
+    private debugData(msg: string, data: unknown, ...params: unknown[]) {
+        logInterfaceData(msg, this.requestContext, data, ...params);
+    }
+
+    private sendMessage(msg: ApiBackendMessage, desc: string) {
+        this.debugData("Sending %s", msg, desc);
         this.ws.send(JSON.stringify(msg));
     }
 
@@ -134,7 +157,7 @@ export class ChatServer {
                 const amsg: unknown = JSON.parse(data.toString());
                 if (isApiFrontendMessage(amsg)) {
                     if (isConfigRequest(amsg)) {
-                        logInterfaceData("Received a configuration request [%s]", amsg, this.ip);
+                        this.debugData("Received a configuration request", amsg);
                         const res: ConfigResponse = {
                             type: "cfgres",
                             ...(this.config?.allowUsers !== undefined || this.config?.googleOAuthClientId !== undefined
@@ -146,17 +169,19 @@ export class ChatServer {
                                   }
                                 : {}),
                         };
-                        logInterfaceData("Sending a configuration response [%s]", res, this.ip);
-                        this.sendMessage(res);
+                        this.sendMessage(res, "a configuration response");
                         processed = true;
                     } else if (isAuthRequest(amsg)) {
-                        logInterfaceData("Received an authentication request [%s]", amsg, this.ip);
-                        this.handleAuthRequest(amsg);
+                        this.debugData("Received an authentication request", amsg);
+                        this.handleAuthRequest(amsg).catch((err: unknown) => {
+                            this.thrownError("Authentication request processing failed", err);
+                        });
                         processed = true;
                     } else if (!this.authenticated) {
-                        throw new VerbalWebError(`Unauthorized request from ${this.ip?.toString() ?? "<unknown>"}`);
+                        this.error("Unauthenticated request (ignoring)");
+                        processed = true;
                     } else {
-                        logInterfaceData("Received a chat update [%s]", amsg, this.ip);
+                        this.debugData("Received a chat update", amsg);
                         this.chat.update(amsg);
                         processed = true;
                     }
@@ -169,57 +194,68 @@ export class ChatServer {
                 }
             }
             if (!processed) {
-                logError("Received an unrecognized message from the client [%s]", this.ip);
+                this.error("Received an unrecognized message");
                 console.debug("msg = " + JSON.stringify(data));
             }
         } catch (err: unknown) {
-            logThrownError("Failed to process a client message [%s]", err, this.ip);
+            this.thrownError("Failed to process a client message [%s]", err);
         }
     }
 
     // On web socket error
     private onWebSocketError(err: unknown) {
-        logThrownError("Web socket error [%s]", err, this.ip);
+        this.thrownError("Web socket closed on error", err);
         this.clearInactivityTimer();
     }
 
     // On web socket close
     private onWebSocketClose() {
-        logDebug("Web socket closed [%s]", this.ip);
+        this.debug("Web socket closed");
         this.clearInactivityTimer();
     }
 
-    private handleAuthRequest(req: AuthRequest) {
+    private async handleAuthRequest(req: AuthRequest) {
+        // Reset any existing authentication on new authencation request
+        this.authenticated = false;
+        this.requestContext.userEmail = undefined;
+
+        let user: string | undefined;
+        let authError: AuthError | undefined;
+
+        // Google authentication
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         if (req.info.type === "google") {
-            let user: string | undefined;
-            let authError: AuthError | undefined;
-            this.checkGoogleAuthRequest(req.info.creds)
-                .then((u) => {
-                    user = u;
-                    const authorized = this.isAuthorized(u);
-                    const res: AuthResponse = {
-                        type: "authres",
-                        error: (authError = authorized ? undefined : "unauthorized"),
-                    };
-                    this.authenticated = authorized;
-                    this.sendMessage(res);
-                })
-                .catch((err: unknown) => {
-                    logThrownError("Google login failed", err);
-                    this.authenticated = false;
-                    this.sendMessage({ type: "authres", error: (authError = "failed") });
-                })
-                .finally(() => {
-                    if (authError) {
-                        logInfo("Google authentication failed [%s]", this.ip);
-                    } else {
-                        logInfo("Google authentication completed for %s [%s]", user, this.ip);
-                    }
-                });
-        } else {
+            try {
+                user = await this.checkGoogleAuthRequest(req.info.creds);
+                this.debug("Google authenticated %s", user);
+            } catch (err) {
+                this.thrownError("Google authentication failed", err);
+                authError = "failed";
+            }
+        }
+
+        // Unsupported authencation method
+        else {
             throw new VerbalWebError("Unsupported authentication method");
         }
+
+        // Check authorization
+        if (user && !authError) {
+            if (this.isAuthorized(user)) {
+                this.authenticated = true;
+                this.requestContext.userEmail = user;
+                this.info("User authenticated and authorized");
+            } else {
+                authError = "unauthorized";
+                this.info("Authenticated user %s is not authorized", user);
+            }
+        }
+
+        const res: AuthResponse = {
+            type: "authres",
+            error: authError,
+        };
+        this.sendMessage(res, "an authentication response");
     }
 
     private isAuthorized(user: string): boolean {
@@ -255,7 +291,7 @@ export class ChatServer {
         this.clearInactivityTimer();
         this.inactivityTimer = setTimeout(() => {
             this.inactivityTimer = undefined;
-            logDebug("Closing the connection due to inactivity timeout [%s]", this.ip);
+            this.debug("Closing the connection due to inactivity timeout");
             this.ws.close();
         }, INACTIVITY_TIMEOUT_MILLIS);
     }
@@ -281,6 +317,7 @@ export class ChatServer {
 
         // Construct a chat completion request
         const request: ChatCompletionRequest = {
+            requestContext: this.requestContext,
             model: this.chat.state.model,
             messages: [...systemInstructions, ...this.chat.state.messages],
         };
@@ -290,7 +327,7 @@ export class ChatServer {
             .map((m) => m.content)
             .flatMap((c) => chunkText(this.moderation.textChunkerParams, c));
         this.moderation
-            .checkModeration(...moderationContent)
+            .checkModeration(this.requestContext, ...moderationContent)
             .then(() => {
                 // Perform (streaming) chat completion
                 const state: ChatCompletionState = {
@@ -357,7 +394,7 @@ export class ChatServer {
                 const moderationInput = state.completion.slice(value.start, value.end);
                 state.moderationPending = true;
                 this.moderation
-                    .checkModeration(moderationInput)
+                    .checkModeration(this.requestContext, moderationInput)
                     .then(() => {
                         state.moderationPending = false;
                         state.moderated = value.end;
@@ -401,8 +438,7 @@ export class ChatServer {
             content: state.completion.slice(state.sent),
             done: allDone,
         };
-        logInterfaceData("Sending a chat update [%s]", msg, this.ip);
-        this.sendMessage(msg);
+        this.sendMessage(msg, "a chat update");
         state.sent = state.completion.length;
         this.clearSendTimeout(state);
     }
@@ -422,11 +458,10 @@ export class ChatServer {
                 limit: "Chat completion usage limit encountered",
             } as Record<ChatMessageErrorCode, string>
         )[errorCode];
-        logThrownError(errorMessage + " [%s]", err, this.ip);
+        this.thrownError(errorMessage, err);
         if (this.ws.readyState === WebSocket.OPEN) {
             const msg: ChatMessageError = { type: "msgerror", code: errorCode, message: errorMessage };
-            logInterfaceData("Sending a chat error [%s]", msg, this.ip);
-            this.sendMessage(msg);
+            this.sendMessage(msg, "a chat error");
             this.ws.close();
         }
     }

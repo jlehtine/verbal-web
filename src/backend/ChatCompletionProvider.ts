@@ -1,8 +1,16 @@
+import { RequestContext } from "./RequestContext";
+
 /**
  * Generic chat completion request.
  */
 export interface ChatCompletionRequest {
+    /** Context details for the request */
+    requestContext: RequestContext;
+
+    /** Model identifier */
     model?: string;
+
+    /** Message history */
     messages: ChatCompletionMessage[];
 }
 

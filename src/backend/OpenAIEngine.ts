@@ -1,6 +1,7 @@
 import { retryWithBackoff } from "../shared/retry";
 import { ChatCompletionProvider, ChatCompletionRequest } from "./ChatCompletionProvider";
 import { ModerationProvider, ModerationResult } from "./ModerationProvider";
+import { RequestContext } from "./RequestContext";
 import { logFatal, logInfo, logInterfaceData, logThrownError } from "./log";
 import OpenAI from "openai";
 
@@ -36,22 +37,22 @@ export class OpenAIEngine implements ChatCompletionProvider, ModerationProvider 
         });
     }
 
-    moderation(...content: string[]): Promise<ModerationResult[]> {
+    moderation(requestContext: RequestContext, ...content: string[]): Promise<ModerationResult[]> {
         return Promise.all(
             content.map((c) => {
                 const request: OpenAI.ModerationCreateParams = { input: content };
-                logInterfaceData("Sending moderation request", request);
+                logInterfaceData("Sending moderation request", requestContext, request);
                 return retryWithBackoff(
                     () =>
                         this.openai.moderations.create(request).then((response) => {
-                            logInterfaceData("Received moderation response", response);
+                            logInterfaceData("Received moderation response", requestContext, response);
                             const flagged = response.results
                                 .map((r) => r.flagged)
                                 .reduce((accumulator, currentValue) => accumulator || currentValue, false);
                             return { content: c, flagged: flagged };
                         }),
                     (err) => {
-                        logThrownError("Moderation failed, retrying...", err);
+                        logThrownError("Moderation failed, retrying...", err, requestContext);
                     },
                     BACKOFF_BASE_MILLIS,
                     BACKOFF_MAX_ATTEMPTS,
@@ -66,7 +67,7 @@ export class OpenAIEngine implements ChatCompletionProvider, ModerationProvider 
             messages: request.messages,
             stream: true,
         };
-        logInterfaceData("Sending chat completion request", params);
+        logInterfaceData("Sending chat completion request", request.requestContext, params);
         return retryWithBackoff(
             () =>
                 this.openai.chat.completions.create(params).then((stream) => {
@@ -79,7 +80,11 @@ export class OpenAIEngine implements ChatCompletionProvider, ModerationProvider 
                                         if (done) {
                                             return { done: true, value: undefined };
                                         } else {
-                                            logInterfaceData("Received a chat completion chunk", value);
+                                            logInterfaceData(
+                                                "Received a chat completion chunk",
+                                                request.requestContext,
+                                                value,
+                                            );
                                             return { value: value.choices[0]?.delta?.content ?? "" };
                                         }
                                     });
@@ -91,7 +96,7 @@ export class OpenAIEngine implements ChatCompletionProvider, ModerationProvider 
                     return strIterable;
                 }),
             (err) => {
-                logThrownError("Chat completion failed, retrying...", err);
+                logThrownError("Chat completion failed, retrying...", err, request.requestContext);
             },
             BACKOFF_BASE_MILLIS,
             BACKOFF_MAX_ATTEMPTS,

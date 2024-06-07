@@ -136,8 +136,16 @@ export function isConfigRequest(v: unknown): v is ConfigRequest {
     return isTypedMessageOfType(v, "cfgreq");
 }
 
+export function isGoogleAuthInfo(v: unknown): v is GoogleAuthInfo {
+    return isObject(v) && v.type === "google" && isObject(v.creds);
+}
+
+export function isAuthInfo(v: unknown): v is AuthInfo {
+    return isGoogleAuthInfo(v);
+}
+
 export function isAuthRequest(v: unknown): v is AuthRequest {
-    return isTypedMessageOfType(v, "authreq");
+    return isTypedMessageOfType(v, "authreq") && isAuthInfo(v.info);
 }
 
 export function isChatInit(v: unknown): v is ChatInit {
