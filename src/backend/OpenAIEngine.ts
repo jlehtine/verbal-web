@@ -40,7 +40,7 @@ export class OpenAIEngine implements ChatCompletionProvider, ModerationProvider 
     moderation(requestContext: RequestContext, ...content: string[]): Promise<ModerationResult[]> {
         return Promise.all(
             content.map((c) => {
-                const request: OpenAI.ModerationCreateParams = { input: content };
+                const request: OpenAI.ModerationCreateParams = { input: c };
                 logInterfaceData("Sending moderation request", requestContext, request);
                 return retryWithBackoff(
                     () =>
