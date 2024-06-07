@@ -138,6 +138,9 @@ export default function MarkdownContentSupport({ children }: PropsWithChildren) 
                         fontSize: "16px",
                         fontWeight: 400,
                     },
+                    ".vw-markdown-message p": {
+                        whiteSpace: "pre-line",
+                    },
                     ".vw-markdown-message table": {
                         color: "inherit",
                     },
