@@ -16,6 +16,7 @@ import {
     LinearProgress,
     Paper,
     Stack,
+    StandardTextFieldProps,
     TextField,
     Tooltip,
     useMediaQuery,
@@ -55,25 +56,25 @@ export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProp
 
     // Update value of userInput when value of textField is changed
     // Update value of allowSubmit
-    const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const onInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const text = event.target.value;
         setUserInput(text);
     };
 
-    const handleSubmit = () => {
+    const onInputKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+        // Enter submits user input but enter+shift doesn't
+        if (event.code === "Enter" && !event.shiftKey) {
+            submitInput();
+            event.preventDefault();
+        }
+    };
+
+    const submitInput = () => {
         // Only allowed to submit when textfield is not empty and response received from previous query
         if (!inputEmpty && !waitingForResponse) {
             setUserInput("");
             setErrorMessage(undefined);
             client.submitMessage(userInput);
-        }
-    };
-
-    const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-        // Enter submits user input but enter+shift doesn't
-        if (event.code === "Enter" && !event.shiftKey) {
-            handleSubmit();
-            event.preventDefault();
         }
     };
 
@@ -190,30 +191,11 @@ export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProp
                 ) : null}
                 {!waitingForResponse && (
                     <Box sx={{ mt: 2, ...(isSmallScreen ? {} : { pl: 12 }) }}>
-                        <TextField
-                            fullWidth
-                            multiline
-                            label={t("input.label")}
-                            value={userInput} // Value stored in state userInput
-                            onChange={handleInputChange}
-                            onKeyDown={handleKeyDown}
-                            inputRef={(input: HTMLInputElement | HTMLTextAreaElement | null) => {
-                                if (input) {
-                                    input.selectionStart = input.selectionEnd = input.value.length;
-                                    input.focus();
-                                }
-                            }}
-                            InputProps={{
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <Tooltip title={t("input.submit")}>
-                                            <IconButton color="primary" size="large" onClick={handleSubmit}>
-                                                <AssistantIcon />
-                                            </IconButton>
-                                        </Tooltip>
-                                    </InputAdornment>
-                                ),
-                            }}
+                        <ChatInput
+                            value={userInput}
+                            onChange={onInputChange}
+                            onKeyDown={onInputKeyDown}
+                            submitInput={submitInput}
                         />
                     </Box>
                 )}
@@ -222,6 +204,45 @@ export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProp
                 ) : null}
             </Box>
         </Box>
+    );
+}
+
+interface ChatInputProps extends StandardTextFieldProps {
+    submitInput: () => void;
+}
+
+function ChatInput({ submitInput, ...props }: ChatInputProps) {
+    const { t } = useTranslation();
+    const inputRef = useRef<HTMLTextAreaElement>();
+
+    // On mount and unmount
+    useEffect(() => {
+        const input = inputRef.current;
+        if (input) {
+            input.selectionStart = input.selectionEnd = input.value.length;
+            input.focus();
+        }
+    }, []);
+
+    return (
+        <TextField
+            {...props}
+            fullWidth
+            multiline
+            label={t("input.label")}
+            inputRef={inputRef}
+            InputProps={{
+                endAdornment: (
+                    <InputAdornment position="end">
+                        <Tooltip title={t("input.submit")}>
+                            <IconButton color="primary" size="large" onClick={submitInput}>
+                                <AssistantIcon />
+                            </IconButton>
+                        </Tooltip>
+                    </InputAdornment>
+                ),
+            }}
+        />
     );
 }
 
