@@ -5,7 +5,7 @@ import { useConfiguration } from "./context";
 import load from "./load";
 import { logThrownError } from "./log";
 import { GlobalStyles, PaletteMode, useTheme } from "@mui/material";
-import { PropsWithChildren, createContext, useEffect } from "react";
+import { PropsWithChildren, createContext, useContext, useEffect } from "react";
 import React from "react";
 
 let highlightStyle: HTMLStyleElement | undefined;
@@ -77,11 +77,36 @@ function setHighlightPaletteMode(mode: PaletteMode, conf: VerbalWebConfiguration
     }
 }
 
-export interface MarkdownContentFuncs {
-    highlight: (elem: HTMLElement, completed: boolean) => void;
+/** Loads KaTeX styles. */
+function loadKatexStyles(conf: VerbalWebConfiguration) {
+    load("katex.css", conf, "extra", () => import("katex/dist/katex.min.css"))
+        .then((module) => {
+            if (!katexStyle) {
+                katexStyle = document.createElement("style");
+                document.head.appendChild(katexStyle);
+                katexStyle.innerHTML = getCssContent(module);
+            }
+        })
+        .catch((err: unknown) => {
+            logThrownError("Failed to load KaTeX styles", err);
+        });
 }
 
-export const MarkdownContentContext = createContext<MarkdownContentFuncs>({ highlight: () => undefined });
+export interface MarkdownContentFuncs {
+    highlight: (elem: HTMLElement, completed: boolean) => void;
+    mathMarkup: (content: string) => string | undefined;
+}
+
+const MarkdownContentContext = createContext<MarkdownContentFuncs | null>(null);
+
+/** Use the markdown content functions */
+export function useMarkdownContent(): MarkdownContentFuncs {
+    const markdownContentFuncs = useContext(MarkdownContentContext);
+    if (markdownContentFuncs === null) {
+        throw new VerbalWebError("Markdown content context not provided");
+    }
+    return markdownContentFuncs;
+}
 
 /**
  * Provides styling for the contained {@link MarkdownContent} elements.
@@ -124,27 +149,28 @@ export default function MarkdownContentSupport({ children }: PropsWithChildren) 
         }
     }
 
+    /**
+     * Converts math markup.
+     *
+     * @param content content
+     * @returns returns converted content or undefined if content did not change
+     */
+    function mathMarkup(content: string): string | undefined {
+        let c = content;
+        c = c.replace(/\\\[(.*?)\\\]/gms, (_, formula: string) => "$$$" + formula + "$$$");
+        c = c.replace(/\\\((.*?)\\\)/gm, (_, formula: string) => "$$" + formula + "$$");
+        if (c !== content) {
+            loadKatexStyles(conf);
+            return c;
+        }
+    }
+
     // Switch highlight palette on light/dark mode changes
     useEffect(() => {
         if (highlightMode !== undefined) {
             setHighlightPaletteMode(mode, conf);
         }
     }, [mode]);
-
-    // Add Katex style on mount
-    useEffect(() => {
-        load("katex.css", conf, "extra", () => import("katex/dist/katex.min.css"))
-            .then((module) => {
-                if (katexStyle === undefined) {
-                    katexStyle = document.createElement("style");
-                    document.head.appendChild(katexStyle);
-                    katexStyle.innerHTML = getCssContent(module);
-                }
-            })
-            .catch((err: unknown) => {
-                logThrownError("Failed to load KaTeX styles", err);
-            });
-    }, []);
 
     return (
         <>
@@ -166,7 +192,7 @@ export default function MarkdownContentSupport({ children }: PropsWithChildren) 
                     },
                 }}
             />
-            <MarkdownContentContext.Provider value={{ highlight: highlight }}>
+            <MarkdownContentContext.Provider value={{ highlight: highlight, mathMarkup: mathMarkup }}>
                 {children}
             </MarkdownContentContext.Provider>
         </>

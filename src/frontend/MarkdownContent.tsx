@@ -1,21 +1,11 @@
-import { MarkdownContentContext } from "./MarkdownContentSupport";
+import LoadingIndicator from "./LoadingIndicator";
+import { useMarkdownContent } from "./MarkdownContentSupport";
 import { useConfiguration } from "./context";
+import load from "./load";
 import { Box } from "@mui/material";
-import React, { useContext, useEffect, useRef } from "react";
+import React, { Suspense, lazy, useEffect, useRef } from "react";
 import Markdown from "react-markdown";
-import rehypeKatex from "rehype-katex";
-import rehypeRaw from "rehype-raw";
-import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
-
-/** Preprocesses math markup to format suitable for remark-math */
-function preprocessMathMarkup(content: string): string {
-    let c = content;
-    c = c.replace(/\\\[(.*?)\\\]/gms, (_, formula: string) => "$$$" + formula + "$$$");
-    c = c.replace(/\\\((.*?)\\\)/gms, (_, formula: string) => "$$" + formula + "$$");
-    return c;
-}
 
 /**
  * Component for handling markdown and code snippet content.
@@ -23,7 +13,7 @@ function preprocessMathMarkup(content: string): string {
  */
 export default function MarkdownContent({ content, completed }: { content: string; completed: boolean }) {
     const conf = useConfiguration();
-    const { highlight } = useContext(MarkdownContentContext);
+    const { highlight, mathMarkup } = useMarkdownContent();
     const selfRef = useRef<HTMLElement>();
 
     // Highlight, if highlighting not disabled
@@ -35,15 +25,26 @@ export default function MarkdownContent({ content, completed }: { content: strin
         }
     }, [content, completed]);
 
+    // Handle math markup, if not disabled
+    let MarkdownMathContent;
+    if (conf.mathMarkup !== false) {
+        const tc = mathMarkup(content);
+        if (tc !== undefined) {
+            content = tc;
+            MarkdownMathContent = lazy(() =>
+                load("MarkdownMathContent", conf, "extra", () => import("./MarkdownMathContent")),
+            );
+        }
+    }
+    const MarkdownComponent = MarkdownMathContent ?? Markdown;
+
     return (
         <Box ref={selfRef}>
-            <Markdown
-                className="vw-markdown-message"
-                remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: false }]]}
-                rehypePlugins={[rehypeRaw, rehypeSanitize, rehypeKatex]}
-            >
-                {preprocessMathMarkup(content)}
-            </Markdown>
+            <Suspense fallback={<LoadingIndicator conf={conf} />}>
+                <MarkdownComponent className="vw-markdown-message" remarkPlugins={[remarkGfm]}>
+                    {content}
+                </MarkdownComponent>
+            </Suspense>
         </Box>
     );
 }

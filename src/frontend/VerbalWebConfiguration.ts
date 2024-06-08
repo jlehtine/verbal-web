@@ -38,8 +38,11 @@ export default interface VerbalWebConfiguration {
     /** URL to the terms of service page (absolute or relative)*/
     termsOfServiceUrl?: string;
 
-    /** Whether to enable syntax highlighting */
+    /** Whether to enable syntax highlighting (default is true) */
     highlight?: boolean;
+
+    /** Whether to enable math markup support (default is true) */
+    mathMarkup?: boolean;
 
     /**
      * Callback for loading state changes.
