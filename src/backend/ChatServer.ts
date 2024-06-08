@@ -19,6 +19,7 @@ import { ModerationProvider, ModerationRejectedError } from "./ModerationProvide
 import { RequestContext } from "./RequestContext";
 import { TextChunker, chunkText } from "./TextChunker";
 import { logDebug, logError, logInfo, logInterfaceData, logThrownError } from "./log";
+import { continueRandomErrors, pauseRandomErrors } from "./randomErrors";
 import { CredentialResponse } from "@react-oauth/google";
 import { Request } from "express";
 import { OAuth2Client } from "google-auth-library";
@@ -186,6 +187,7 @@ export class ChatServer {
                         processed = true;
                     }
                     if (this.chat.backendProcessing) {
+                        continueRandomErrors();
                         this.info("Chat completion requested");
                         this.clearInactivityTimer();
                         this.doChatCompletion();
@@ -199,7 +201,7 @@ export class ChatServer {
                 this.debugData("Unrecognized input message", data);
             }
         } catch (err: unknown) {
-            this.thrownError("Failed to process a client message [%s]", err);
+            this.handleError(err);
         }
     }
 
@@ -427,6 +429,7 @@ export class ChatServer {
 
         if (allDone) {
             this.initWebSocketInactivityTimeout();
+            pauseRandomErrors();
         }
     }
 
@@ -454,17 +457,18 @@ export class ChatServer {
         const errorMessage = (
             {
                 connection: "Assistant connection failed",
-                moderation: "Moderation failed",
+                moderation: "Moderation flagged",
                 chat: "Chat completion failed",
                 limit: "Chat completion usage limit encountered",
             } as Record<ChatMessageErrorCode, string>
         )[errorCode];
         this.thrownError(errorMessage, err);
         if (this.ws.readyState === WebSocket.OPEN) {
-            const msg: ChatMessageError = { type: "msgerror", code: errorCode, message: errorMessage };
+            const msg: ChatMessageError = { type: "msgerror", code: errorCode };
             this.chat.update(msg);
             this.sendMessage(msg, "a chat error");
             this.ws.close();
         }
+        pauseRandomErrors();
     }
 }

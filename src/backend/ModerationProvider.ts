@@ -5,7 +5,7 @@ import { TextChunkerParams } from "./TextChunker";
 /** Signals that content was rejected by moderation */
 export class ModerationRejectedError extends VerbalWebError {
     constructor(reason?: string, options?: ErrorOptions) {
-        super(`Moderation rejected content${reason ? ": " + reason : ""}`, options);
+        super(`Moderation flagged content${reason ? ": " + reason : ""}`, options);
         this.name = "ModerationRejectedError";
     }
 }

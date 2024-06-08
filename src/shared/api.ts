@@ -109,9 +109,6 @@ export type ChatMessageErrorCode = "connection" | "chat" | "moderation" | "limit
 export interface ChatMessageError extends TypedMessage<"msgerror"> {
     /** Error code */
     code: ChatMessageErrorCode;
-
-    /** Error message as human readable text */
-    message: string;
 }
 
 function isTypedMessage(v: unknown): v is TypedMessage<string> {

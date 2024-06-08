@@ -4,6 +4,7 @@ import { ChatServer, ChatServerConfig } from "./ChatServer";
 import { ModerationProvider } from "./ModerationProvider";
 import { OpenAIEngine } from "./OpenAIEngine";
 import { logFatal, logInfo, logThrownError, setLogLevel } from "./log";
+import { pauseRandomErrors, setRandomErrorsEnabled } from "./randomErrors";
 import cors from "cors";
 import express, { Request } from "express";
 import path from "path";
@@ -39,6 +40,8 @@ options:
         enable Google login using the specified OAuth client id
     -v, --verbose
         increase logging, use multiple times for even more verbose logging
+    --random-errors
+        generate random backend errors, for error testing
 `);
 }
 
@@ -50,6 +53,7 @@ let trustProxy = parseTrustProxy(process.env.VW_TRUST_PROXY);
 let allowUsers = parseAllowUsers(process.env.VW_ALLOW_USERS);
 let googleOAuthClientId = process.env.VW_GOOGLE_OAUTH_CLIENT_ID;
 let logLevel = process.env.VW_LOG_LEVEL ? parseInt(process.env.VW_LOG_LEVEL) : 0;
+let randomErrors = process.env.VW_RANDOM_ERRORS !== undefined;
 for (let i = 2; i < process.argv.length; i++) {
     const a = process.argv[i];
     if (a === "-h" || a === "--help") {
@@ -70,6 +74,8 @@ for (let i = 2; i < process.argv.length; i++) {
         googleOAuthClientId = safeNextArg(process.argv, ++i);
     } else if (a === "-v" || a === "--verbose") {
         logLevel++;
+    } else if (a === "--random-errors") {
+        randomErrors = true;
     } else {
         logFatal("Unexpected command line argument: %s", a);
     }
@@ -78,6 +84,8 @@ setLogLevel(logLevel);
 if (process.env.VW_STATIC) {
     staticContent.push(...process.env.VW_STATIC.split(";").map(parseStatic));
 }
+setRandomErrorsEnabled(randomErrors);
+pauseRandomErrors();
 
 // Initialize configuration
 const config: ChatServerConfig = {
