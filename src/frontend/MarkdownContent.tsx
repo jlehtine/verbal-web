@@ -3,7 +3,19 @@ import { useConfiguration } from "./context";
 import { Box } from "@mui/material";
 import React, { useContext, useEffect, useRef } from "react";
 import Markdown from "react-markdown";
+import rehypeKatex from "rehype-katex";
+import rehypeRaw from "rehype-raw";
+import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+
+/** Preprocesses math markup to format suitable for remark-math */
+function preprocessMathMarkup(content: string): string {
+    let c = content;
+    c = c.replace(/\\\[(.*?)\\\]/gms, (_, formula: string) => "$$$" + formula + "$$$");
+    c = c.replace(/\\\((.*?)\\\)/gms, (_, formula: string) => "$$" + formula + "$$");
+    return c;
+}
 
 /**
  * Component for handling markdown and code snippet content.
@@ -25,8 +37,12 @@ export default function MarkdownContent({ content, completed }: { content: strin
 
     return (
         <Box ref={selfRef}>
-            <Markdown className="vw-markdown-message" remarkPlugins={[remarkGfm]}>
-                {content}
+            <Markdown
+                className="vw-markdown-message"
+                remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: false }]]}
+                rehypePlugins={[rehypeRaw, rehypeSanitize, rehypeKatex]}
+            >
+                {preprocessMathMarkup(content)}
             </Markdown>
         </Box>
     );

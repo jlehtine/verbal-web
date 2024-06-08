@@ -11,6 +11,8 @@ import React from "react";
 let highlightStyle: HTMLStyleElement | undefined;
 let highlightMode: PaletteMode | undefined;
 
+let katexStyle: HTMLStyleElement | undefined;
+
 interface CssModule {
     default: [[unknown, string]];
 }
@@ -128,6 +130,21 @@ export default function MarkdownContentSupport({ children }: PropsWithChildren) 
             setHighlightPaletteMode(mode, conf);
         }
     }, [mode]);
+
+    // Add Katex style on mount
+    useEffect(() => {
+        load("katex.css", conf, "extra", () => import("katex/dist/katex.min.css"))
+            .then((module) => {
+                if (katexStyle === undefined) {
+                    katexStyle = document.createElement("style");
+                    document.head.appendChild(katexStyle);
+                    katexStyle.innerHTML = getCssContent(module);
+                }
+            })
+            .catch((err: unknown) => {
+                logThrownError("Failed to load KaTeX styles", err);
+            });
+    }, []);
 
     return (
         <>
