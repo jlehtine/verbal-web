@@ -63,6 +63,14 @@ export class Chat {
         } else if (isChatMessageError(amsg)) {
             this.error = amsg.code;
             this.backendProcessing = false;
+
+            // Remove messages depending on the error
+            if (this.error === "moderation" && lastOf(this.state.messages)?.role === "assistant") {
+                this.state.messages.pop();
+            }
+            if (lastOf(this.state.messages)?.role === "user") {
+                this.state.messages.pop();
+            }
         } else {
             throw new VerbalWebError("Unexpected API message");
         }

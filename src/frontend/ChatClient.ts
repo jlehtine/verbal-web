@@ -2,6 +2,7 @@ import {
     ApiFrontendMessage,
     AuthError,
     AuthInfo,
+    ChatInit,
     ChatMessageNew,
     SharedConfig,
     isApiBackendMessage,
@@ -52,6 +53,9 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
     /** Chat client connection state */
     connectionState = ChatConnectionState.UNCONNECTED;
 
+    /** Previous user input */
+    previousUserInput = "";
+
     /** Web socket URL */
     private wsUrl;
 
@@ -83,6 +87,8 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
      * @param content message text
      */
     submitMessage(content: string) {
+        this.previousUserInput = content;
+
         // Update chat model state
         const amsg: ChatMessageNew = { type: "msgnew", content: content };
         this.chat.update(amsg);
@@ -148,10 +154,12 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
         // Ready to send chat content?
         else if (!this.sharedConfig.auth?.required || this.authInitialized) {
             // Need chat initialization?
-            if (!this.chatInitialized && this.chat.backendProcessing) {
+            if (!this.chatInitialized || this.chat.error !== undefined || this.chat.backendProcessing) {
                 if (this.ensureWebSocket()) {
                     logDebug("Sending the chat initialization");
-                    this.sendMessage({ ...this.chat.state, type: "init" });
+                    const init: ChatInit = { ...this.chat.state, type: "init" };
+                    this.chat.update(init);
+                    this.sendMessage(init);
                 }
             }
 

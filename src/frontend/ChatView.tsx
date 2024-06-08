@@ -63,8 +63,9 @@ export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProp
     const handleSubmit = () => {
         // Only allowed to submit when textfield is not empty and response received from previous query
         if (!inputEmpty && !waitingForResponse) {
-            client.submitMessage(userInput);
             setUserInput("");
+            setErrorMessage(undefined);
+            client.submitMessage(userInput);
         }
     };
 
@@ -99,6 +100,9 @@ export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProp
         }
         setErrorMessage(errorMessage);
         setWaitingForResponse(client.chat.backendProcessing);
+        if (errorMessage && !client.chat.backendProcessing) {
+            setUserInput(client.previousUserInput);
+        }
     }
 
     // Detect user scrolling up
@@ -177,8 +181,15 @@ export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProp
                 </Box>
             </Suspense>
             <Box {...(fullHeight ? { sx: { flex: "0 0 auto" } } : {})}>
-                {!waitingForResponse && errorMessage === undefined ? (
-                    <Box {...(isSmallScreen ? {} : { pl: 12 })}>
+                {errorMessage ? (
+                    <Box sx={{ mt: 2, ...(isSmallScreen || waitingForResponse ? {} : { pl: 12 }) }}>
+                        <Alert variant="filled" severity="error">
+                            {errorMessage}
+                        </Alert>
+                    </Box>
+                ) : null}
+                {!waitingForResponse && (
+                    <Box sx={{ mt: 2, ...(isSmallScreen ? {} : { pl: 12 }) }}>
                         <TextField
                             fullWidth
                             multiline
@@ -186,8 +197,9 @@ export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProp
                             value={userInput} // Value stored in state userInput
                             onChange={handleInputChange}
                             onKeyDown={handleKeyDown}
-                            inputRef={(input: unknown) => {
-                                if (input instanceof HTMLTextAreaElement || input instanceof HTMLInputElement) {
+                            inputRef={(input: HTMLInputElement | HTMLTextAreaElement | null) => {
+                                if (input) {
+                                    input.selectionStart = input.selectionEnd = input.value.length;
                                     input.focus();
                                 }
                             }}
@@ -202,15 +214,9 @@ export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProp
                                     </InputAdornment>
                                 ),
                             }}
-                            sx={{ mt: 2 }}
-                        ></TextField>
+                        />
                     </Box>
-                ) : null}
-                {errorMessage ? (
-                    <Alert variant="filled" severity="error">
-                        {errorMessage}
-                    </Alert>
-                ) : null}
+                )}
                 {waitingForResponse ? (
                     <LinearProgress color={errorMessage ? "error" : "primary"} sx={{ marginTop: 1 }} />
                 ) : null}

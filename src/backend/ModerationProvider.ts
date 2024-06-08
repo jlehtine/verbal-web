@@ -6,7 +6,7 @@ import { TextChunkerParams } from "./TextChunker";
 export class ModerationRejectedError extends VerbalWebError {
     constructor(reason?: string, options?: ErrorOptions) {
         super(`Moderation rejected content${reason ? ": " + reason : ""}`, options);
-        this.name = "ModerationRejecteError";
+        this.name = "ModerationRejectedError";
     }
 }
 

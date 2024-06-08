@@ -186,6 +186,7 @@ export class ChatServer {
                         processed = true;
                     }
                     if (this.chat.backendProcessing) {
+                        this.info("Chat completion requested");
                         this.clearInactivityTimer();
                         this.doChatCompletion();
                     } else {
@@ -195,7 +196,7 @@ export class ChatServer {
             }
             if (!processed) {
                 this.error("Received an unrecognized message");
-                console.debug("msg = " + JSON.stringify(data));
+                this.debugData("Unrecognized input message", data);
             }
         } catch (err: unknown) {
             this.thrownError("Failed to process a client message [%s]", err);
@@ -347,7 +348,7 @@ export class ChatServer {
                                 .next()
                                 .then(onChunk)
                                 .catch((err: unknown) => {
-                                    this.handleError(err, "chat");
+                                    this.handleError(err);
                                 });
                         };
                         const onChunk = ({ done, value }: IteratorResult<string>) => {
@@ -363,11 +364,11 @@ export class ChatServer {
                         doIter();
                     })
                     .catch((err: unknown) => {
-                        this.handleError(err, "chat");
+                        this.handleError(err);
                     });
             })
             .catch((err: unknown) => {
-                this.handleError(err, "moderation");
+                this.handleError(err);
             });
     }
 
@@ -401,9 +402,7 @@ export class ChatServer {
                         this.process(state);
                     })
                     .catch((err: unknown) => {
-                        if (err instanceof ModerationRejectedError) {
-                            this.handleError(err, "moderation");
-                        }
+                        this.handleError(err);
                     });
             }
         }
@@ -450,7 +449,8 @@ export class ChatServer {
         }
     }
 
-    private handleError(err: unknown, errorCode: ChatMessageErrorCode) {
+    private handleError(err: unknown) {
+        const errorCode: ChatMessageErrorCode = err instanceof ModerationRejectedError ? "moderation" : "chat";
         const errorMessage = (
             {
                 connection: "Assistant connection failed",
@@ -462,6 +462,7 @@ export class ChatServer {
         this.thrownError(errorMessage, err);
         if (this.ws.readyState === WebSocket.OPEN) {
             const msg: ChatMessageError = { type: "msgerror", code: errorCode, message: errorMessage };
+            this.chat.update(msg);
             this.sendMessage(msg, "a chat error");
             this.ws.close();
         }
