@@ -73,7 +73,6 @@ module.exports = [
                     ws: true,
                 },
             ],
-            open: true,
             port: 9000,
         },
         plugins: [new ESLintPlugin()],
