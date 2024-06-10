@@ -20,7 +20,7 @@ function doRetryWithBackoff<T>(
     attempt: number,
     operation: () => Promise<T>,
     onError: (err: unknown) => void,
-    backoffBaseMillis = 5,
+    backoffBaseMillis: number,
     maxAttempts?: number,
 ): Promise<T> {
     return operation().catch((err: unknown) => {

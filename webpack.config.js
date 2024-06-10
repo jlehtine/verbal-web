@@ -68,7 +68,7 @@ module.exports = [
                 },
                 {
                     static: false,
-                    context: ["/chatws"],
+                    context: ["/vw/chat"],
                     target: "http://localhost:3000",
                     ws: true,
                 },

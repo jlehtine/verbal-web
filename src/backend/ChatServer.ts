@@ -1,18 +1,12 @@
 import {
-    ApiBackendMessage,
-    AuthError,
-    AuthRequest,
-    AuthResponse,
+    ApiBackendChatMessage,
+    ApiFrontendChatMessage,
     ChatMessageError,
     ChatMessageErrorCode,
     ChatMessagePart,
-    ConfigResponse,
-    isApiFrontendMessage,
-    isAuthRequest,
-    isConfigRequest,
+    isApiFrontendChatMessage,
 } from "../shared/api";
 import { Chat, InitialChatStateOverrides } from "../shared/chat";
-import { VerbalWebError } from "../shared/error";
 import { ChatCompletionMessage, ChatCompletionProvider, ChatCompletionRequest } from "./ChatCompletionProvider";
 import { ModerationCache } from "./ModerationCache";
 import { ModerationProvider, ModerationRejectedError } from "./ModerationProvider";
@@ -20,9 +14,8 @@ import { RequestContext } from "./RequestContext";
 import { TextChunker, chunkText } from "./TextChunker";
 import { logDebug, logError, logInfo, logInterfaceData, logThrownError } from "./log";
 import { continueRandomErrors, pauseRandomErrors } from "./randomErrors";
-import { CredentialResponse } from "@react-oauth/google";
+import { checkSession } from "./session";
 import { Request } from "express";
-import { OAuth2Client } from "google-auth-library";
 import { v4 as uuidv4 } from "uuid";
 import { WebSocket } from "ws";
 
@@ -42,6 +35,9 @@ export interface ChatServerConfig {
 
     /** Google OAuth client id, if Google login enabled */
     googleOAuthClientId?: string;
+
+    /** Session expiration time in millis */
+    sessionExpiration: number;
 }
 
 /** Internal chat completion state */
@@ -73,7 +69,7 @@ interface ChatCompletionState {
  */
 export class ChatServer {
     /** Request context */
-    private readonly requestContext: RequestContext;
+    private requestContext: RequestContext;
 
     /** Server configuration */
     private readonly config;
@@ -92,9 +88,11 @@ export class ChatServer {
 
     private inactivityTimer?: NodeJS.Timeout;
 
-    private readonly googleClient = new OAuth2Client();
+    private authorized;
 
-    private authenticated;
+    private sessionPending = true;
+
+    private readonly pendingMessages: ApiFrontendChatMessage[] = [];
 
     constructor(
         req: Request,
@@ -106,12 +104,12 @@ export class ChatServer {
     ) {
         this.requestContext = { chatId: uuidv4(), sourceIp: req.ip };
         this.config = config;
+        this.authorized = config?.allowUsers === undefined;
         this.debug("Accepted a web socket connection");
         this.chat = new Chat(undefined, serverOverrides);
         this.ws = ws;
         this.moderation = new ModerationCache(moderation);
         this.chatCompletion = chatCompletion;
-        this.authenticated = this.config?.allowUsers === undefined;
         this.initWebSocketInactivityTimeout();
 
         this.ws.on("message", (data, isBinary) => {
@@ -123,6 +121,26 @@ export class ChatServer {
         this.ws.on("close", () => {
             this.onWebSocketClose();
         });
+
+        // Check session before processing any messages
+        checkSession(req)
+            .then((session) => {
+                this.requestContext.session = session;
+                this.sessionPending = false;
+                this.authorized = this.authorized || session !== undefined;
+                if (session) {
+                    this.debug("A valid session exists");
+                }
+
+                // Process pending messages
+                for (const amsg of this.pendingMessages) {
+                    this.processChatMessage(amsg);
+                }
+                this.pendingMessages.length = 0;
+            })
+            .catch((err: unknown) => {
+                this.handleError(err);
+            });
     }
 
     private error(msg: string, ...params: unknown[]) {
@@ -145,55 +163,25 @@ export class ChatServer {
         logInterfaceData(msg, this.requestContext, data, ...params);
     }
 
-    private sendMessage(msg: ApiBackendMessage, desc: string) {
+    private sendMessage(msg: ApiBackendChatMessage, desc: string) {
         this.debugData("Sending %s", msg, desc);
         this.ws.send(JSON.stringify(msg));
     }
 
     // On web socket message
     private onWebSocketMessage(data: unknown, isBinary: boolean) {
-        let processed = false;
         try {
+            let processed = false;
             if (!isBinary && (typeof data === "string" || Buffer.isBuffer(data))) {
                 const amsg: unknown = JSON.parse(data.toString());
-                if (isApiFrontendMessage(amsg)) {
-                    if (isConfigRequest(amsg)) {
-                        this.debugData("Received a configuration request", amsg);
-                        const res: ConfigResponse = {
-                            type: "cfgres",
-                            ...(this.config?.allowUsers !== undefined || this.config?.googleOAuthClientId !== undefined
-                                ? {
-                                      auth: {
-                                          required: this.config.allowUsers !== undefined,
-                                          googleId: this.config.googleOAuthClientId,
-                                      },
-                                  }
-                                : {}),
-                        };
-                        this.sendMessage(res, "a configuration response");
-                        processed = true;
-                    } else if (isAuthRequest(amsg)) {
-                        this.debugData("Received an authentication request", amsg);
-                        this.handleAuthRequest(amsg).catch((err: unknown) => {
-                            this.thrownError("Authentication request processing failed", err);
-                        });
-                        processed = true;
-                    } else if (!this.authenticated) {
-                        this.error("Unauthenticated request (ignoring)");
-                        processed = true;
+                if (isApiFrontendChatMessage(amsg)) {
+                    // Queue messages until session resolved
+                    if (this.sessionPending || this.pendingMessages.length > 0) {
+                        this.pendingMessages.push(amsg);
                     } else {
-                        this.debugData("Received a chat update", amsg);
-                        this.chat.update(amsg);
-                        processed = true;
+                        this.processChatMessage(amsg);
                     }
-                    if (this.chat.backendProcessing) {
-                        continueRandomErrors();
-                        this.info("Chat completion requested");
-                        this.clearInactivityTimer();
-                        this.doChatCompletion();
-                    } else {
-                        this.initWebSocketInactivityTimeout();
-                    }
+                    processed = true;
                 }
             }
             if (!processed) {
@@ -202,6 +190,29 @@ export class ChatServer {
             }
         } catch (err: unknown) {
             this.handleError(err);
+        }
+    }
+
+    // Process a chat message
+    private processChatMessage(amsg: ApiFrontendChatMessage) {
+        if (!this.authorized) {
+            this.error("Unauthorized request, requesting authentication");
+            if (this.ws.readyState === WebSocket.OPEN) {
+                const errmsg: ChatMessageError = { type: "msgerror", code: "auth" };
+                this.sendMessage(errmsg, "a chat error");
+                this.ws.close();
+            }
+        } else {
+            this.debugData("Received a chat update", amsg);
+            this.chat.update(amsg);
+        }
+        if (this.chat.backendProcessing) {
+            continueRandomErrors();
+            this.info("Chat completion requested");
+            this.clearInactivityTimer();
+            this.doChatCompletion();
+        } else {
+            this.initWebSocketInactivityTimeout();
         }
     }
 
@@ -215,79 +226,6 @@ export class ChatServer {
     private onWebSocketClose() {
         this.debug("Web socket closed");
         this.clearInactivityTimer();
-    }
-
-    private async handleAuthRequest(req: AuthRequest) {
-        // Reset any existing authentication on new authencation request
-        this.authenticated = false;
-        this.requestContext.userEmail = undefined;
-
-        let user: string | undefined;
-        let authError: AuthError | undefined;
-
-        // Google authentication
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        if (req.info.type === "google") {
-            try {
-                user = await this.checkGoogleAuthRequest(req.info.creds);
-                this.debug("Google authenticated %s", user);
-            } catch (err) {
-                this.thrownError("Google authentication failed", err);
-                authError = "failed";
-            }
-        }
-
-        // Unsupported authencation method
-        else {
-            throw new VerbalWebError("Unsupported authentication method");
-        }
-
-        // Check authorization
-        if (user && !authError) {
-            if (this.isAuthorized(user)) {
-                this.authenticated = true;
-                this.requestContext.userEmail = user;
-                this.info("User authenticated and authorized");
-            } else {
-                authError = "unauthorized";
-                this.info("Authenticated user %s is not authorized", user);
-            }
-        }
-
-        const res: AuthResponse = {
-            type: "authres",
-            error: authError,
-        };
-        this.sendMessage(res, "an authentication response");
-    }
-
-    private isAuthorized(user: string): boolean {
-        if (this.config?.allowUsers === undefined) {
-            return true;
-        } else {
-            const ulc = user.toLowerCase();
-            for (const au of this.config.allowUsers) {
-                const aulc = au.toLowerCase();
-                if (ulc == aulc || ulc.endsWith("@" + aulc)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    private async checkGoogleAuthRequest(creds: CredentialResponse): Promise<string> {
-        if (creds.credential) {
-            const ticket = await this.googleClient.verifyIdToken({
-                idToken: creds.credential,
-                audience: this.config?.googleOAuthClientId,
-            });
-            const user = ticket.getPayload()?.email;
-            if (user) {
-                return user;
-            }
-        }
-        throw new VerbalWebError("Google authentication failed on missing information");
     }
 
     private initWebSocketInactivityTimeout() {

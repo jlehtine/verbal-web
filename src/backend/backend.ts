@@ -1,12 +1,16 @@
+import { SharedConfig } from "../shared/api";
 import { InitialChatStateOverrides } from "../shared/chat";
 import { ChatCompletionProvider } from "./ChatCompletionProvider";
 import { ChatServer, ChatServerConfig } from "./ChatServer";
 import { ModerationProvider } from "./ModerationProvider";
 import { OpenAIEngine } from "./OpenAIEngine";
+import { contextFrom } from "./RequestContext";
+import { handleAuthCheck, handleAuthRequest } from "./auth";
 import { logFatal, logInfo, logThrownError, setLogLevel } from "./log";
 import { pauseRandomErrors, setRandomErrorsEnabled } from "./randomErrors";
+import cookieParser from "cookie-parser";
 import cors from "cors";
-import express, { Request } from "express";
+import express, { Request, Response } from "express";
 import path from "path";
 import { WebSocketExpress } from "websocket-express";
 
@@ -38,6 +42,8 @@ options:
         allow users with specified email addresses or domains
     --google-oauth-client-id ID
         enable Google login using the specified OAuth client id
+    --session-expiration DAYS
+        session expiration time in days (default is 30 days, or a month)
     -v, --verbose
         increase logging, use multiple times for even more verbose logging
     --random-errors
@@ -52,6 +58,7 @@ const staticContent: StaticContent[] = [];
 let trustProxy = parseTrustProxy(process.env.VW_TRUST_PROXY);
 let allowUsers = parseAllowUsers(process.env.VW_ALLOW_USERS);
 let googleOAuthClientId = process.env.VW_GOOGLE_OAUTH_CLIENT_ID;
+let sessionExpirationDays = parseNumber(process.env.VW_SESSION_EXPIRATION) ?? 30;
 let logLevel = process.env.VW_LOG_LEVEL ? parseInt(process.env.VW_LOG_LEVEL) : 0;
 let randomErrors = process.env.VW_RANDOM_ERRORS !== undefined;
 for (let i = 2; i < process.argv.length; i++) {
@@ -72,6 +79,8 @@ for (let i = 2; i < process.argv.length; i++) {
         allowUsers = parseAllowUsers(safeNextArg(process.argv, ++i));
     } else if (a === "--google-oauth-client-id") {
         googleOAuthClientId = safeNextArg(process.argv, ++i);
+    } else if (a === "--session-expiration") {
+        sessionExpirationDays = parseNumber(safeNextArg(process.argv, ++i));
     } else if (a === "-v" || a === "--verbose") {
         logLevel++;
     } else if (a === "--random-errors") {
@@ -91,6 +100,7 @@ pauseRandomErrors();
 const config: ChatServerConfig = {
     allowUsers: allowUsers,
     googleOAuthClientId: googleOAuthClientId,
+    sessionExpiration: sessionExpirationDays * 24 * 60 * 60 * 1000,
 };
 
 function safeNextArg(argv: string[], i: number) {
@@ -134,6 +144,14 @@ function parseTrustProxy(arg: string | undefined) {
     }
 }
 
+function parseNumber(arg: string): number;
+function parseNumber(arg: undefined): undefined;
+function parseNumber(arg: string | undefined): number | undefined;
+function parseNumber(arg: string | undefined): number | undefined {
+    if (arg === undefined) return undefined;
+    return Number(arg);
+}
+
 // Switch to specified directory
 if (chdir !== undefined) {
     logInfo("Changing directory to %s", undefined, chdir);
@@ -170,8 +188,28 @@ backend.use((req, res, next) => {
 // Set CORS headers for all responses
 backend.use(cors({ origin: process.env.VW_ALLOW_ORIGIN }));
 
-// Client API web socket endpoint
-backend.ws("/chatws", (req, res) => {
+// Parse cookies
+backend.use(cookieParser());
+
+// Client configuration endpoint
+backend.get("/vw/conf", (req, res) => {
+    handleConfRequest(req, res);
+});
+
+// Client authentication endpoint
+backend.get("/vw/auth", (req, res) => {
+    handleAuthCheck(config, req, res).catch((err: unknown) => {
+        logThrownError("Authentication check failed", err);
+    });
+});
+backend.post("/vw/auth/:idp", (req, res) => {
+    handleAuthRequest(config, req, res).catch((err: unknown) => {
+        logThrownError("Authentication request failed", err);
+    });
+});
+
+// Client chat API web socket endpoint
+backend.ws("/vw/chat", (req, res) => {
     res.accept()
         .then((ws) => {
             new ChatServer(req, ws, moderation, chatCompletion, config, serverOverrides);
@@ -193,8 +231,23 @@ for (const sc of staticContent) {
 
 function logRequest(req: Request) {
     if (req.method && req.url) {
-        logInfo("Processing request [%s]: %s %s", undefined, req.ip, req.method, req.url);
+        logInfo("%s %s", contextFrom(req), req.method, req.url);
     }
+}
+
+/** Handles a configuration request from the frontend */
+function handleConfRequest(req: Request, res: Response) {
+    const clientConf: SharedConfig = {
+        ...(config.allowUsers !== undefined || config.googleOAuthClientId !== undefined
+            ? {
+                  auth: {
+                      required: config.allowUsers !== undefined,
+                      googleId: config.googleOAuthClientId,
+                  },
+              }
+            : {}),
+    };
+    res.json(clientConf);
 }
 
 // Start listening for requests

@@ -1,38 +1,32 @@
 import { isObject } from "./util";
-import { CredentialResponse } from "@react-oauth/google";
 
-/** API messages */
-export type ApiMessage = ApiFrontendMessage | ApiBackendMessage;
+/** Shared configuration provided by the backend from `/chatconf` path */
+export interface SharedConfig {
+    /** Authentication configuration, indicating that authentication is supported */
+    auth?: AuthConfig;
+}
+
+/** Authentication configuration */
+export interface AuthConfig {
+    /** Whether authentication is required */
+    required: boolean;
+    /** Google OAuth client id, indicating that Google login should be enabled */
+    googleId?: string;
+}
 
 /** API chat messages */
-export type ApiChatMessage = ChatInit | ChatMessageNew | ChatMessagePart | ChatMessageError;
+export type ApiChatMessage = ApiFrontendChatMessage | ApiBackendChatMessage;
 
-/** API messages sent by the frontend */
-export type ApiFrontendMessage = ConfigRequest | AuthRequest | ChatInit | ChatMessageNew;
+/** API messages sent by the frontend over web socket */
+export type ApiFrontendChatMessage = ChatInit | ChatMessageNew;
 
-/** API messages sent by the backend */
-export type ApiBackendMessage = ConfigResponse | AuthResponse | ChatMessagePart | ChatMessageError;
+/** API messages sent by the backend over web socket */
+export type ApiBackendChatMessage = ChatMessagePart | ChatMessageError;
 
 /** API message of specific type */
 export interface TypedMessage<T extends string> extends Record<string, unknown> {
     /** Type identifier */
     type: T;
-}
-
-/** Configuration request from the frontend to the backend */
-export type ConfigRequest = TypedMessage<"cfgreq">;
-
-/** Authentication request from the frontend to the backend */
-export interface AuthRequest extends TypedMessage<"authreq"> {
-    info: AuthInfo;
-}
-
-/** Authentication information */
-export type AuthInfo = GoogleAuthInfo;
-
-export interface GoogleAuthInfo {
-    type: "google";
-    creds: CredentialResponse;
 }
 
 /** Chat initialization by the frontend */
@@ -68,31 +62,6 @@ export interface ChatMessageNew extends TypedMessage<"msgnew"> {
     content: string;
 }
 
-/** Configuration details from the backend to the frontend */
-export interface ConfigResponse extends TypedMessage<"cfgres">, SharedConfig {}
-
-/** Authentication response from the backend to the frontend */
-export interface AuthResponse extends TypedMessage<"authres"> {
-    error?: AuthError;
-}
-
-/** Authentication error code */
-export type AuthError = "failed" | "unauthorized";
-
-/** Shared configuration provided by the backend */
-export interface SharedConfig {
-    /** Authentication configuration, indicating that authentication is supported */
-    auth?: AuthConfig;
-}
-
-/** Authentication configuration */
-export interface AuthConfig {
-    /** Whether authentication is required */
-    required: boolean;
-    /** Google OAuth client id, indicating that Google login should be enabled */
-    googleId?: string;
-}
-
 /** Partial chat message by the backend */
 export interface ChatMessagePart extends TypedMessage<"msgpart"> {
     /** New text content */
@@ -103,7 +72,17 @@ export interface ChatMessagePart extends TypedMessage<"msgpart"> {
 }
 
 /** Chat message generation error codes */
-export type ChatMessageErrorCode = "connection" | "chat" | "moderation" | "limit";
+export type ChatMessageErrorCode =
+    /** Authentication is required */
+    | "auth"
+    /** Connection issue with the AI backend */
+    | "connection"
+    /** Chat completion error */
+    | "chat"
+    /** Moderation rejected content */
+    | "moderation"
+    /** Usage limits exceeded */
+    | "limit";
 
 /** Chat message generation error */
 export interface ChatMessageError extends TypedMessage<"msgerror"> {
@@ -119,30 +98,12 @@ function isTypedMessageOfType<T extends string>(v: unknown, type: T): v is Typed
     return isObject(v) && v.type === type;
 }
 
-export function isApiFrontendMessage(v: unknown): v is ApiFrontendMessage {
-    return isTypedMessage(v) && (isConfigRequest(v) || isAuthRequest(v) || isChatInit(v) || isChatMessageNew(v));
+export function isApiFrontendChatMessage(v: unknown): v is ApiFrontendChatMessage {
+    return isTypedMessage(v) && (isChatInit(v) || isChatMessageNew(v));
 }
 
-export function isApiBackendMessage(v: unknown): v is ApiBackendMessage {
-    return (
-        isTypedMessage(v) && (isConfigResponse(v) || isAuthResponse(v) || isChatMessagePart(v) || isChatMessageError(v))
-    );
-}
-
-export function isConfigRequest(v: unknown): v is ConfigRequest {
-    return isTypedMessageOfType(v, "cfgreq");
-}
-
-export function isGoogleAuthInfo(v: unknown): v is GoogleAuthInfo {
-    return isObject(v) && v.type === "google" && isObject(v.creds);
-}
-
-export function isAuthInfo(v: unknown): v is AuthInfo {
-    return isGoogleAuthInfo(v);
-}
-
-export function isAuthRequest(v: unknown): v is AuthRequest {
-    return isTypedMessageOfType(v, "authreq") && isAuthInfo(v.info);
+export function isApiBackendChatMessage(v: unknown): v is ApiBackendChatMessage {
+    return isTypedMessage(v) && (isChatMessagePart(v) || isChatMessageError(v));
 }
 
 export function isChatInit(v: unknown): v is ChatInit {
@@ -162,14 +123,6 @@ export function isChatMessage(v: unknown): v is ChatMessage {
 
 export function isChatMessageNew(v: unknown): v is ChatMessageNew {
     return isTypedMessageOfType(v, "msgnew") && typeof v.content === "string";
-}
-
-export function isConfigResponse(v: unknown): v is ConfigResponse {
-    return isTypedMessageOfType(v, "cfgres") && isSharedConfig(v);
-}
-
-export function isAuthResponse(v: unknown): v is AuthResponse {
-    return isTypedMessageOfType(v, "authres") && (v.error === undefined || isAuthError(v.error));
 }
 
 export function isSharedConfig(v: unknown): v is SharedConfig {
@@ -192,8 +145,4 @@ export function isChatMessageError(v: unknown): v is ChatMessageError {
 
 export function isChatMessageErrorCode(v: unknown): v is ChatMessageErrorCode {
     return typeof v === "string" && ["connection", "chat", "moderation", "limit"].includes(v);
-}
-
-export function isAuthError(v: unknown): v is AuthError {
-    return v === "failed" || v === "unauthorized";
 }

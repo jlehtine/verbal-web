@@ -1,4 +1,3 @@
-import { AuthError } from "../shared/api";
 import { ChatClient } from "./ChatClient";
 import ChatView from "./ChatView";
 import LoadingIndicator from "./LoadingIndicator";
@@ -25,12 +24,6 @@ export interface VerbalWebViewProps {
  * The main Verbal Web view that can be used either as a standalone view or inside a dialog.
  */
 export default function VerbalWebView({ conf, fullHeight, scrollRef }: VerbalWebViewProps) {
-    const [configuring, setConfiguring] = useState(true);
-    const [googleClientId, setGoogleClientId] = useState<string>();
-    const [loginPending, setLoginPending] = useState(false);
-    const [authPending, setAuthPending] = useState(false);
-    const [authError, setAuthError] = useState<AuthError>();
-
     // Chat client containing also state and model
     // This is not used directly for rendering but has the same lifecycle as the component
     const [client] = useState(
@@ -42,14 +35,18 @@ export default function VerbalWebView({ conf, fullHeight, scrollRef }: VerbalWeb
             }),
     );
 
+    const [initializing, setInitializing] = useState(client.initializing);
+    const [expectLogin, setExpectLogin] = useState(client.expectLogin);
+    const [googleClientId, setGoogleClientId] = useState(client.sharedConfig?.auth?.googleId);
+    const [authError, setAuthError] = useState(client.authError);
+
     // Google OAuth provider
     const GoogleOAuthProvider = getGoogleOAuthProvider(conf, googleClientId);
 
     function onInit() {
-        setConfiguring(!client.sharedConfig);
-        setLoginPending(client.sharedConfig?.auth?.required === true && !client.authenticated);
+        setInitializing(client.initializing);
+        setExpectLogin(client.expectLogin);
         setGoogleClientId(client.sharedConfig?.auth?.googleId);
-        setAuthPending(client.authPending);
         setAuthError(client.authError);
     }
 
@@ -65,17 +62,16 @@ export default function VerbalWebView({ conf, fullHeight, scrollRef }: VerbalWeb
     return (
         <Box className={VERBAL_WEB_CLASS_NAME} {...(fullHeight ? { sx: { height: "100%" } } : {})}>
             <VerbalWebConfigurationProvider conf={conf}>
-                {configuring ? (
+                {initializing ? (
                     <LoadingIndicator conf={conf} />
                 ) : (
                     <Suspense fallback={<LoadingIndicator conf={conf} />}>
                         <GoogleOAuthProvider clientId={googleClientId ?? ""}>
-                            {" "}
-                            {loginPending ? (
+                            {expectLogin ? (
                                 <LoginView
                                     client={client}
+                                    expectLogin={expectLogin}
                                     googleClientId={googleClientId}
-                                    authPending={authPending}
                                     authError={authError}
                                 />
                             ) : (

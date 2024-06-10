@@ -2,12 +2,18 @@ import { describeError } from "../shared/error";
 import { RequestContext } from "./RequestContext";
 
 /** Prefix used for logging */
-const LOG_PREFIX = "Chat %s [%s @ %s]: ";
+const LOG_PREFIX_SOURCE = "[%s @ %s]";
+const LOG_PREFIX_CHAT = " chat %s";
+const LOG_PREFIX_TAIL = ": ";
 
 let logLevel = 1;
 
-function contextParams(ctx: RequestContext): [string, string, string] {
-    return [ctx.chatId, ctx.userEmail ?? "<anon>", ctx.sourceIp ?? "<unknown>"];
+function contextParams(ctx: RequestContext): unknown[] {
+    return [ctx.session?.userEmail ?? "<anon>", ctx.sourceIp ?? "<unknown>", ...(ctx.chatId ? [ctx.chatId] : [])];
+}
+
+function contextPrefix(ctx: RequestContext): string {
+    return LOG_PREFIX_SOURCE + (ctx.chatId ? LOG_PREFIX_CHAT : "") + LOG_PREFIX_TAIL;
 }
 
 export function setLogLevel(level: number) {
@@ -21,7 +27,7 @@ export function logFatal(msg: string, ...params: unknown[]) {
 
 export function logError(msg: string, ctx?: RequestContext, ...params: unknown[]) {
     if (ctx) {
-        console.error(LOG_PREFIX + msg, ...contextParams(ctx), ...params);
+        console.error(contextPrefix(ctx) + msg, ...contextParams(ctx), ...params);
     } else {
         console.error(msg, ...params);
     }
@@ -34,7 +40,7 @@ export function logThrownError(msg: string, err: unknown, ctx?: RequestContext, 
 export function logInfo(msg: string, ctx?: RequestContext, ...params: unknown[]) {
     if (logLevel >= 1) {
         if (ctx) {
-            console.info(LOG_PREFIX + msg, ...contextParams(ctx), ...params);
+            console.info(contextPrefix(ctx) + msg, ...contextParams(ctx), ...params);
         } else {
             console.info(msg, ...params);
         }
@@ -44,7 +50,7 @@ export function logInfo(msg: string, ctx?: RequestContext, ...params: unknown[])
 export function logDebug(msg: string, ctx?: RequestContext, ...params: unknown[]) {
     if (logLevel >= 2) {
         if (ctx) {
-            console.debug(LOG_PREFIX + msg, ...contextParams(ctx), ...params);
+            console.debug(contextPrefix(ctx) + msg, ...contextParams(ctx), ...params);
         } else {
             console.debug(msg, ...params);
         }
@@ -54,7 +60,7 @@ export function logDebug(msg: string, ctx?: RequestContext, ...params: unknown[]
 export function logTrace(msg: string, ctx?: RequestContext, ...params: unknown[]) {
     if (logLevel >= 3) {
         if (ctx) {
-            console.debug(LOG_PREFIX + msg, ...contextParams(ctx), ...params);
+            console.debug(contextPrefix(ctx) + msg, ...contextParams(ctx), ...params);
         } else {
             console.debug(msg, ...params);
         }

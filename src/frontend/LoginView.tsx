@@ -1,10 +1,10 @@
-import { AuthError } from "../shared/api";
-import { ChatClient } from "./ChatClient";
+import { AuthError, ChatClient, IdentityProviderId } from "./ChatClient";
 import LoadingIndicator from "./LoadingIndicator";
 import VerbalWebConfiguration from "./VerbalWebConfiguration";
 import WelcomeView from "./WelcomeView";
 import { useConfiguration } from "./context";
 import load from "./load";
+import { logError } from "./log";
 import LoginIcon from "@mui/icons-material/Login";
 import { Alert, Box, Paper, Stack, Typography, useTheme } from "@mui/material";
 import React, { Suspense, lazy } from "react";
@@ -12,8 +12,8 @@ import { useTranslation } from "react-i18next";
 
 export interface LoginViewProps {
     client: ChatClient;
+    expectLogin: IdentityProviderId[];
     googleClientId?: string;
-    authPending: boolean;
     authError?: AuthError;
 }
 
@@ -27,12 +27,8 @@ export default function LoginView(props: LoginViewProps) {
 }
 
 function AuthenticationView(props: LoginViewProps) {
-    const conf = useConfiguration();
     const { t } = useTranslation();
-
-    return props.authPending ? (
-        <LoadingIndicator conf={conf} />
-    ) : (
+    return (
         <Stack direction="row" justifyContent="center">
             <Paper sx={{ maxWidth: "40rem", padding: 2, pt: 4, pb: 4 }}>
                 <Stack direction="row" spacing={2}>
@@ -57,20 +53,25 @@ function AuthenticationView(props: LoginViewProps) {
     );
 }
 
-function LoginButtons({ client, googleClientId }: LoginViewProps) {
+function LoginButtons({ client, expectLogin, googleClientId }: LoginViewProps) {
     const conf = useConfiguration();
     const theme = useTheme();
 
-    const GoogleLogin = getGoogleLogin(conf, googleClientId);
+    const google = expectLogin.includes("google");
+    const GoogleLogin = google && getGoogleLogin(conf, googleClientId);
 
     return (
         <Suspense fallback={<LoadingIndicator conf={conf} />}>
             <Stack spacing={2} alignItems="center" sx={{ mt: 2 }}>
-                {googleClientId && (
+                {GoogleLogin && (
                     <Box sx={{ mt: 2 }}>
                         <GoogleLogin
                             onSuccess={(creds) => {
-                                client.submitAuthentication({ type: "google", creds: creds });
+                                if (creds.credential !== undefined) {
+                                    client.submitAuthentication("google", creds.credential);
+                                } else {
+                                    logError("Google authentication credentials not received");
+                                }
                             }}
                             onError={() => {
                                 client.setAuthError("failed");
