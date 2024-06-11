@@ -4,6 +4,7 @@ import {
     ChatMessageNew,
     SharedConfig,
     isApiBackendChatMessage,
+    isChatMessageError,
     isSharedConfig,
 } from "../shared/api";
 import { Chat, InitialChatState } from "../shared/chat";
@@ -389,9 +390,20 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
                         logDebug("Received a chat update");
                         this.chat.update(amsg);
                         this.numErrors = 0;
-                        this.chatInitialized = true;
                         this.chatEvent();
-                        this.initWebSocketInactivityTimeout();
+                        if (isChatMessageError(amsg) && amsg.code === "auth") {
+                            if (this.ws.readyState !== WebSocket.CLOSED && this.ws.readyState !== WebSocket.CLOSING) {
+                                this.authInitialized = false;
+                                this.authChecked = false;
+                                this.connectionState = ChatConnectionState.UNCONNECTED;
+                                this.ws.close();
+                                this.initializationEvent();
+                                this.resetConnectionState();
+                                this.updateState();
+                            }
+                        } else {
+                            this.initWebSocketInactivityTimeout();
+                        }
                         processed = true;
                     }
                 }
@@ -427,7 +439,6 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
 
     private resetConnectionState() {
         this.clearInactivityTimer();
-        this.authInitialized = false;
         this.chatInitialized = false;
     }
 

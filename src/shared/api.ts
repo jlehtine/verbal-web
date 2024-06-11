@@ -144,5 +144,5 @@ export function isChatMessageError(v: unknown): v is ChatMessageError {
 }
 
 export function isChatMessageErrorCode(v: unknown): v is ChatMessageErrorCode {
-    return typeof v === "string" && ["connection", "chat", "moderation", "limit"].includes(v);
+    return typeof v === "string" && ["auth", "connection", "chat", "moderation", "limit"].includes(v);
 }
