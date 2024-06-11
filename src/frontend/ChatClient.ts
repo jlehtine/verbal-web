@@ -85,9 +85,6 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
     /** Chat client connection state */
     connectionState = ChatConnectionState.UNCONNECTED;
 
-    /** Previous user input */
-    previousUserInput = "";
-
     private ws?: WebSocket;
 
     private numErrors = 0;
@@ -122,8 +119,6 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
      * @param content message text
      */
     submitMessage(content: string): void {
-        this.previousUserInput = content;
-
         // Update chat model state
         const amsg: ChatMessageNew = { type: "msgnew", content: content };
         this.chat.update(amsg);

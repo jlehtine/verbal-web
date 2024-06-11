@@ -101,8 +101,8 @@ export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProp
         }
         setErrorMessage(errorMessage);
         setWaitingForResponse(client.chat.backendProcessing);
-        if (errorMessage && !client.chat.backendProcessing) {
-            setUserInput(client.previousUserInput);
+        if (client.chat.error && !client.chat.backendProcessing) {
+            setUserInput(client.chat.failedUserInput);
         }
     }
 

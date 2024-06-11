@@ -21,6 +21,9 @@ export class Chat {
     /** Error code on the last message */
     error?: ChatMessageErrorCode;
 
+    /** Failed user input if user input was removed */
+    failedUserInput = "";
+
     /** Whether backend is currently processing a response */
     backendProcessing = false;
 
@@ -50,6 +53,7 @@ export class Chat {
         } else if (isChatMessageNew(amsg)) {
             this.state.messages.push({ role: "user", content: amsg.content });
             this.backendProcessing = true;
+            this.failedUserInput = "";
         } else if (isChatMessagePart(amsg)) {
             const lastMsg = lastOf(this.state.messages);
             if (lastMsg?.role === "assistant") {
@@ -69,7 +73,11 @@ export class Chat {
                 this.state.messages.pop();
             }
             if (lastOf(this.state.messages)?.role === "user") {
-                this.state.messages.pop();
+                if (this.error !== "auth") {
+                    this.failedUserInput = this.state.messages.pop()?.content ?? "";
+                } else {
+                    this.backendProcessing = true;
+                }
             }
         } else {
             throw new VerbalWebError("Unexpected API message");
