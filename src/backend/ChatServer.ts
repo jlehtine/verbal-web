@@ -105,7 +105,6 @@ export class ChatServer {
         this.requestContext = { chatId: uuidv4(), sourceIp: req.ip };
         this.config = config;
         this.authorized = config?.allowUsers === undefined;
-        this.debug("Accepted a web socket connection");
         this.chat = new Chat(undefined, serverOverrides);
         this.ws = ws;
         this.moderation = new ModerationCache(moderation);
@@ -126,11 +125,9 @@ export class ChatServer {
         checkSession(req)
             .then((session) => {
                 this.requestContext.session = session;
+                this.debug("Web socket connection");
                 this.sessionPending = false;
                 this.authorized = this.authorized || session !== undefined;
-                if (session) {
-                    this.debug("A valid session exists");
-                }
 
                 // Process pending messages
                 for (const amsg of this.pendingMessages) {

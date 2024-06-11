@@ -8,9 +8,10 @@ import { contextFrom } from "./RequestContext";
 import { handleAuthCheck, handleAuthRequest } from "./auth";
 import { logFatal, logInfo, logThrownError, setLogLevel } from "./log";
 import { pauseRandomErrors, setRandomErrorsEnabled } from "./randomErrors";
+import { checkSession } from "./session";
 import cookieParser from "cookie-parser";
 import cors from "cors";
-import express, { Request, Response } from "express";
+import express, { NextFunction, Request, Response } from "express";
 import path from "path";
 import { WebSocketExpress } from "websocket-express";
 
@@ -179,17 +180,18 @@ const backend = new WebSocketExpress();
 // Set trust proxy setting
 backend.set("trust proxy", trustProxy);
 
+// Parse cookies
+backend.use(cookieParser());
+
 // Log all requests
 backend.use((req, res, next) => {
-    logRequest(req);
-    next();
+    logRequest(req, next).catch((err: unknown) => {
+        logThrownError("Request logging failed", err, contextFrom(req));
+    });
 });
 
 // Set CORS headers for all responses
 backend.use(cors({ origin: process.env.VW_ALLOW_ORIGIN }));
-
-// Parse cookies
-backend.use(cookieParser());
 
 // Client configuration endpoint
 backend.get("/vw/conf", (req, res) => {
@@ -229,10 +231,13 @@ for (const sc of staticContent) {
     backend.use(path, express.static(sc.dir));
 }
 
-function logRequest(req: Request) {
+async function logRequest(req: Request, next: NextFunction): Promise<void> {
     if (req.method && req.url) {
-        logInfo("%s %s", contextFrom(req), req.method, req.url);
+        const session = await checkSession(req);
+        const ctx = contextFrom(req, session);
+        logInfo("%s %s", ctx, req.method, req.url);
     }
+    next();
 }
 
 /** Handles a configuration request from the frontend */
