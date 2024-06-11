@@ -393,6 +393,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
                         this.chatEvent();
                         if (isChatMessageError(amsg) && amsg.code === "auth") {
                             if (this.ws.readyState !== WebSocket.CLOSED && this.ws.readyState !== WebSocket.CLOSING) {
+                                logDebug("Authentication missing, must re-authenticate");
                                 this.authInitialized = false;
                                 this.authChecked = false;
                                 this.connectionState = ChatConnectionState.UNCONNECTED;
