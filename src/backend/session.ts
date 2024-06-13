@@ -58,13 +58,7 @@ export async function startSession(
 
     // Set session cookie
     const cookieValue = sessionId + COOKIE_VALUE_SEPARATOR + sessionKey;
-    const cookiePath = req.path.substring(0, req.path.lastIndexOf(AUTH_PATH)) + COOKIE_PATH;
-    res.cookie(COOKIE_NAME, cookieValue, {
-        httpOnly: true,
-        secure: req.secure,
-        path: cookiePath,
-        expires: session.validUntil,
-    });
+    setSessionCookie(req, res, cookieValue, session.validUntil);
 
     return session;
 }
@@ -93,6 +87,24 @@ export async function checkSession(req: Request): Promise<Session | undefined> {
     }
 
     return Promise.resolve(session);
+}
+
+export async function endSession(req: Request, res: Response): Promise<void> {
+    const session = await checkSession(req);
+    if (session) {
+        sessions.delete(session.id);
+        setSessionCookie(req, res, "", new Date(0));
+    }
+}
+
+function setSessionCookie(req: Request, res: Response, value: string, expires: Date) {
+    const cookiePath = req.path.substring(0, req.path.lastIndexOf(AUTH_PATH)) + COOKIE_PATH;
+    res.cookie(COOKIE_NAME, value, {
+        httpOnly: true,
+        secure: req.secure,
+        path: cookiePath,
+        expires: expires,
+    });
 }
 
 function findSessionById(sessionId: string): Session | undefined {

@@ -8,7 +8,7 @@ import { contextFrom } from "./RequestContext";
 import { handleAuthCheck, handleAuthRequest } from "./auth";
 import { logFatal, logInfo, logThrownError, setLogLevel } from "./log";
 import { pauseRandomErrors, setRandomErrorsEnabled } from "./randomErrors";
-import { checkSession } from "./session";
+import { checkSession, endSession } from "./session";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import express, { NextFunction, Request, Response } from "express";
@@ -202,6 +202,11 @@ backend.get("/vw/conf", (req, res) => {
 backend.get("/vw/auth/session", (req, res) => {
     handleAuthCheck(config, req, res).catch((err: unknown) => {
         logThrownError("Authentication check failed", err);
+    });
+});
+backend.delete("/vw/auth/session", (req, res) => {
+    endSession(req, res).catch((err: unknown) => {
+        logThrownError("Logout failed", err);
     });
 });
 backend.post("/vw/auth/login/:idp", (req, res) => {
