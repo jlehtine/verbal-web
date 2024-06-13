@@ -16,9 +16,9 @@ import { StatusCodes } from "http-status-codes";
 
 /** Paths to backend endpoints */
 const CONF_PATH = "vw/conf";
-const AUTH_CHECK_PATH = "vw/auth";
-const AUTH_REQUEST_PATH_PREFIX = AUTH_CHECK_PATH + "/";
-const WS_PATH = "vw/chat";
+const AUTH_SESSION_PATH = "vw/auth/session";
+const AUTH_LOGIN_PATH_PREFIX = "vw/auth/login/";
+const CHAT_PATH = "vw/chat";
 
 /** Base backoff period in milliseconds for exponential backoff */
 const BACKOFF_BASE_MILLIS = 100;
@@ -203,7 +203,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
             retryWithBackoff(
                 () => {
                     logDebug("Checking for an existing session");
-                    return fetch(getHttpUrl(this.backendUrl, AUTH_CHECK_PATH)).then((res) => {
+                    return fetch(getHttpUrl(this.backendUrl, AUTH_SESSION_PATH)).then((res) => {
                         if (res.ok) {
                             logDebug("A valid session already exists");
                             return true;
@@ -237,7 +237,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
             retryWithBackoff(
                 () => {
                     logDebug("Sending an authentication request");
-                    return fetch(getHttpUrl(this.backendUrl, AUTH_REQUEST_PATH_PREFIX + encodeURIComponent(idp)), {
+                    return fetch(getHttpUrl(this.backendUrl, AUTH_LOGIN_PATH_PREFIX + encodeURIComponent(idp)), {
                         method: "post",
                         headers: {
                             Authorization: "Bearer " + idt,
@@ -548,7 +548,7 @@ function getHttpUrl(backendUrl: string, path: string): URL {
  */
 function getWebSocketUrl(backendUrl: string): URL {
     const backendBase = getBackendBase(backendUrl);
-    const url = new URL(WS_PATH, backendBase);
+    const url = new URL(CHAT_PATH, backendBase);
     const wsProtocol = {
         "http:": "ws:",
         "https:": "wss:",

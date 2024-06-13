@@ -199,12 +199,12 @@ backend.get("/vw/conf", (req, res) => {
 });
 
 // Client authentication endpoint
-backend.get("/vw/auth", (req, res) => {
+backend.get("/vw/auth/session", (req, res) => {
     handleAuthCheck(config, req, res).catch((err: unknown) => {
         logThrownError("Authentication check failed", err);
     });
 });
-backend.post("/vw/auth/:idp", (req, res) => {
+backend.post("/vw/auth/login/:idp", (req, res) => {
     handleAuthRequest(config, req, res).catch((err: unknown) => {
         logThrownError("Authentication request failed", err);
     });
