@@ -41,6 +41,8 @@ export async function startSession(
     res: Response,
     userEmail: string,
 ): Promise<Session> {
+    purgeExpiredSessions();
+
     // Generate authenticated session record
     const sessionKey = generateSessionKey();
     const sessionKeyHash = await hashSessionKey(sessionKey);
@@ -89,6 +91,10 @@ export async function checkSession(req: Request): Promise<Session | undefined> {
     return Promise.resolve(session);
 }
 
+export function isValidSession(session?: Session): boolean {
+    return session !== undefined && session.validUntil >= new Date();
+}
+
 export async function endSession(req: Request, res: Response): Promise<void> {
     const session = await checkSession(req);
     if (session) {
@@ -109,10 +115,17 @@ function setSessionCookie(req: Request, res: Response, value: string, expires: D
 
 function findSessionById(sessionId: string): Session | undefined {
     const session = sessions.get(sessionId);
-    const now = new Date();
-    if (session && session.validUntil <= now) {
+    if (session && !isValidSession(session)) {
         sessions.delete(session.id);
         return undefined;
     }
     return session;
+}
+
+function purgeExpiredSessions() {
+    for (const [sessionId, session] of sessions) {
+        if (!isValidSession(session)) {
+            sessions.delete(sessionId);
+        }
+    }
 }
