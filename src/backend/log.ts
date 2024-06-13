@@ -3,17 +3,21 @@ import { RequestContext } from "./RequestContext";
 
 /** Prefix used for logging */
 const LOG_PREFIX_SOURCE = "[%s @ %s]";
-const LOG_PREFIX_CHAT = " chat %s";
+const LOG_PREFIX_SESSION = " / %s";
 const LOG_PREFIX_TAIL = ": ";
 
 let logLevel = 1;
 
 function contextParams(ctx: RequestContext): unknown[] {
-    return [ctx.session?.userEmail ?? "<anon>", ctx.sourceIp ?? "<unknown>", ...(ctx.chatId ? [ctx.chatId] : [])];
+    return [
+        ctx.session?.userEmail ?? "<anon>",
+        ctx.sourceIp ?? "<unknown>",
+        ...(ctx.session?.id ? [ctx.session.id] : []),
+    ];
 }
 
 function contextPrefix(ctx: RequestContext): string {
-    return LOG_PREFIX_SOURCE + (ctx.chatId ? LOG_PREFIX_CHAT : "") + LOG_PREFIX_TAIL;
+    return LOG_PREFIX_SOURCE + (ctx.session?.id ? LOG_PREFIX_SESSION : "") + LOG_PREFIX_TAIL;
 }
 
 export function setLogLevel(level: number) {

@@ -8,7 +8,7 @@ import { contextFrom } from "./RequestContext";
 import { handleAuthCheck, handleAuthRequest } from "./auth";
 import { logFatal, logInfo, logThrownError, setLogLevel } from "./log";
 import { pauseRandomErrors, setRandomErrorsEnabled } from "./randomErrors";
-import { checkSession, endSession } from "./session";
+import { Session, checkSession, endSession } from "./session";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import express, { NextFunction, Request, Response } from "express";
@@ -20,7 +20,21 @@ interface StaticContent {
     dir: string;
 }
 
+declare global {
+    // Extend the Express.js request object
+    // eslint-disable-next-line @typescript-eslint/no-namespace
+    namespace Express {
+        /** Extend request with session information */
+        interface Request {
+            vwSession?: Session;
+        }
+    }
+}
+
 const DEFAULT_PORT = 3000;
+
+const BASE_PATH = "/vw/";
+const CHAT_PATH = BASE_PATH + "chat";
 
 // Usage
 function usage() {
@@ -183,11 +197,16 @@ backend.set("trust proxy", trustProxy);
 // Parse cookies
 backend.use(cookieParser());
 
+// Initialize session
+backend.use((req, res, next) => {
+    initSession(req, res, next).catch((err: unknown) => {
+        logThrownError("Session initialization failed", err, contextFrom(req));
+    });
+});
+
 // Log all requests
 backend.use((req, res, next) => {
-    logRequest(req, next).catch((err: unknown) => {
-        logThrownError("Request logging failed", err, contextFrom(req));
-    });
+    logRequest(req, next);
 });
 
 // Set CORS headers for all responses
@@ -216,7 +235,7 @@ backend.post("/vw/auth/login/:idp", (req, res) => {
 });
 
 // Client chat API web socket endpoint
-backend.ws("/vw/chat", (req, res) => {
+backend.ws(CHAT_PATH, (req, res) => {
     res.accept()
         .then((ws) => {
             new ChatServer(req, ws, moderation, chatCompletion, config, serverOverrides);
@@ -236,10 +255,18 @@ for (const sc of staticContent) {
     backend.use(path, express.static(sc.dir));
 }
 
-async function logRequest(req: Request, next: NextFunction): Promise<void> {
+// Initialize session
+async function initSession(req: Request, res: Response, next: NextFunction): Promise<void> {
+    const path = req.path;
+    if (path.startsWith(BASE_PATH)) {
+        req.vwSession = await checkSession(req, path === CHAT_PATH ? undefined : res);
+    }
+    next();
+}
+
+function logRequest(req: Request, next: NextFunction): void {
     if (req.method && req.url) {
-        const session = await checkSession(req);
-        const ctx = contextFrom(req, session);
+        const ctx = contextFrom(req);
         logInfo("%s %s", ctx, req.method, req.url);
     }
     next();

@@ -81,6 +81,7 @@ export class OpenAIEngine implements ChatCompletionProvider, ModerationProvider 
     chatCompletion(request: ChatCompletionRequest): Promise<AsyncIterable<string>> {
         const params: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
             model: request.model ?? DEFAULT_CHAT_MODEL,
+            user: request.user,
             messages: request.messages,
             stream: true,
         };

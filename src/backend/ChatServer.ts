@@ -10,13 +10,11 @@ import { Chat, InitialChatStateOverrides } from "../shared/chat";
 import { ChatCompletionMessage, ChatCompletionProvider, ChatCompletionRequest } from "./ChatCompletionProvider";
 import { ModerationCache } from "./ModerationCache";
 import { ModerationProvider, ModerationRejectedError } from "./ModerationProvider";
-import { RequestContext } from "./RequestContext";
+import { RequestContext, contextFrom } from "./RequestContext";
 import { TextChunker, chunkText } from "./TextChunker";
 import { logDebug, logError, logInfo, logInterfaceData, logThrownError } from "./log";
 import { continueRandomErrors, pauseRandomErrors } from "./randomErrors";
-import { checkSession } from "./session";
 import { Request } from "express";
-import { v4 as uuidv4 } from "uuid";
 import { WebSocket } from "ws";
 
 /** Inactivity timeout is one minute */
@@ -88,12 +86,6 @@ export class ChatServer {
 
     private inactivityTimer?: NodeJS.Timeout;
 
-    private authorized;
-
-    private sessionPending = true;
-
-    private readonly pendingMessages: ApiFrontendChatMessage[] = [];
-
     constructor(
         req: Request,
         ws: WebSocket,
@@ -102,9 +94,9 @@ export class ChatServer {
         config?: ChatServerConfig,
         serverOverrides?: InitialChatStateOverrides,
     ) {
-        this.requestContext = { chatId: uuidv4(), sourceIp: req.ip };
+        this.requestContext = contextFrom(req);
+        this.debug("Web socket connection");
         this.config = config;
-        this.authorized = config?.allowUsers === undefined;
         this.chat = new Chat(undefined, serverOverrides);
         this.ws = ws;
         this.moderation = new ModerationCache(moderation);
@@ -121,25 +113,7 @@ export class ChatServer {
             this.onWebSocketClose();
         });
 
-        // Check session before processing any messages
-        checkSession(req)
-            .then((session) => {
-                this.requestContext.session = session;
-                this.debug("Web socket connection");
-                this.sessionPending = false;
-                this.authorized = this.authorized || session !== undefined;
-
-                // Process pending messages, if authorized
-                if (this.checkAuthorized()) {
-                    for (const amsg of this.pendingMessages) {
-                        this.processChatMessage(amsg);
-                    }
-                    this.pendingMessages.length = 0;
-                }
-            })
-            .catch((err: unknown) => {
-                this.handleError(err);
-            });
+        this.checkAuthorized();
     }
 
     private error(msg: string, ...params: unknown[]) {
@@ -174,12 +148,7 @@ export class ChatServer {
             if (!isBinary && (typeof data === "string" || Buffer.isBuffer(data))) {
                 const amsg: unknown = JSON.parse(data.toString());
                 if (isApiFrontendChatMessage(amsg)) {
-                    // Queue messages until session resolved
-                    if (this.sessionPending || this.pendingMessages.length > 0) {
-                        this.pendingMessages.push(amsg);
-                    } else {
-                        this.processChatMessage(amsg);
-                    }
+                    this.processChatMessage(amsg);
                     processed = true;
                 }
             }
@@ -209,7 +178,10 @@ export class ChatServer {
     }
 
     private checkAuthorized(): boolean {
-        if (!this.authorized) {
+        if (this.config?.allowUsers === undefined || this.requestContext.session?.userEmail !== undefined) {
+            return true;
+        } else {
+            console.debug("session = " + JSON.stringify(this.requestContext.session));
             this.error("Unauthorized, requesting authentication");
             if (this.ws.readyState === WebSocket.OPEN) {
                 const errmsg: ChatMessageError = { type: "msgerror", code: "auth" };
@@ -217,8 +189,8 @@ export class ChatServer {
                 this.ws.close();
                 this.clearInactivityTimer();
             }
+            return false;
         }
-        return this.authorized;
     }
 
     // On web socket error
@@ -265,6 +237,7 @@ export class ChatServer {
         const request: ChatCompletionRequest = {
             requestContext: this.requestContext,
             model: this.chat.state.model,
+            user: this.requestContext.session?.id,
             messages: [...systemInstructions, ...this.chat.state.messages],
         };
 

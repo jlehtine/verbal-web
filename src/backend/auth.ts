@@ -11,7 +11,9 @@ export async function handleAuthCheck(config: ChatServerConfig, req: Request, re
     const session = await checkSession(req);
 
     // Return response
-    res.sendStatus(config.allowUsers === undefined || session ? StatusCodes.OK : StatusCodes.UNAUTHORIZED);
+    res.sendStatus(
+        config.allowUsers === undefined || session.userEmail !== undefined ? StatusCodes.OK : StatusCodes.UNAUTHORIZED,
+    );
 }
 
 export async function handleAuthRequest(
@@ -50,7 +52,7 @@ export async function handleAuthRequest(
     // Check authorization
     if (isAuthorized(config, user)) {
         // Initiate session
-        ctx.session = await startSession(config, req, res, user);
+        ctx.session = await startSession(req, res, user, config);
 
         logInfo("User authenticated and authorized", ctx);
         res.sendStatus(StatusCodes.OK);

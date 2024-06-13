@@ -10,6 +10,9 @@ export interface ChatCompletionRequest {
     /** Model identifier */
     model?: string;
 
+    /** User identifier */
+    user?: string;
+
     /** Message history */
     messages: ChatCompletionMessage[];
 }

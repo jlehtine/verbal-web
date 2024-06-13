@@ -6,8 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 
 const COOKIE_NAME = "VWSESSIONKEY";
 const COOKIE_VALUE_SEPARATOR = "_";
-const AUTH_PATH = "/vw/auth";
-const COOKIE_PATH = "/vw";
+const COOKIE_PATH = "/vw/";
 const BCRYPT_SALT_ROUNDS = 12;
 
 /** Session record */
@@ -15,17 +14,28 @@ export interface Session {
     /** Identifier */
     id: string;
 
-    /** Secure hash of session key */
-    keyHash: string;
+    /** Secure hash of session key, if authenticated */
+    keyHash?: string;
 
     /** User email address, if authenticated */
     userEmail?: string;
 
-    /** Validity time */
-    validUntil: Date;
+    /** Validity time, if authenticated */
+    validUntil?: Date;
 }
 
-const sessions = new Map<string, Session>();
+/** Unauthenticated session record */
+type UnauthenticatedSession = Omit<Session, "keyHash" | "userEmail" | "validUntil">;
+
+/** Authenticated session record */
+type AuthenticatedSession = Required<Session>;
+
+export function isAuthenticatedSession(session: Session): session is AuthenticatedSession {
+    return session.keyHash !== undefined && session.userEmail !== undefined && session.validUntil instanceof Date;
+}
+
+/** Authenticated sessions */
+const sessions = new Map<string, AuthenticatedSession>();
 
 function generateSessionKey(): string {
     return randomBytes(32).toString("hex");
@@ -36,36 +46,76 @@ async function hashSessionKey(sessionKey: string): Promise<string> {
 }
 
 export async function startSession(
-    config: ChatServerConfig,
     req: Request,
     res: Response,
     userEmail: string,
+    config: ChatServerConfig,
+): Promise<AuthenticatedSession>;
+export async function startSession(
+    req: Request,
+    res?: Response,
+    userEmail?: undefined,
+    config?: ChatServerConfig,
+): Promise<UnauthenticatedSession>;
+
+/**
+ * Start a new session, either an authenticated one or an unauthenticated one.
+ *
+ * @param req request
+ * @param res response, to set a session cookie
+ * @param userEmail user email, if authenticated
+ * @param config config, if authenticated
+ * @returns
+ */
+export async function startSession(
+    req: Request,
+    res?: Response,
+    userEmail?: string,
+    config?: ChatServerConfig,
 ): Promise<Session> {
     purgeExpiredSessions();
 
-    // Generate authenticated session record
-    const sessionKey = generateSessionKey();
-    const sessionKeyHash = await hashSessionKey(sessionKey);
+    // Generate a session key for authenticated sessions
+    let sessionKey;
+    let sessionKeyHash;
+    if (userEmail) {
+        sessionKey = generateSessionKey();
+        sessionKeyHash = await hashSessionKey(sessionKey);
+    }
+
+    // Generate a session id
     let sessionId;
     do {
         sessionId = uuidv4();
     } while (sessions.has(sessionId));
-    const session: Session = {
+
+    // Initialize a session and store authenticated sessions
+    const session = {
         id: sessionId,
         keyHash: sessionKeyHash,
         userEmail: userEmail,
-        validUntil: new Date(Date.now() + config.sessionExpiration),
+        validUntil: userEmail && config ? new Date(Date.now() + config.sessionExpiration) : undefined,
     };
-    sessions.set(sessionId, session);
+    if (isAuthenticatedSession(session)) {
+        sessions.set(sessionId, session);
+    }
 
     // Set session cookie
-    const cookieValue = sessionId + COOKIE_VALUE_SEPARATOR + sessionKey;
-    setSessionCookie(req, res, cookieValue, session.validUntil);
+    const cookieValue = sessionKey ? sessionId + COOKIE_VALUE_SEPARATOR + sessionKey : sessionId;
+    if (res) {
+        setSessionCookie(req, res, cookieValue, session.validUntil);
+    }
 
     return session;
 }
 
-export async function checkSession(req: Request): Promise<Session | undefined> {
+/**
+ * Checks for a valid session and creates an unauthenticated session if none is found.
+ *
+ * @param req request
+ * @param res response, if a cookie should be set upon creating a new session
+ */
+export async function checkSession(req: Request, res?: Response): Promise<Session> {
     let session;
 
     // Find the session cookie, if any
@@ -85,26 +135,38 @@ export async function checkSession(req: Request): Promise<Session | undefined> {
                     session = s;
                 }
             }
+        } else if (isUUIDv4(cookieValue)) {
+            session = { id: cookieValue };
         }
     }
 
-    return Promise.resolve(session);
+    // Create unauthenticated session, if requested
+    if (session === undefined) {
+        session = await startSession(req, res);
+    }
+
+    return session;
+}
+
+function isUUIDv4(str: string): boolean {
+    const uuidv4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidv4Regex.test(str);
 }
 
 export function isValidSession(session?: Session): boolean {
-    return session !== undefined && session.validUntil >= new Date();
+    return session !== undefined && (session.validUntil === undefined || session.validUntil >= new Date());
 }
 
 export async function endSession(req: Request, res: Response): Promise<void> {
     const session = await checkSession(req);
-    if (session) {
+    if (session.userEmail) {
         sessions.delete(session.id);
         setSessionCookie(req, res, "", new Date(0));
     }
 }
 
-function setSessionCookie(req: Request, res: Response, value: string, expires: Date) {
-    const cookiePath = req.path.substring(0, req.path.lastIndexOf(AUTH_PATH)) + COOKIE_PATH;
+function setSessionCookie(req: Request, res: Response, value: string, expires?: Date) {
+    const cookiePath = req.path.substring(0, req.path.lastIndexOf(COOKIE_PATH) + COOKIE_PATH.length);
     res.cookie(COOKIE_NAME, value, {
         httpOnly: true,
         secure: req.secure,
@@ -113,7 +175,7 @@ function setSessionCookie(req: Request, res: Response, value: string, expires: D
     });
 }
 
-function findSessionById(sessionId: string): Session | undefined {
+function findSessionById(sessionId: string): AuthenticatedSession | undefined {
     const session = sessions.get(sessionId);
     if (session && !isValidSession(session)) {
         sessions.delete(session.id);

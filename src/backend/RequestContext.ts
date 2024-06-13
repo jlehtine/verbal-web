@@ -8,11 +8,8 @@ export interface RequestContext {
 
     /** Session information, if authenticated */
     session?: Session;
-
-    /** Chat session identifier */
-    chatId?: string;
 }
 
-export function contextFrom(req: Request, session?: Session, chatId?: string): RequestContext {
-    return { sourceIp: req.ip, session: session, chatId: chatId };
+export function contextFrom(req: Request): RequestContext {
+    return { sourceIp: req.ip, session: req.vwSession };
 }
