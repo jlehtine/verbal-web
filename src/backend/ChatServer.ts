@@ -129,11 +129,13 @@ export class ChatServer {
                 this.sessionPending = false;
                 this.authorized = this.authorized || session !== undefined;
 
-                // Process pending messages
-                for (const amsg of this.pendingMessages) {
-                    this.processChatMessage(amsg);
+                // Process pending messages, if authorized
+                if (this.checkAuthorized()) {
+                    for (const amsg of this.pendingMessages) {
+                        this.processChatMessage(amsg);
+                    }
+                    this.pendingMessages.length = 0;
                 }
-                this.pendingMessages.length = 0;
             })
             .catch((err: unknown) => {
                 this.handleError(err);
@@ -192,25 +194,31 @@ export class ChatServer {
 
     // Process a chat message
     private processChatMessage(amsg: ApiFrontendChatMessage) {
+        if (this.checkAuthorized()) {
+            this.debugData("Received a chat update", amsg);
+            this.chat.update(amsg);
+            if (this.chat.backendProcessing) {
+                continueRandomErrors();
+                this.info("Chat completion requested");
+                this.clearInactivityTimer();
+                this.doChatCompletion();
+            } else {
+                this.initWebSocketInactivityTimeout();
+            }
+        }
+    }
+
+    private checkAuthorized(): boolean {
         if (!this.authorized) {
-            this.error("Unauthorized request, requesting authentication");
+            this.error("Unauthorized, requesting authentication");
             if (this.ws.readyState === WebSocket.OPEN) {
                 const errmsg: ChatMessageError = { type: "msgerror", code: "auth" };
                 this.sendMessage(errmsg, "a chat error");
                 this.ws.close();
+                this.clearInactivityTimer();
             }
-        } else {
-            this.debugData("Received a chat update", amsg);
-            this.chat.update(amsg);
         }
-        if (this.chat.backendProcessing) {
-            continueRandomErrors();
-            this.info("Chat completion requested");
-            this.clearInactivityTimer();
-            this.doChatCompletion();
-        } else {
-            this.initWebSocketInactivityTimeout();
-        }
+        return this.authorized;
     }
 
     // On web socket error
