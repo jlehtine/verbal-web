@@ -110,12 +110,12 @@ export async function startSession(
 }
 
 /**
- * Checks for a valid session and creates an unauthenticated session if none is found.
+ * Returns the existing session associated with the request, if any.
  *
  * @param req request
- * @param res response, if a cookie should be set upon creating a new session
+ * @returns existing session assicated with the request, if any
  */
-export async function checkSession(req: Request, res?: Response): Promise<Session> {
+export async function getSession(req: Request): Promise<Session | undefined> {
     let session;
 
     // Find the session cookie, if any
@@ -140,7 +140,21 @@ export async function checkSession(req: Request, res?: Response): Promise<Sessio
         }
     }
 
-    // Create unauthenticated session, if requested
+    return session;
+}
+
+/**
+ * Checks for a valid session and creates an unauthenticated session if none is found.
+ *
+ * @param req request
+ * @param res response, if a cookie should be set upon creating a new session
+ * @returns an existing session or a new unauthenticated session
+ */
+export async function checkSession(req: Request, res?: Response): Promise<Session> {
+    // Get the existing session, if any
+    let session = await getSession(req);
+
+    // Create an unauthenticated session, if necessary
     if (session === undefined) {
         session = await startSession(req, res);
     }
