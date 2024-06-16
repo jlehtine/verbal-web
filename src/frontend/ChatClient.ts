@@ -47,7 +47,17 @@ export enum ChatConnectionState {
 }
 
 /** Authentication errors */
-export type AuthError = "failed" | "unauthorized";
+export type AuthErrorCode = "failed" | "unauthorized";
+
+/** Signals authentication failure */
+export class AuthError extends VerbalWebError {
+    readonly errorCode: AuthErrorCode;
+
+    constructor(msg: string, code: AuthErrorCode, options?: ErrorOptions) {
+        super(msg, options);
+        this.errorCode = code;
+    }
+}
 
 /**
  * A client for the chat backend.
@@ -55,11 +65,7 @@ export type AuthError = "failed" | "unauthorized";
 export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap> {
     /** Whether currently busy with initialization */
     get initializing(): boolean {
-        return (
-            this.sharedConfig === undefined ||
-            (this.sharedConfig.auth?.required === true &&
-                (!this.authChecked || (this.idToken !== undefined && !this.authInitialized)))
-        );
+        return this.sharedConfig === undefined || (this.sharedConfig.auth?.required === true && !this.authChecked);
     }
 
     /** Whether currently expecting a login and a list of supported identity providers */
@@ -77,7 +83,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
     sharedConfig?: SharedConfig;
 
     /** Authentication error */
-    authError?: AuthError;
+    authError?: AuthErrorCode;
 
     /** Chat model */
     chat;
@@ -130,21 +136,66 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
     }
 
     /**
-     * Submits authentication request.
+     * Login to backend.
      *
      * @param idProvider identity provider
      * @param idToken identity token
      */
-    submitAuthentication(idProvider: IdentityProviderId, idToken: string): void {
-        // Authentication request
-        this.idProvider = idProvider;
-        this.idToken = idToken;
+    async login(idProvider: IdentityProviderId, idToken: string): Promise<void> {
+        // Update state
+        this.idProvider = undefined;
+        this.idToken = undefined;
         this.authInitialized = false;
-
-        // Send the API message, if possible
-        this.updateState();
-
         this.initializationEvent();
+
+        // Authentication request
+        return retryWithBackoff(
+            () => {
+                logDebug("Sending an authentication request");
+                return fetch(getHttpUrl(this.backendUrl, AUTH_LOGIN_PATH_PREFIX + encodeURIComponent(idProvider)), {
+                    method: "post",
+                    headers: {
+                        Authorization: "Bearer " + idToken,
+                    },
+                }).then((res) => {
+                    if (res.ok) {
+                        logDebug("Authenticated successfully");
+                        return undefined;
+                    } else if (res.status === StatusCodes.UNAUTHORIZED.valueOf()) {
+                        logDebug("Unauthorized to use the service");
+                        return "unauthorized";
+                    } else if (res.status >= 400 && res.status <= 499) {
+                        logDebug("Authentication request failed: HTTP error %d", res.status);
+                        return "failed";
+                    } else {
+                        throw new VerbalWebError(httpStatusError(res, "Error while authenticating"));
+                    }
+                });
+            },
+            (err: unknown) => {
+                logThrownError("Failed to send an authentication request", err);
+            },
+            5,
+        )
+            .then((errorCode) => {
+                if (!errorCode) {
+                    this.idProvider = idProvider;
+                    this.idToken = idToken;
+                    this.authInitialized = true;
+                } else {
+                    throw new AuthError("Authentication failed", errorCode);
+                }
+            })
+            .catch((err: unknown) => {
+                this.setAuthError(err instanceof AuthError ? err.errorCode : "failed");
+                this.initializationEvent();
+                throw err;
+            })
+            .finally(() => {
+                this.authChecked = true;
+                this.initializationEvent();
+                this.updateState();
+            });
     }
 
     /**
@@ -152,7 +203,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
      *
      * @param error authentication error code
      */
-    setAuthError(error: AuthError | undefined) {
+    setAuthError(error: AuthErrorCode | undefined) {
         this.authError = error;
         if (error) {
             this.idProvider = undefined;
@@ -207,7 +258,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
                         if (res.ok) {
                             logDebug("A valid session already exists");
                             return true;
-                        } else if (res.status === StatusCodes.UNAUTHORIZED.valueOf()) {
+                        } else if (res.status >= 400 && res.status <= 499) {
                             logDebug("Session not found, authentication is required");
                             return false;
                         }
@@ -217,64 +268,20 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
                 (err: unknown) => {
                     logThrownError("Failed to check for an existing session", err);
                 },
+                5,
             )
                 .then((sessionOk) => {
-                    this.authChecked = true;
-                    this.authError = undefined;
-                    this.authInitialized = sessionOk;
-                    this.initializationEvent();
-                    this.updateState();
-                })
-                .catch((err: unknown) => {
-                    logThrownError("Unable to check for a session", err);
-                });
-        }
-
-        // Authentication request pending?
-        else if (this.idProvider && this.idToken && !this.authInitialized) {
-            const idp = this.idProvider;
-            const idt = this.idToken;
-            retryWithBackoff(
-                () => {
-                    logDebug("Sending an authentication request");
-                    return fetch(getHttpUrl(this.backendUrl, AUTH_LOGIN_PATH_PREFIX + encodeURIComponent(idp)), {
-                        method: "post",
-                        headers: {
-                            Authorization: "Bearer " + idt,
-                        },
-                    }).then((res) => {
-                        if (res.ok) {
-                            logDebug("Authenticated successfully");
-                            return true;
-                        } else if (
-                            res.status === StatusCodes.UNAUTHORIZED.valueOf() ||
-                            res.status === StatusCodes.FORBIDDEN.valueOf()
-                        ) {
-                            logDebug("Unauthorized to use the service");
-                            return false;
-                        }
-                        throw new VerbalWebError(httpStatusError(res, "Unexpected error while authenticating"));
-                    });
-                },
-                (err: unknown) => {
-                    logThrownError("Failed to send an authentication request", err);
-                },
-            )
-                .then((ok) => {
-                    if (ok) {
+                    if (sessionOk) {
                         this.authInitialized = true;
-                        this.initializationEvent();
-                        this.updateState();
-                    } else {
-                        throw new VerbalWebError("Authentication rejected or not authorized");
                     }
                 })
                 .catch((err: unknown) => {
-                    logThrownError("Unauthorized", err);
-                    this.setAuthError("unauthorized");
-                    this.idProvider = undefined;
-                    this.idToken = undefined;
+                    logThrownError("Unable to check for a session", err);
+                })
+                .finally(() => {
+                    this.authChecked = true;
                     this.initializationEvent();
+                    this.updateState();
                 });
         }
 

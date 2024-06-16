@@ -3,15 +3,15 @@
  *
  * @param operation operation to perform
  * @param onError error listener
- * @param backoffBaseMillis backoff base milliseconds
  * @param maxAttempts maximum attempts, if limited
+ * @param backoffBaseMillis backoff base milliseconds
  * @returns promise for performing the operation with exponential backoff
  */
 export function retryWithBackoff<T>(
     operation: () => Promise<T>,
     onError: (err: unknown) => void,
-    backoffBaseMillis = 100,
     maxAttempts?: number,
+    backoffBaseMillis = 100,
 ): Promise<T> {
     return doRetryWithBackoff(0, operation, onError, backoffBaseMillis, maxAttempts);
 }

@@ -22,6 +22,7 @@
             "failed": "Authentication failed",
             "unauthorized": "Unauthorized to use this service"
         },
+        "inProgress": "Logging in...",
         "text": "Select how to login.",
         "title": "Login is required"
     },

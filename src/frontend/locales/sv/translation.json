@@ -17,6 +17,15 @@
         "text": "AI-assistent",
         "tooltip": "Fråga AI-assistenten"
     },
+    "login": {
+        "error": {
+            "failed": "Autentisering misslyckades",
+            "unauthorized": "Obehörig att använda denna tjänst"
+        },
+        "inProgress": "Loggar in...",
+        "text": "Välj hur du vill logga in.",
+        "title": "Inloggning krävs"
+    },
     "welcome": {
         "terms": "Användarvillkor och integritetspolicy",
         "text": "Här kan du chatta med AI-assistenten. Känn dig fri att ställa frågor eller delta i en diskussion.",

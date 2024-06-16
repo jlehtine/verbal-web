@@ -9,9 +9,6 @@ import OpenAI from "openai";
 
 const DEFAULT_CHAT_MODEL = "gpt-4o";
 
-/** Retry backoff base milliseconds */
-const BACKOFF_BASE_MILLIS = 8;
-
 /** Max backoff attempts */
 const BACKOFF_MAX_ATTEMPTS = 5;
 
@@ -71,7 +68,6 @@ export class OpenAIEngine implements ChatCompletionProvider, ModerationProvider 
                     (err) => {
                         logThrownError("Moderation failed, retrying...", err, requestContext);
                     },
-                    BACKOFF_BASE_MILLIS,
                     BACKOFF_MAX_ATTEMPTS,
                 );
             }),
@@ -124,7 +120,6 @@ export class OpenAIEngine implements ChatCompletionProvider, ModerationProvider 
             (err) => {
                 logThrownError("Chat completion failed, retrying...", err, request.requestContext);
             },
-            BACKOFF_BASE_MILLIS,
             BACKOFF_MAX_ATTEMPTS,
         );
     }

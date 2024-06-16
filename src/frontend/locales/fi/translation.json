@@ -22,6 +22,7 @@
             "failed": "Tunnistautuminen epäonnistui",
             "unauthorized": "Ei käyttöoikeutta tähän palveluun"
         },
+        "inProgress": "Tunnistaudutaan...",
         "text": "Valitse tunnistautumistapa.",
         "title": "Tunnistautuminen tarvitaan"
     },

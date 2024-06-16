@@ -1,20 +1,20 @@
-import { AuthError, ChatClient, IdentityProviderId } from "./ChatClient";
+import { AuthErrorCode, ChatClient, IdentityProviderId } from "./ChatClient";
 import LoadingIndicator from "./LoadingIndicator";
 import VerbalWebConfiguration from "./VerbalWebConfiguration";
 import WelcomeView from "./WelcomeView";
 import { useConfiguration } from "./context";
 import load from "./load";
-import { logError } from "./log";
+import { logError, logThrownError } from "./log";
 import LoginIcon from "@mui/icons-material/Login";
-import { Alert, Box, Paper, Stack, Typography, useTheme } from "@mui/material";
-import React, { Suspense, lazy } from "react";
+import { Alert, Box, CircularProgress, Paper, Stack, Typography, useTheme } from "@mui/material";
+import React, { Suspense, lazy, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 export interface LoginViewProps {
     client: ChatClient;
     expectLogin: IdentityProviderId[];
     googleClientId?: string;
-    authError?: AuthError;
+    authError?: AuthErrorCode;
 }
 
 export default function LoginView(props: LoginViewProps) {
@@ -54,8 +54,11 @@ function AuthenticationView(props: LoginViewProps) {
 }
 
 function LoginButtons({ client, expectLogin, googleClientId }: LoginViewProps) {
+    const { t } = useTranslation();
     const conf = useConfiguration();
     const theme = useTheme();
+
+    const [inProgress, setInProgress] = useState(false);
 
     const google = expectLogin.includes("google");
     const GoogleLogin = google && getGoogleLogin(conf, googleClientId);
@@ -63,22 +66,39 @@ function LoginButtons({ client, expectLogin, googleClientId }: LoginViewProps) {
     return (
         <Suspense fallback={<LoadingIndicator conf={conf} />}>
             <Stack spacing={2} alignItems="center" sx={{ mt: 2 }}>
-                {GoogleLogin && (
-                    <Box sx={{ mt: 2 }}>
-                        <GoogleLogin
-                            onSuccess={(creds) => {
-                                if (creds.credential !== undefined) {
-                                    client.submitAuthentication("google", creds.credential);
-                                } else {
-                                    logError("Google authentication credentials not received");
-                                }
-                            }}
-                            onError={() => {
-                                client.setAuthError("failed");
-                            }}
-                            theme={theme.palette.mode === "dark" ? "filled_black" : undefined}
-                        />
-                    </Box>
+                {inProgress ? (
+                    <Paper sx={{ mt: 2, padding: 2 }}>
+                        <CircularProgress />
+                        <Typography>{t("login.inProgress")}</Typography>
+                    </Paper>
+                ) : (
+                    <>
+                        {GoogleLogin && (
+                            <Box sx={{ mt: 2 }}>
+                                <GoogleLogin
+                                    onSuccess={(creds) => {
+                                        if (creds.credential !== undefined) {
+                                            setInProgress(true);
+                                            client
+                                                .login("google", creds.credential)
+                                                .catch((err: unknown) => {
+                                                    logThrownError("Login failed", err);
+                                                })
+                                                .finally(() => {
+                                                    setInProgress(false);
+                                                });
+                                        } else {
+                                            logError("Google authentication credentials not received");
+                                        }
+                                    }}
+                                    onError={() => {
+                                        client.setAuthError("failed");
+                                    }}
+                                    theme={theme.palette.mode === "dark" ? "filled_black" : undefined}
+                                />
+                            </Box>
+                        )}
+                    </>
                 )}
             </Stack>
         </Suspense>
