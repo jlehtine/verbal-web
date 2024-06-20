@@ -17,7 +17,7 @@ export default function load<T>(
     if (cache[cacheKey] !== undefined) {
         return cache[cacheKey] as Promise<T>;
     }
-    logDebug("Verbal Web loading modules for %s phase", phase);
+    logDebug("Loading modules for %s phase", phase);
     let onLoadingIndicated = false;
     const onLoadingTimeout = setTimeout(() => {
         onLoadingIndicated = true;
@@ -31,14 +31,14 @@ export default function load<T>(
     const promise = load()
         .catch((err: unknown) => {
             clearTimeout(onLoadingTimeout);
-            logThrownError("Verbal Web failed to load modules for %s phase", err, phase);
+            logThrownError("Failed to load modules for %s phase", err, phase);
             if (conf.onLoading) {
                 conf.onLoading(false, phase, err);
             }
             throw err;
         })
         .then((res) => {
-            logDebug("Verbal Web loaded modules for %s phase", phase);
+            logDebug("Loaded modules for %s phase", phase);
             clearTimeout(onLoadingTimeout);
             if (onLoadingIndicated) {
                 onLoadingCount--;
