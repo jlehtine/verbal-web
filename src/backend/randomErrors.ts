@@ -1,4 +1,8 @@
 import { ComputableMap } from "../shared/ComputableMap";
+import { contextFrom } from "./RequestContext";
+import { logInfo } from "./log";
+import { NextFunction, Request, Response } from "express";
+import { StatusCodes } from "http-status-codes";
 
 /** A random error thrown for testing purposes only */
 export class RandomError extends Error {
@@ -13,6 +17,9 @@ const DEFAULT_RATE = 1 / 300;
 
 /** Default random delay in seconds */
 const DEFAULT_DELAY = 3;
+
+/** Default fixed error probability */
+const DEFAULT_PROPABILITY = 0.1;
 
 /** A Poisson distribution of errors */
 class PoissonErrorDistribution {
@@ -149,4 +156,27 @@ export function asyncrnderr<T, R>(
                   );
               })
         : f;
+}
+
+export function httprnderr(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+    delay = DEFAULT_DELAY,
+    p = DEFAULT_PROPABILITY,
+): void {
+    enabled
+        ? setTimeout(
+              () => {
+                  if (Math.random() < p) {
+                      const ctx = contextFrom(req);
+                      logInfo("%s %s => Random 503 Service unavailable", ctx, req.method, req.url);
+                      res.sendStatus(StatusCodes.SERVICE_UNAVAILABLE);
+                  } else {
+                      next();
+                  }
+              },
+              delay * 1000 * Math.random(),
+          )
+        : next();
 }

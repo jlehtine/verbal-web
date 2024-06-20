@@ -7,7 +7,7 @@ import { OpenAIEngine } from "./OpenAIEngine";
 import { contextFrom } from "./RequestContext";
 import { handleAuthCheck, handleAuthRequest } from "./auth";
 import { logFatal, logInfo, logThrownError, setLogLevel } from "./log";
-import { pauseRandomErrors, setRandomErrorsEnabled } from "./randomErrors";
+import { httprnderr, pauseRandomErrors, setRandomErrorsEnabled } from "./randomErrors";
 import { Session, checkSession, endSession } from "./session";
 import cookieParser from "cookie-parser";
 import cors from "cors";
@@ -193,6 +193,11 @@ const backend = new WebSocketExpress();
 
 // Set trust proxy setting
 backend.set("trust proxy", trustProxy);
+
+// Produce random delays and errors, if so configured
+backend.use((req, res, next) => {
+    httprnderr(req, res, next);
+});
 
 // Parse cookies
 backend.use(cookieParser());
