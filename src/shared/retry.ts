@@ -1,8 +1,16 @@
-/** Signals that the maximum number of retries had been */
-export class MaxRetriesExceededError extends Error {
+/** Signals an error related to retrying an operation */
+export class RetryError extends Error {
     constructor(msg: string, options: ErrorOptions & { cause: unknown }) {
         super(msg, options);
-        this.name = "RetryExhaustedError";
+        this.name = "RetryError";
+    }
+}
+
+/** Signals that the maximum number of retries has been exceeded */
+export class MaxRetriesExceededError extends RetryError {
+    constructor(msg: string, options: ErrorOptions & { cause: unknown }) {
+        super(msg, options);
+        this.name = "MaxRetriesExceededError";
     }
 }
 
@@ -43,12 +51,14 @@ function doRetryWithBackoff<T>(
                             resolve(res);
                         })
                         .catch((err: unknown) => {
-                            reject(new MaxRetriesExceededError("Maximum number of retries exceeded", { cause: err }));
+                            reject(err instanceof RetryError ? err : new RetryError("Retry failed", { cause: err }));
                         });
                 }, backoff);
             });
         } else {
-            throw err;
+            throw new MaxRetriesExceededError(`Maximum number of retry attempts (${String(maxAttempts)}) exceeded`, {
+                cause: err,
+            });
         }
     });
 }
