@@ -1,10 +1,16 @@
-import { describeError } from "../shared/error";
+import { VerbalWebError } from "../shared/error";
 import VerbalWebConfiguration from "./VerbalWebConfiguration";
 import load from "./load";
 import { FunctionComponent } from "react";
 
 function initVerbalWebLauncher(elementId: string, conf: VerbalWebConfiguration) {
-    initVerbalWebElement(elementId, conf, import(/* webpackPrefetch: true */ "./VerbalWebLauncher"), { conf: conf });
+    initVerbalWebElement(
+        elementId,
+        conf,
+        "VerbalWebLauncher",
+        () => import(/* webpackPrefetch: true */ "./VerbalWebLauncher"),
+        { conf: conf },
+    );
 }
 
 function initVerbalWebView(
@@ -15,30 +21,35 @@ function initVerbalWebView(
 ) {
     const scrollElem = scrollElemId !== undefined ? document.getElementById(scrollElemId) : undefined;
     const scrollRef = scrollElem ? { current: scrollElem } : undefined;
-    initVerbalWebElement(elementId, conf, import(/* webpackPrefetch: true */ "./VerbalWebView"), {
-        conf: conf,
-        fullHeight: fullHeight,
-        scrollRef: scrollRef,
-    });
+    initVerbalWebElement(
+        elementId,
+        conf,
+        "VerbalWebView",
+        () => import(/* webpackPrefetch: true */ "./VerbalWebView"),
+        {
+            conf: conf,
+            fullHeight: fullHeight,
+            scrollRef: scrollRef,
+        },
+    );
 }
 
 function initVerbalWebElement<P extends Record<string, unknown>>(
     elementId: string,
     conf: VerbalWebConfiguration,
-    compImport: Promise<{ default: FunctionComponent<P> }>,
+    compName: string,
+    compImport: () => Promise<{ default: FunctionComponent<P> }>,
     props: P,
 ) {
     const elem = document.getElementById(elementId);
     if (elem !== null) {
-        load("initial", conf, "initial", () =>
-            Promise.all([
-                import(/* webpackPrefetch: true */ "react"),
-                import(/* webpackPrefetch: true */ "./i18n"),
-                import(/* webpackPrefetch: true */ "react-dom/client"),
-                import(/* webpackPrefetch: true */ "./defaultTheme"),
-                compImport,
-            ]),
-        )
+        Promise.all([
+            load("react", conf, "initial", () => import(/* webpackPrefetch: true */ "react")),
+            load("i18n", conf, "initial", () => import(/* webpackPrefetch: true */ "./i18n")),
+            load("react-dom/client", conf, "initial", () => import(/* webpackPrefetch: true */ "react-dom/client")),
+            load("defaultTheme", conf, "initial", () => import(/* webpackPrefetch: true */ "./defaultTheme")),
+            load(compName, conf, "initial", compImport),
+        ])
             .then(
                 ([
                     { default: React },
@@ -57,11 +68,10 @@ function initVerbalWebElement<P extends Record<string, unknown>>(
                 },
             )
             .catch((err: unknown) => {
-                console.error(describeError(err, false, "Verbal Web initialization failed"));
-                throw err;
+                throw new VerbalWebError("Verbal Web initialization failed", { cause: err });
             });
     } else {
-        console.error("Verbal Web container element not fount: #%s", elementId);
+        throw new VerbalWebError(`Verbal Web container element not found: #${elementId}`);
     }
 }
 
