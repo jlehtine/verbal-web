@@ -1,3 +1,11 @@
+/** Signals that the maximum number of retries had been */
+export class MaxRetriesExceededError extends Error {
+    constructor(msg: string, options: ErrorOptions & { cause: unknown }) {
+        super(msg, options);
+        this.name = "RetryExhaustedError";
+    }
+}
+
 /**
  * Retry operation with exponential backoff.
  *
@@ -35,7 +43,7 @@ function doRetryWithBackoff<T>(
                             resolve(res);
                         })
                         .catch((err: unknown) => {
-                            reject(err instanceof Error ? err : new Error("Operation failed", { cause: err }));
+                            reject(new MaxRetriesExceededError("Maximum number of retries exceeded", { cause: err }));
                         });
                 }, backoff);
             });
