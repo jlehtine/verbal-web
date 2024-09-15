@@ -159,11 +159,12 @@ function parseTrustProxy(arg: string | undefined) {
     }
 }
 
+const originMatchRE = /^\/.*\/$/;
 function parseAllowOrigin(arg: string | undefined) {
     if (arg === undefined) {
         return undefined;
     } else {
-        return arg.split(/(\s*,\s*|\s+)/);
+        return arg.split(/(\s*,\s*|\s+)/).map((origin) => (originMatchRE.exec(origin) ? new RegExp(origin) : origin));
     }
 }
 
