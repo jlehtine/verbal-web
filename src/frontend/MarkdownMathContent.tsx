@@ -9,7 +9,7 @@ export default function MarkdownMathContent({
     remarkPlugins,
     rehypePlugins,
     ...options
-}: Readonly<Options>): JSX.Element {
+}: Readonly<Options>): React.JSX.Element {
     return (
         <Markdown
             {...options}

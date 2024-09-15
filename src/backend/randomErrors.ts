@@ -165,18 +165,20 @@ export function httprnderr(
     delay = DEFAULT_DELAY,
     p = DEFAULT_PROPABILITY,
 ): void {
-    enabled
-        ? setTimeout(
-              () => {
-                  if (Math.random() < p) {
-                      const ctx = contextFrom(req);
-                      logInfo("%s %s => Random 503 Service unavailable", ctx, req.method, req.url);
-                      res.sendStatus(StatusCodes.SERVICE_UNAVAILABLE);
-                  } else {
-                      next();
-                  }
-              },
-              delay * 1000 * Math.random(),
-          )
-        : next();
+    if (enabled) {
+        setTimeout(
+            () => {
+                if (Math.random() < p) {
+                    const ctx = contextFrom(req);
+                    logInfo("%s %s => Random 503 Service unavailable", ctx, req.method, req.url);
+                    res.sendStatus(StatusCodes.SERVICE_UNAVAILABLE);
+                } else {
+                    next();
+                }
+            },
+            delay * 1000 * Math.random(),
+        );
+    } else {
+        next();
+    }
 }

@@ -170,7 +170,7 @@ function lastBoundaryIndex(giter: GraphemeIterable, end: number) {
     let lastb = 0;
     for (const g of giter) {
         // Check if alphabetic boundary found
-        const alpha = g.match(realpha) !== null;
+        const alpha = realpha.exec(g) !== null;
         if (alpha && !lastalpha) {
             lastb = gind;
         }

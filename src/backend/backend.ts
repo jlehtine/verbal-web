@@ -152,7 +152,7 @@ function parseTrustProxy(arg: string | undefined) {
         return false;
     } else if (arg === "true" || arg === "false") {
         return Boolean(arg);
-    } else if (arg.match(/^(0|[1-9][0-9]*)$/)) {
+    } else if (/^(0|[1-9][0-9]*)$/.exec(arg)) {
         return Number(arg);
     } else {
         return arg;

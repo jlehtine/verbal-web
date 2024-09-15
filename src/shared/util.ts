@@ -3,5 +3,5 @@ export function isObject(v: unknown): v is Record<string, unknown> {
 }
 
 export function isHexBytes(v: unknown): v is string {
-    return typeof v === "string" && v.match(/^([0-9a-fA-F]{2})+$/) !== null;
+    return typeof v === "string" && /^([0-9a-fA-F]{2})+$/.exec(v) !== null;
 }
