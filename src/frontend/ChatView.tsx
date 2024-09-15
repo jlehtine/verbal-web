@@ -31,12 +31,13 @@ export interface ChatViewProps {
     scrollRef?: MutableRefObject<HTMLElement | undefined>;
 }
 
-export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProps) {
+export default function ChatView({ client, fullHeight }: ChatViewProps) {
     const { t } = useTranslation();
     const conf = useConfiguration();
     const chatRef = useRef<HTMLElement>();
     const tailRef = useRef<HTMLElement>();
     const overflowRef = useRef<HTMLElement>();
+    const msgsRef = useRef<HTMLElement>();
     const inputRef = useRef<HTMLTextAreaElement>();
     const theme = useTheme();
     const isSmallScreen = useMediaQuery(theme.breakpoints.down("sm"));
@@ -47,8 +48,6 @@ export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProp
     const [errorMessage, setErrorMessage] = useState<string>();
     // true when waiting for response from backend, used to disable submit-button and display progress circle
     const [waitingForResponse, setWaitingForResponse] = useState(false);
-    // whether user has scrolled the window up
-    const [userScrolledUp, setUserScrolledUp] = useState(false);
 
     // Returns current user input
     const getUserInput = () => {
@@ -102,61 +101,17 @@ export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProp
         }
     }
 
-    // Detect user scrolling up
-    let lastTop = chatRef.current?.getBoundingClientRect().top;
-    function onScroll() {
-        const br = chatRef.current?.getBoundingClientRect();
-        const nowTop = br?.top;
-        if (br && lastTop !== undefined && nowTop !== undefined) {
-            if (nowTop > lastTop && br.bottom > innerHeight + 20) {
-                setUserScrolledUp(true);
-            } else if (nowTop < lastTop && br.bottom < innerHeight + 20) {
-                setUserScrolledUp(false);
-            }
-        }
-        lastTop = nowTop;
-    }
-
     // Scroll to the bottom when there is new content, unless user has scrolled up
-    let scrollTimeout: number | undefined;
-    let scrollPending = false;
-    const scrollDown = () => {
-        tailRef.current?.scrollIntoView({ block: "end", behavior: "instant" });
-        if (scrollPending) {
-            scrollTimeout = setTimeout(scrollDown, 200);
-        } else {
-            scrollTimeout = undefined;
-        }
-    };
     useEffect(() => {
-        if (!userScrolledUp) {
-            if (scrollTimeout === undefined) {
-                scrollTimeout = setTimeout(scrollDown, 200);
-            } else {
-                scrollPending = true;
-            }
-        }
-    }, [messages, errorMessage, waitingForResponse, userScrolledUp]);
+        msgsRef.current?.scrollIntoView({ block: "end", behavior: "instant" });
+        tailRef.current?.scrollIntoView({ block: "end", behavior: "instant" });
+    }, [messages, errorMessage, waitingForResponse]);
 
     // On mount and unmount
     useEffect(() => {
         client.addEventListener("chat", onChatChange);
-        [scrollRef?.current, overflowRef.current, window].forEach((r) => {
-            if (r) {
-                r.addEventListener("scroll", onScroll);
-            }
-        });
         return () => {
-            [window, overflowRef.current, scrollRef?.current].forEach((r) => {
-                if (r) {
-                    r.removeEventListener("scroll", onScroll);
-                }
-            });
             client.removeEventListener("chat", onChatChange);
-            if (scrollTimeout !== undefined) {
-                clearTimeout(scrollTimeout);
-                scrollTimeout = undefined;
-            }
         };
     }, []);
 
@@ -188,6 +143,7 @@ export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProp
                     <ChatMessageListView
                         messages={messages}
                         waitingForResponse={waitingForResponse}
+                        msgsRef={msgsRef}
                         isSmallScreen={isSmallScreen}
                     />
                 </Box>
@@ -243,7 +199,7 @@ function ChatInput({ inputRef, submitInput, ...props }: ChatInputProps) {
         const input = inputRef.current;
         if (input) {
             input.selectionStart = input.selectionEnd = input.value.length;
-            input.focus();
+            input.focus({ preventScroll: true });
         }
     }, []);
 
@@ -274,6 +230,7 @@ function ChatInput({ inputRef, submitInput, ...props }: ChatInputProps) {
 
 function ChatMessageListView({
     messages,
+    msgsRef,
     waitingForResponse,
     isSmallScreen,
 }: {
@@ -284,7 +241,7 @@ function ChatMessageListView({
 }) {
     const MemoizedWelcomeView = memo(WelcomeView);
     return (
-        <Box>
+        <Box ref={msgsRef}>
             <MemoizedWelcomeView />
             <Stack spacing={2}>
                 {messages.map((m, idx, array) => (
