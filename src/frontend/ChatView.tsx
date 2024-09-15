@@ -36,11 +36,10 @@ export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProp
     const chatRef = useRef<HTMLElement>();
     const tailRef = useRef<HTMLElement>();
     const overflowRef = useRef<HTMLElement>();
+    const inputRef = useRef<HTMLTextAreaElement>();
     const theme = useTheme();
     const isSmallScreen = useMediaQuery(theme.breakpoints.down("sm"));
 
-    // userInput stores value of textField
-    const [userInput, setUserInput] = useState("");
     // messages stores previous queries and their responses
     const [messages, setMessages] = useState<ChatMessage[]>(client.chat.state.messages);
     // error message shown
@@ -50,26 +49,23 @@ export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProp
     // whether user has scrolled the window up
     const [userScrolledUp, setUserScrolledUp] = useState(false);
 
-    // Check user input length
-    const inputEmpty = userInput.trim().length == 0;
-
-    // Update value of userInput when value of textField is changed
-    // Update value of allowSubmit
-    const onInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const text = event.target.value;
-        setUserInput(text);
+    // Returns current user input
+    const getUserInput = () => {
+        return inputRef.current?.value ?? "";
     };
 
-    const onInputKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-        // Enter submits user input but enter+shift doesn't
-        if (event.code === "Enter" && !event.shiftKey) {
-            submitInput();
-            event.preventDefault();
+    // Set user input
+    const setUserInput = (userInput: string) => {
+        const input = inputRef.current;
+        if (input) {
+            input.value = userInput;
         }
     };
 
     const submitInput = () => {
         // Only allowed to submit when textfield is not empty and response received from previous query
+        const userInput = getUserInput();
+        const inputEmpty = userInput.trim().length == 0;
         if (!inputEmpty && !waitingForResponse) {
             setUserInput("");
             setErrorMessage(undefined);
@@ -204,12 +200,7 @@ export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProp
                 ) : null}
                 {!waitingForResponse && (
                     <Box sx={{ mt: 2, ...(isSmallScreen ? {} : { pl: 12 }) }}>
-                        <ChatInput
-                            value={userInput}
-                            onChange={onInputChange}
-                            onKeyDown={onInputKeyDown}
-                            submitInput={submitInput}
-                        />
+                        <ChatInput submitInput={submitInput} inputRef={inputRef} />
                     </Box>
                 )}
                 {waitingForResponse ? (
@@ -221,12 +212,20 @@ export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProp
 }
 
 interface ChatInputProps extends StandardTextFieldProps {
+    inputRef: React.MutableRefObject<HTMLTextAreaElement | undefined>;
     submitInput: () => void;
 }
 
-function ChatInput({ submitInput, ...props }: ChatInputProps) {
+function ChatInput({ inputRef, submitInput, ...props }: ChatInputProps) {
     const { t } = useTranslation();
-    const inputRef = useRef<HTMLTextAreaElement>();
+
+    const onInputKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+        // Enter submits user input but enter+shift doesn't
+        if (event.code === "Enter" && !event.shiftKey) {
+            submitInput();
+            event.preventDefault();
+        }
+    };
 
     // On mount and unmount
     useEffect(() => {
@@ -243,6 +242,7 @@ function ChatInput({ submitInput, ...props }: ChatInputProps) {
             fullWidth
             multiline
             label={t("input.label")}
+            onKeyDown={onInputKeyDown}
             inputRef={inputRef}
             slotProps={{
                 input: {
