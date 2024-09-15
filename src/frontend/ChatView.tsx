@@ -244,16 +244,18 @@ function ChatInput({ submitInput, ...props }: ChatInputProps) {
             multiline
             label={t("input.label")}
             inputRef={inputRef}
-            InputProps={{
-                endAdornment: (
-                    <InputAdornment position="end">
-                        <Tooltip title={t("input.submit")}>
-                            <IconButton color="primary" size="large" onClick={submitInput}>
-                                <AssistantIcon />
-                            </IconButton>
-                        </Tooltip>
-                    </InputAdornment>
-                ),
+            slotProps={{
+                input: {
+                    endAdornment: (
+                        <InputAdornment position="end">
+                            <Tooltip title={t("input.submit")}>
+                                <IconButton color="primary" size="large" onClick={submitInput}>
+                                    <AssistantIcon />
+                                </IconButton>
+                            </Tooltip>
+                        </InputAdornment>
+                    ),
+                },
             }}
         />
     );
