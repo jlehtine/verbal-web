@@ -34,9 +34,9 @@ export interface ChatViewProps {
 export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProps) {
     const { t } = useTranslation();
     const conf = useConfiguration();
-    const ref = useRef<HTMLElement>();
+    const chatRef = useRef<HTMLElement>();
+    const tailRef = useRef<HTMLElement>();
     const overflowRef = useRef<HTMLElement>();
-    const msgsRef = useRef<HTMLElement>();
     const theme = useTheme();
     const isSmallScreen = useMediaQuery(theme.breakpoints.down("sm"));
 
@@ -107,14 +107,14 @@ export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProp
     }
 
     // Detect user scrolling up
-    let lastTop = msgsRef.current?.getBoundingClientRect().top;
+    let lastTop = chatRef.current?.getBoundingClientRect().top;
     function onScroll() {
-        const br = msgsRef.current?.getBoundingClientRect();
+        const br = chatRef.current?.getBoundingClientRect();
         const nowTop = br?.top;
         if (br && lastTop !== undefined && nowTop !== undefined) {
-            if (nowTop > lastTop) {
+            if (nowTop > lastTop && br.bottom > innerHeight + 20) {
                 setUserScrolledUp(true);
-            } else if (nowTop < lastTop && br.bottom < innerHeight + 50) {
+            } else if (nowTop < lastTop && br.bottom < innerHeight + 20) {
                 setUserScrolledUp(false);
             }
         }
@@ -122,10 +122,23 @@ export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProp
     }
 
     // Scroll to the bottom when there is new content, unless user has scrolled up
+    let scrollTimeout: number | undefined;
+    let scrollPending = false;
+    const scrollDown = () => {
+        tailRef.current?.scrollIntoView({ block: "end", behavior: "instant" });
+        if (scrollPending) {
+            scrollTimeout = setTimeout(scrollDown, 200);
+        } else {
+            scrollTimeout = undefined;
+        }
+    };
     useEffect(() => {
         if (!userScrolledUp) {
-            msgsRef.current?.scrollIntoView({ block: "end", behavior: "instant" });
-            ref.current?.scrollIntoView({ block: "end", behavior: "instant" });
+            if (scrollTimeout === undefined) {
+                scrollTimeout = setTimeout(scrollDown, 200);
+            } else {
+                scrollPending = true;
+            }
         }
     }, [messages, errorMessage, waitingForResponse, userScrolledUp]);
 
@@ -144,12 +157,16 @@ export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProp
                 }
             });
             client.removeEventListener("chat", onChatChange);
+            if (scrollTimeout !== undefined) {
+                clearTimeout(scrollTimeout);
+                scrollTimeout = undefined;
+            }
         };
     }, []);
 
     return (
         <Box
-            ref={ref}
+            ref={chatRef}
             {...(fullHeight
                 ? { sx: { height: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-end" } }
                 : {})}
@@ -175,13 +192,12 @@ export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProp
                         <ChatMessageListView
                             messages={messages}
                             waitingForResponse={waitingForResponse}
-                            msgsRef={msgsRef}
                             isSmallScreen={isSmallScreen}
                         />
                     </MarkdownContentSupport>
                 </Box>
             </Suspense>
-            <Box {...(fullHeight ? { sx: { flex: "0 0 auto" } } : {})}>
+            <Box ref={tailRef} {...(fullHeight ? { sx: { flex: "0 0 auto" } } : {})}>
                 {errorMessage ? (
                     <Box sx={{ mt: 2, ...(isSmallScreen || waitingForResponse ? {} : { pl: 12 }) }}>
                         <Alert variant="filled" severity="error">
@@ -248,7 +264,6 @@ function ChatInput({ submitInput, ...props }: ChatInputProps) {
 
 function ChatMessageListView({
     messages,
-    msgsRef,
     waitingForResponse,
     isSmallScreen,
 }: {
@@ -258,7 +273,7 @@ function ChatMessageListView({
     isSmallScreen: boolean;
 }) {
     return (
-        <Box ref={msgsRef}>
+        <Box>
             <WelcomeView />
             <Stack spacing={2}>
                 {messages.map((m, idx, array) => (
