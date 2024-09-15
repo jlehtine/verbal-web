@@ -26,6 +26,7 @@
         "text": "Valitse tunnistautumistapa.",
         "title": "Tunnistautuminen tarvitaan"
     },
+    "poweredByHtml": "Moottorina <a href=\"https://github.com/jlehtine/verbal-web\" target=\"_blank\">Verbal Web</a>",
     "welcome": {
         "terms": "Käyttöehdot ja tietosuojakäytäntö",
         "text": "Täällä voit keskustella tekoälyavustajan kanssa. Kysy rohkeasti kysymyksiä tai osallistu keskusteluun.",

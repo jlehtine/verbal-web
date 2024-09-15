@@ -18,6 +18,7 @@ import {
     StandardTextFieldProps,
     TextField,
     Tooltip,
+    Typography,
     useMediaQuery,
     useTheme,
 } from "@mui/material";
@@ -159,6 +160,7 @@ export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProp
         };
     }, []);
 
+    const poweredByHtml = t("poweredByHtml");
     return (
         <Box
             ref={chatRef}
@@ -207,6 +209,15 @@ export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProp
                     <LinearProgress color={errorMessage ? "error" : "primary"} sx={{ marginTop: 1 }} />
                 ) : null}
             </Box>
+            {poweredByHtml.length > 0 && (
+                <Box {...(fullHeight ? { sx: { flex: "0 0 auto" } } : {})}>
+                    <Typography
+                        variant="body2"
+                        dangerouslySetInnerHTML={{ __html: poweredByHtml }}
+                        sx={{ mt: 2, textAlign: "right" }}
+                    />
+                </Box>
+            )}
         </Box>
     );
 }

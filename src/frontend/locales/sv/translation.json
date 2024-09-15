@@ -26,6 +26,7 @@
         "text": "Välj hur du vill logga in.",
         "title": "Inloggning krävs"
     },
+    "poweredByHtml": "Drivs av <a href=\"https://github.com/jlehtine/verbal-web\" target=\"_blank\">Verbal Web</a>",
     "welcome": {
         "terms": "Användarvillkor och integritetspolicy",
         "text": "Här kan du chatta med AI-assistenten. Känn dig fri att ställa frågor eller delta i en diskussion.",
