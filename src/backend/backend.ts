@@ -159,6 +159,14 @@ function parseTrustProxy(arg: string | undefined) {
     }
 }
 
+function parseAllowOrigin(arg: string | undefined) {
+    if (arg === undefined) {
+        return undefined;
+    } else {
+        return arg.split(/(\s*,\s*|\s+)/);
+    }
+}
+
 function parseNumber(arg: string): number;
 function parseNumber(arg: undefined): undefined;
 function parseNumber(arg: string | undefined): number | undefined;
@@ -215,7 +223,7 @@ backend.use((req, res, next) => {
 });
 
 // Set CORS headers for all responses
-backend.use(cors({ origin: process.env.VW_ALLOW_ORIGIN }));
+backend.use(cors({ origin: parseAllowOrigin(process.env.VW_ALLOW_ORIGIN) }));
 
 // Client configuration endpoint
 backend.get("/vw/conf", (req, res) => {
