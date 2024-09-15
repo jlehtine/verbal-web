@@ -2,7 +2,6 @@ import { ChatMessage } from "../shared/api";
 import { ChatClient, ChatConnectionState } from "./ChatClient";
 import LoadingIndicator from "./LoadingIndicator";
 import MarkdownContent from "./MarkdownContent";
-import MarkdownContentSupport from "./MarkdownContentSupport";
 import WelcomeView from "./WelcomeView";
 import { useConfiguration } from "./context";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
@@ -22,7 +21,7 @@ import {
     useMediaQuery,
     useTheme,
 } from "@mui/material";
-import React, { MutableRefObject, PropsWithChildren, Suspense, useEffect, useRef, useState } from "react";
+import React, { memo, MutableRefObject, PropsWithChildren, Suspense, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 export interface ChatViewProps {
@@ -188,13 +187,11 @@ export default function ChatView({ client, fullHeight, scrollRef }: ChatViewProp
                           }
                         : {})}
                 >
-                    <MarkdownContentSupport>
-                        <ChatMessageListView
-                            messages={messages}
-                            waitingForResponse={waitingForResponse}
-                            isSmallScreen={isSmallScreen}
-                        />
-                    </MarkdownContentSupport>
+                    <ChatMessageListView
+                        messages={messages}
+                        waitingForResponse={waitingForResponse}
+                        isSmallScreen={isSmallScreen}
+                    />
                 </Box>
             </Suspense>
             <Box ref={tailRef} {...(fullHeight ? { sx: { flex: "0 0 auto" } } : {})}>
@@ -272,9 +269,10 @@ function ChatMessageListView({
     waitingForResponse: boolean;
     isSmallScreen: boolean;
 }) {
+    const MemoizedWelcomeView = memo(WelcomeView);
     return (
         <Box>
-            <WelcomeView />
+            <MemoizedWelcomeView />
             <Stack spacing={2}>
                 {messages.map((m, idx, array) => (
                     <ChatMessageView
@@ -295,6 +293,7 @@ function ChatMessageView({
     isSmallScreen,
 }: PropsWithChildren<{ msg: ChatMessage; completed: boolean; isSmallScreen: boolean }>) {
     const um = msg.role === "user";
+    const MemoizedMarkdownContent = memo(MarkdownContent);
     return (
         <Box sx={um ? { pl: 4 } : { pr: 4 }}>
             <Stack direction="row" spacing={2} alignItems="flex-start" justifyContent={um ? "flex-end" : "flex-start"}>
@@ -306,7 +305,7 @@ function ChatMessageView({
                     </Box>
                 )}
                 <Paper sx={{ pl: 2, pr: 2 }}>
-                    <MarkdownContent content={msg.content} completed={completed} />
+                    <MemoizedMarkdownContent content={msg.content} completed={completed} />
                 </Paper>
             </Stack>
         </Box>

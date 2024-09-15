@@ -3,7 +3,7 @@ import { useMarkdownContent } from "./MarkdownContentSupport";
 import { useConfiguration } from "./context";
 import load from "./load";
 import { Box } from "@mui/material";
-import React, { Suspense, lazy, memo, useEffect, useRef } from "react";
+import React, { Suspense, lazy, useEffect, useRef } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -32,11 +32,7 @@ export default function MarkdownContent({ content, completed }: { content: strin
         if (tc !== undefined) {
             content = tc;
             MarkdownMathContent = lazy(() =>
-                load("MarkdownMathContent", conf, "extra", () =>
-                    import("./MarkdownMathContent").then(({ default: comp }) => ({
-                        default: memo(comp, (prevProps, nextProps) => prevProps.children === nextProps.children),
-                    })),
-                ),
+                load("MarkdownMathContent", conf, "extra", () => import("./MarkdownMathContent")),
             );
         }
     }

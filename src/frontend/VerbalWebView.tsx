@@ -2,6 +2,7 @@ import { ChatClient } from "./ChatClient";
 import ChatView from "./ChatView";
 import LoadingIndicator from "./LoadingIndicator";
 import LoginView from "./LoginView";
+import MarkdownContentSupport from "./MarkdownContentSupport";
 import VerbalWebConfiguration from "./VerbalWebConfiguration";
 import { VerbalWebConfigurationProvider } from "./context";
 import { VERBAL_WEB_CLASS_NAME, extract } from "./extract";
@@ -75,7 +76,9 @@ export default function VerbalWebView({ conf, fullHeight, scrollRef }: VerbalWeb
                                     authError={authError}
                                 />
                             ) : (
-                                <ChatView client={client} fullHeight={fullHeight} scrollRef={scrollRef} />
+                                <MarkdownContentSupport>
+                                    <ChatView client={client} fullHeight={fullHeight} scrollRef={scrollRef} />
+                                </MarkdownContentSupport>
                             )}
                         </GoogleOAuthProvider>
                     </Suspense>
