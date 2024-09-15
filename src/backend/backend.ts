@@ -52,7 +52,7 @@ options:
         serve static content from DIR either as /PATH or at root,
         repeat the option to serve content from multiple directories
     --trust-proxy TRUST_PROXY_SETTING
-        Express.js "trust proxy" setting 
+        Express.js "trust proxy" setting
     --allow-users (EMAIL|DOMAIN)[,(EMAIL|DOMAIN)]...
         allow users with specified email addresses or domains
     --google-oauth-client-id ID
@@ -222,8 +222,15 @@ backend.use((req, res, next) => {
     logRequest(req, next);
 });
 
-// Set CORS headers for all responses
-backend.use(cors({ origin: parseAllowOrigin(process.env.VW_ALLOW_ORIGIN) }));
+// Set CORS headers for all responses, except for the WebSocket endpoint
+const corsHandler = cors({ origin: parseAllowOrigin(process.env.VW_ALLOW_ORIGIN) });
+backend.use((req, res, next) => {
+    if (req.path === CHAT_PATH && req.method === "GET") {
+        next();
+    } else {
+        corsHandler(req, res, next);
+    }
+});
 
 // Client configuration endpoint
 backend.get("/vw/conf", (req, res) => {
