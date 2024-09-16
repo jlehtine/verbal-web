@@ -1,5 +1,8 @@
 import { FallbackLng, Resource } from "i18next";
 
+/** Color scheme to be used */
+export type ColorScheme = "light" | "dark";
+
 /** Describes the phase of loading components */
 export type VerbalWebLoadingPhase =
     /** Loading assistant button and associated dependencies */
@@ -22,6 +25,9 @@ export default interface VerbalWebConfiguration {
 
     /** GPT model to be used */
     useModel?: string;
+
+    /** Color scheme to be used (default is to auto detect) */
+    colorScheme?: ColorScheme;
 
     /** Forced language */
     lng?: string;

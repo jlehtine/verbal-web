@@ -51,17 +51,11 @@ function initVerbalWebElement<P extends Record<string, unknown>>(
             load(compName, conf, "initial", compImport),
         ])
             .then(
-                ([
-                    { default: React },
-                    { initI18n },
-                    { createRoot },
-                    { DefaultThemed: DefaultThemed },
-                    { default: MainComponent },
-                ]) => {
+                ([{ default: React }, { initI18n }, { createRoot }, { DefaultThemed }, { default: MainComponent }]) => {
                     initI18n(conf);
                     const root = createRoot(elem);
                     root.render(
-                        <DefaultThemed>
+                        <DefaultThemed conf={conf}>
                             <MainComponent {...props} />
                         </DefaultThemed>,
                     );

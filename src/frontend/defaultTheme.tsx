@@ -1,39 +1,42 @@
-import { PaletteMode, ThemeProvider, createTheme, useMediaQuery } from "@mui/material";
+import VerbalWebConfiguration, { ColorScheme } from "./VerbalWebConfiguration";
+import { ThemeProvider, createTheme, useMediaQuery } from "@mui/material";
 import React, { PropsWithChildren } from "react";
 
-export function defaultTheme() {
-    const prefersDarkMode = useMediaQuery("(prefers-color-scheme: dark)");
-    const mode: PaletteMode = prefersDarkMode ? "dark" : "light";
-    return React.useMemo(
-        () =>
-            createTheme({
-                palette: {
-                    mode: mode,
-                    ...(mode === "light"
-                        ? {
-                              text: {
-                                  primary: "#333333",
-                              },
-                              background: {
-                                  default: "#f5f5f5",
-                                  paper: "#f5f5f5",
-                              },
-                          }
-                        : {
-                              text: {
-                                  primary: "#cccccc",
-                              },
-                              background: {
-                                  default: "#121212",
-                                  paper: "#121212",
-                              },
-                          }),
-                },
-            }),
-        [mode],
-    );
+export function defaultTheme(colorScheme: ColorScheme) {
+    return createTheme({
+        palette: {
+            mode: colorScheme,
+            ...(colorScheme === "light"
+                ? {
+                      text: {
+                          primary: "#333333",
+                      },
+                      background: {
+                          default: "#f5f5f5",
+                          paper: "#f5f5f5",
+                      },
+                  }
+                : {
+                      text: {
+                          primary: "#cccccc",
+                      },
+                      background: {
+                          default: "#121212",
+                          paper: "#121212",
+                      },
+                  }),
+        },
+    });
 }
 
-export function DefaultThemed({ children }: PropsWithChildren) {
-    return <ThemeProvider theme={defaultTheme()}>{children}</ThemeProvider>;
+export interface DefaultThemedProps extends PropsWithChildren {
+    readonly conf: VerbalWebConfiguration;
+}
+
+export function DefaultThemed({ conf, children }: DefaultThemedProps) {
+    const prefersDarkMode = useMediaQuery("(prefers-color-scheme: dark)");
+    const autoColorScheme = prefersDarkMode ? "dark" : "light";
+    const colorScheme = conf.colorScheme ? conf.colorScheme : autoColorScheme;
+    const theme = React.useMemo(() => defaultTheme(colorScheme), [colorScheme]);
+    return <ThemeProvider theme={theme}>{children}</ThemeProvider>;
 }
