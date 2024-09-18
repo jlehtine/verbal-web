@@ -48,11 +48,7 @@ export default function ChatView({ client, fullHeight }: ChatViewProps) {
     const [errorMessage, setErrorMessage] = useState<string>();
     // true when waiting for response from backend, used to disable submit-button and display progress circle
     const [waitingForResponse, setWaitingForResponse] = useState(false);
-
-    // Returns current user input
-    const getUserInput = () => {
-        return inputRef.current?.value ?? "";
-    };
+    const [inputEmpty, setInputEmpty] = useState(true);
 
     // Set user input
     const setUserInput = (userInput: string) => {
@@ -60,17 +56,14 @@ export default function ChatView({ client, fullHeight }: ChatViewProps) {
         if (input) {
             input.value = userInput;
         }
+        setInputEmpty(userInput.trim() === "");
     };
 
-    const submitInput = () => {
-        // Only allowed to submit when textfield is not empty and response received from previous query
-        const userInput = getUserInput();
-        const inputEmpty = userInput.trim().length == 0;
-        if (!inputEmpty && !waitingForResponse) {
-            setUserInput("");
-            setErrorMessage(undefined);
-            client.submitMessage(userInput);
-        }
+    const submitInput = (userInput: string) => {
+        const ui = userInput;
+        setUserInput("");
+        setErrorMessage(undefined);
+        client.submitMessage(ui);
     };
 
     function onChatChange() {
@@ -157,8 +150,23 @@ export default function ChatView({ client, fullHeight }: ChatViewProps) {
                     </Box>
                 ) : null}
                 {!waitingForResponse && (
-                    <Box sx={{ mt: 2, ...(isSmallScreen ? {} : { pl: 12 }) }}>
-                        <ChatInput submitInput={submitInput} inputRef={inputRef} />
+                    <Box
+                        sx={{
+                            mt: 2,
+                            display: "flex",
+                            flexDirection: "row",
+                            alignItems: "center",
+                            ...(isSmallScreen ? {} : { pl: 12 }),
+                        }}
+                    >
+                        <Box sx={{ flex: "1 1 auto" }}>
+                            <ChatInput
+                                submitInput={submitInput}
+                                inputEmpty={inputEmpty}
+                                setInputEmpty={setInputEmpty}
+                                inputRef={inputRef}
+                            />
+                        </Box>
                     </Box>
                 )}
                 {waitingForResponse ? (
@@ -180,17 +188,33 @@ export default function ChatView({ client, fullHeight }: ChatViewProps) {
 
 interface ChatInputProps extends StandardTextFieldProps {
     inputRef: React.MutableRefObject<HTMLTextAreaElement | undefined>;
-    submitInput: () => void;
+    inputEmpty: boolean;
+    setInputEmpty: React.Dispatch<React.SetStateAction<boolean>>;
+    submitInput: (input: string) => void;
 }
 
-function ChatInput({ inputRef, submitInput, ...props }: ChatInputProps) {
+function ChatInput({ inputRef, inputEmpty, setInputEmpty, submitInput, ...props }: ChatInputProps) {
     const { t } = useTranslation();
 
-    const onInputKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const doSubmit = () => {
+        const userInput = (inputRef.current?.value ?? "").trim();
+        if (userInput !== "") {
+            submitInput(userInput);
+        }
+    };
+
+    const onInputKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
         // Enter submits user input but enter+shift doesn't
         if (event.code === "Enter" && !event.shiftKey) {
-            submitInput();
+            doSubmit();
             event.preventDefault();
+        }
+    };
+
+    const onChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const ie = event.target.value.trim() === "";
+        if (ie !== inputEmpty) {
+            setInputEmpty(ie);
         }
     };
 
@@ -209,19 +233,24 @@ function ChatInput({ inputRef, submitInput, ...props }: ChatInputProps) {
             fullWidth
             multiline
             label={t("input.label")}
-            onKeyDown={onInputKeyDown}
+            onChange={onChange}
             inputRef={inputRef}
             slotProps={{
                 input: {
-                    endAdornment: (
-                        <InputAdornment position="end">
-                            <Tooltip title={t("input.submit")}>
-                                <IconButton color="primary" size="large" onClick={submitInput}>
-                                    <AssistantIcon />
-                                </IconButton>
-                            </Tooltip>
-                        </InputAdornment>
-                    ),
+                    onKeyDown: onInputKeyDown,
+                    ...(!inputEmpty
+                        ? {
+                              endAdornment: (
+                                  <InputAdornment position="end">
+                                      <Tooltip title={t("input.submit")}>
+                                          <IconButton color="primary" size="large" onClick={doSubmit} sx={{ p: 0 }}>
+                                              <AssistantIcon />
+                                          </IconButton>
+                                      </Tooltip>
+                                  </InputAdornment>
+                              ),
+                          }
+                        : {}),
                 },
             }}
         />
