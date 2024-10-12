@@ -84,6 +84,8 @@ export class ChatServer {
     /** Chat completion provider */
     private readonly chatCompletion;
 
+    private readonly pendingWebSocketMessages: { data: unknown; isBinary: boolean }[] = [];
+
     private inactivityTimer?: NodeJS.Timeout;
 
     constructor(
@@ -144,6 +146,32 @@ export class ChatServer {
     // On web socket message
     private onWebSocketMessage(data: unknown, isBinary: boolean) {
         try {
+            this.pendingWebSocketMessages.push({ data, isBinary });
+            if (this.pendingWebSocketMessages.length === 1) {
+                this.processPendingWebSocketMessages();
+            }
+        } catch (err: unknown) {
+            this.handleError(err);
+        }
+    }
+
+    // Process next web socket message
+    private processPendingWebSocketMessages() {
+        const msg = this.pendingWebSocketMessages.shift();
+        if (msg) {
+            this.processWebSocketMessage(msg.data, msg.isBinary)
+                .catch((err: unknown) => {
+                    this.handleError(err);
+                })
+                .finally(() => {
+                    this.processPendingWebSocketMessages();
+                });
+        }
+    }
+
+    // Process web socket message
+    private processWebSocketMessage(data: unknown, isBinary: boolean): Promise<void> {
+        return new Promise((resolve) => {
             let processed = false;
             if (!isBinary && (typeof data === "string" || Buffer.isBuffer(data))) {
                 const amsg: unknown = JSON.parse(data.toString());
@@ -156,9 +184,8 @@ export class ChatServer {
                 this.error("Received an unrecognized message");
                 this.debugData("Unrecognized input message", data);
             }
-        } catch (err: unknown) {
-            this.handleError(err);
-        }
+            resolve();
+        });
     }
 
     // Process a chat message
