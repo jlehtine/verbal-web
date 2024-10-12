@@ -171,21 +171,19 @@ export class ChatServer {
 
     // Process web socket message
     private processWebSocketMessage(data: unknown, isBinary: boolean): Promise<void> {
-        return new Promise((resolve) => {
-            let processed = false;
-            if (!isBinary && (typeof data === "string" || Buffer.isBuffer(data))) {
-                const amsg: unknown = JSON.parse(data.toString());
-                if (isApiFrontendChatMessage(amsg)) {
-                    this.processChatMessage(amsg);
-                    processed = true;
-                }
+        let processed = false;
+        if (!isBinary && (typeof data === "string" || Buffer.isBuffer(data))) {
+            const amsg: unknown = JSON.parse(data.toString());
+            if (isApiFrontendChatMessage(amsg)) {
+                this.processChatMessage(amsg);
+                processed = true;
             }
-            if (!processed) {
-                this.error("Received an unrecognized message");
-                this.debugData("Unrecognized input message", data);
-            }
-            resolve();
-        });
+        }
+        if (!processed) {
+            this.error("Received an unrecognized message");
+            this.debugData("Unrecognized input message", data);
+        }
+        return Promise.resolve();
     }
 
     // Process a chat message
