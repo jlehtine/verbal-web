@@ -32,7 +32,7 @@ export interface ChatCompletionProvider {
     /**
      * Perform chat completion. Returns asynchronously iterable list of updates.
      *
-     * @param request initial chat state
+     * @param request chat completion request
      * @return one or more updates asynchronously as API backend messages
      */
     chatCompletion(request: ChatCompletionRequest): Promise<AsyncIterable<string>>;
