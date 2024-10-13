@@ -1,5 +1,6 @@
 import {
     ApiFrontendChatMessage,
+    ChatAudioMessageNew,
     ChatInit,
     ChatMessageNew,
     SharedConfig,
@@ -11,8 +12,8 @@ import { Chat, InitialChatState } from "../shared/chat";
 import { VerbalWebError } from "../shared/error";
 import { TypedEvent, TypedEventTarget } from "../shared/event";
 import { retryWithBackoff } from "../shared/retry";
-import { apiMessageToWsData } from "../shared/wsdata";
-import { logDebug, logError, logThrownError } from "./log";
+import { apiMessageToWsData, wsDataToApiMessage } from "../shared/wsdata";
+import { logDebug, logThrownError } from "./log";
 import { StatusCodes } from "http-status-codes";
 
 /** Paths to backend endpoints */
@@ -110,6 +111,8 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
 
     private chatInitialized = false;
 
+    private pendingAudioMessage: ChatAudioMessageNew | undefined;
+
     private readonly backendUrl;
 
     constructor(backendUrl: string, initialState: InitialChatState) {
@@ -132,6 +135,24 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
 
         // Send the API message, if possible
         this.updateState(amsg);
+
+        this.chatEvent();
+    }
+
+    /**
+     * Submits a new audio message to the backend.
+     *
+     * @param blob audio data
+     */
+    async submitAudioMessage(blob: Blob): Promise<void> {
+        // Update chat model state
+        const binary = await blob.arrayBuffer();
+        const amsg: ChatAudioMessageNew = { type: "audnew", mimeType: blob.type, binary };
+        this.chat.update(amsg);
+        this.pendingAudioMessage = amsg;
+
+        // Send the API message, if possible
+        this.updateState();
 
         this.chatEvent();
     }
@@ -296,6 +317,10 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
                     this.chat.update(init);
                     this.sendMessage(init);
                     this.chatInitialized = true;
+                    if (this.pendingAudioMessage) {
+                        this.chat.update(this.pendingAudioMessage);
+                    }
+                    this.updateState();
                 }
             }
 
@@ -304,6 +329,15 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
                 if (this.ensureWebSocket()) {
                     logDebug("Sending a chat update");
                     this.sendMessage(msg);
+                }
+            }
+
+            // Can send the pending audio message
+            else if (this.pendingAudioMessage) {
+                if (this.ensureWebSocket()) {
+                    logDebug("Sending a pending audio message");
+                    this.sendMessage(this.pendingAudioMessage);
+                    this.pendingAudioMessage = undefined;
                 }
             }
         }
@@ -386,34 +420,27 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
     private onWebSocketMessage(ws: WebSocket, ev: MessageEvent) {
         if (ws === this.ws && ws.readyState === WebSocket.OPEN) {
             try {
-                let processed = false;
-                const data: unknown = ev.data;
-                if (typeof data === "string") {
-                    const amsg: unknown = JSON.parse(data);
-                    if (isApiBackendChatMessage(amsg)) {
-                        logDebug("Received a chat update");
-                        this.chat.update(amsg);
-                        this.numErrors = 0;
-                        this.chatEvent();
-                        if (isChatMessageError(amsg) && amsg.code === "auth") {
-                            if (this.ws.readyState !== WebSocket.CLOSED && this.ws.readyState !== WebSocket.CLOSING) {
-                                logDebug("Authentication missing, must re-authenticate");
-                                this.authInitialized = false;
-                                this.authChecked = false;
-                                this.connectionState = ChatConnectionState.UNCONNECTED;
-                                this.ws.close();
-                                this.initializationEvent();
-                                this.resetConnectionState();
-                                this.updateState();
-                            }
-                        } else {
-                            this.initWebSocketInactivityTimeout();
-                        }
-                        processed = true;
-                    }
+                const amsg = wsDataToApiMessage(ev.data, isApiBackendChatMessage);
+                logDebug("Received a chat update");
+                this.chat.update(amsg);
+                this.numErrors = 0;
+                if (isChatMessageError(amsg) && amsg.code !== "auth") {
+                    this.pendingAudioMessage = undefined;
                 }
-                if (!processed) {
-                    logError("Received an unrecognized message from the backend");
+                this.chatEvent();
+                if (isChatMessageError(amsg) && amsg.code === "auth") {
+                    if (this.ws.readyState !== WebSocket.CLOSED && this.ws.readyState !== WebSocket.CLOSING) {
+                        logDebug("Authentication missing, must re-authenticate");
+                        this.authInitialized = false;
+                        this.authChecked = false;
+                        this.connectionState = ChatConnectionState.UNCONNECTED;
+                        this.ws.close();
+                        this.initializationEvent();
+                        this.resetConnectionState();
+                        this.updateState();
+                    }
+                } else {
+                    this.initWebSocketInactivityTimeout();
                 }
             } catch (err: unknown) {
                 logThrownError("Failed to process a backend message", err);

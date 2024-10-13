@@ -3,6 +3,8 @@ import {
     ChatMessage,
     ChatMessageErrorCode,
     ChatState,
+    isChatAudioMessageNew,
+    isChatAudioTranscription,
     isChatInit,
     isChatMessageError,
     isChatMessageNew,
@@ -50,10 +52,15 @@ export class Chat {
             this.state = { ...amsg, ...this.serverOverrides };
             this.error = undefined;
             this.backendProcessing = lastOf(this.state.messages)?.role === "user";
-        } else if (isChatMessageNew(amsg)) {
-            this.state.messages.push({ role: "user", content: amsg.content });
+        } else if (isChatMessageNew(amsg) || isChatAudioMessageNew(amsg)) {
+            if (typeof amsg.content === "string") {
+                this.state.messages.push({ role: "user", content: amsg.content });
+            }
             this.backendProcessing = true;
             this.failedUserInput = "";
+        } else if (isChatAudioTranscription(amsg)) {
+            this.state.messages.push({ role: "user", content: amsg.transcription });
+            this.backendProcessing = true;
         } else if (isChatMessagePart(amsg)) {
             const lastMsg = lastOf(this.state.messages);
             if (lastMsg?.role === "assistant") {

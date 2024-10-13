@@ -1,8 +1,7 @@
 import { SharedConfig } from "../shared/api";
 import { InitialChatStateOverrides } from "../shared/chat";
-import { ChatCompletionProvider } from "./ChatCompletionProvider";
 import { ChatServer, ChatServerConfig } from "./ChatServer";
-import { ModerationProvider } from "./ModerationProvider";
+import { Engine } from "./Engine";
 import { OpenAIEngine } from "./OpenAIEngine";
 import { contextFrom } from "./RequestContext";
 import { handleAuthCheck, handleAuthRequest } from "./auth";
@@ -59,6 +58,8 @@ options:
         enable Google login using the specified OAuth client id
     --session-expiration DAYS
         session expiration time in days (default is 30 days, or a month)
+    --disable-speech-to-text
+        disable speech-to-text feature, if available
     -v, --verbose
         increase logging, use multiple times for even more verbose logging
     --random-errors
@@ -74,6 +75,7 @@ let trustProxy = parseTrustProxy(process.env.VW_TRUST_PROXY);
 let allowUsers = parseAllowUsers(process.env.VW_ALLOW_USERS);
 let googleOAuthClientId = process.env.VW_GOOGLE_OAUTH_CLIENT_ID;
 let sessionExpirationDays = parseNumber(process.env.VW_SESSION_EXPIRATION) ?? 30;
+let enableSpeechToText = parseBoolean(process.env.VW_ENABLE_SPEECH_TO_TEXT) ?? true;
 let logLevel = process.env.VW_LOG_LEVEL ? parseInt(process.env.VW_LOG_LEVEL) : 0;
 let randomErrors = process.env.VW_RANDOM_ERRORS !== undefined;
 for (let i = 2; i < process.argv.length; i++) {
@@ -96,6 +98,8 @@ for (let i = 2; i < process.argv.length; i++) {
         googleOAuthClientId = safeNextArg(process.argv, ++i);
     } else if (a === "--session-expiration") {
         sessionExpirationDays = parseNumber(safeNextArg(process.argv, ++i));
+    } else if (a === "--disable-speech-to-text") {
+        enableSpeechToText = false;
     } else if (a === "-v" || a === "--verbose") {
         logLevel++;
     } else if (a === "--random-errors") {
@@ -177,7 +181,25 @@ function parseNumber(arg: undefined): undefined;
 function parseNumber(arg: string | undefined): number | undefined;
 function parseNumber(arg: string | undefined): number | undefined {
     if (arg === undefined) return undefined;
-    return Number(arg);
+    const n = Number(arg);
+    if (isNaN(n)) {
+        logFatal("Invalid number: %s", arg);
+    }
+    return n;
+}
+
+function parseBoolean(arg: string): boolean;
+function parseBoolean(arg: undefined): undefined;
+function parseBoolean(arg: string | undefined): boolean | undefined;
+function parseBoolean(arg: string | undefined): boolean | undefined {
+    if (arg === undefined) return undefined;
+    if (arg === "true") {
+        return true;
+    } else if (arg === "false") {
+        return false;
+    } else {
+        logFatal('Invalid boolean (expected "true" or "false"): %s', arg);
+    }
 }
 
 // Switch to specified directory
@@ -197,9 +219,10 @@ const serverOverrides: InitialChatStateOverrides = {
 };
 
 // Initialize AI engine
-const engine = new OpenAIEngine();
-const moderation: ModerationProvider = engine;
-const chatCompletion: ChatCompletionProvider = engine;
+const engine: Engine = new OpenAIEngine();
+const moderation = engine.moderationProvider();
+const chatCompletion = engine.chatCompletionProvider();
+const transcription = enableSpeechToText ? engine.transcriptionProvider() : undefined;
 
 // Use WebSocket Express
 const backend = new WebSocketExpress();
@@ -263,7 +286,7 @@ backend.post("/vw/auth/login/:idp", (req, res) => {
 backend.ws(CHAT_PATH, (req, res) => {
     res.accept()
         .then((ws) => {
-            new ChatServer(req, ws, moderation, chatCompletion, config, serverOverrides);
+            new ChatServer(req, ws, transcription, moderation, chatCompletion, config, serverOverrides);
         })
         .catch((err: unknown) => {
             logThrownError("Failed to accept web socket connection [%s]", err, undefined, req.ip);
@@ -307,6 +330,9 @@ function handleConfRequest(req: Request, res: Response) {
                       googleId: config.googleOAuthClientId,
                   },
               }
+            : {}),
+        ...(transcription
+            ? { speechToText: { supportedAudioTypes: transcription.supportedTranscriptionAudioTypes() } }
             : {}),
     };
     res.json(clientConf);

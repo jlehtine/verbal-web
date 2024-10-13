@@ -1,4 +1,18 @@
 {
+    "audio": {
+        "error": {
+            "general": "Ääniominaisuuksien alustaminen epäonnistui.",
+            "notallowed": "Ääni ei ole sallittu. Tarkista selaimen asetukset ja verkkosivun käyttöoikeudet.",
+            "notfound": "Yhteensopivaa äänilähdettä ei löytynyt.",
+            "processing": "Äänen käsittely epäonnistui."
+        },
+        "initializingRecording": "Puheohjausta valmistellaan. Sallithan äänen tallennuksen käyttääksesi puheohjausta.",
+        "input": "Puheohjaus",
+        "processing": "Käsitellään ääntä...",
+        "recording": "Kuuntelen puhettasi. Lopeta pitämällä tauko tai painamalla napista.",
+        "stopRecording": "Lopeta tallennus"
+    },
+    "close": "Sulje",
     "dialog": {
         "title": "Tekoälyavustaja"
     },
