@@ -27,7 +27,7 @@ export interface ModerationResult {
  */
 export interface ModerationProvider {
     /** Text chunker parameters for long or streaming content */
-    textChunkerParams: TextChunkerParams;
+    readonly textChunkerParams: TextChunkerParams;
 
     /**
      * Checks whether the specified content should be accepted or not.
