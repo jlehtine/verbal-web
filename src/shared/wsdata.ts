@@ -22,7 +22,6 @@ export function wsDataToApiMessage<T extends ApiChatMessage>(data: unknown, type
             return amsg;
         }
     }
-    console.error("message", amsg);
     throw new VerbalWebError("Received WebSocket message is invalid", { cause });
 }
 
@@ -52,7 +51,6 @@ function toJsonBinaryParts(data: unknown): { json: string; binary?: ArrayBuffer 
 
     // Unexpected data type
     else {
-        console.error("Data", data);
         throw new VerbalWebError("WebSocket message data is not a string or an ArrayBuffer");
     }
 }
