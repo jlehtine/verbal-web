@@ -11,6 +11,7 @@ import { Chat, InitialChatState } from "../shared/chat";
 import { VerbalWebError } from "../shared/error";
 import { TypedEvent, TypedEventTarget } from "../shared/event";
 import { retryWithBackoff } from "../shared/retry";
+import { apiMessageToWsData } from "../shared/wsdata";
 import { logDebug, logError, logThrownError } from "./log";
 import { StatusCodes } from "http-status-codes";
 
@@ -335,7 +336,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
 
     private sendMessage(msg: ApiFrontendChatMessage) {
         if (this.ws === undefined) throw new VerbalWebError("Web socket not created");
-        this.ws.send(JSON.stringify(msg));
+        this.ws.send(apiMessageToWsData(msg));
         this.clearInactivityTimer();
     }
 
@@ -347,6 +348,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
         logDebug("Connecting to %s", wsUrl);
         this.clearRetryTimer();
         const ws = new WebSocket(wsUrl);
+        ws.binaryType = "arraybuffer";
 
         ws.addEventListener("open", () => {
             this.onWebSocketOpen(ws);

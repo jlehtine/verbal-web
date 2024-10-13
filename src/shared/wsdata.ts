@@ -5,12 +5,8 @@ import { isObject } from "./util";
 /**
  * Parse WebSocket data into an object.
  */
-export async function wsDataToApiMessage<T extends ApiChatMessage>(
-    data: unknown,
-    isBinary: boolean,
-    typeCheck: (v: unknown) => v is T,
-): Promise<T> {
-    const { json, binary } = await toJsonBinaryParts(data, isBinary);
+export function wsDataToApiMessage<T extends ApiChatMessage>(data: unknown, typeCheck: (v: unknown) => v is T): T {
+    const { json, binary } = toJsonBinaryParts(data);
     let amsg: unknown;
     let cause;
     try {
@@ -26,27 +22,23 @@ export async function wsDataToApiMessage<T extends ApiChatMessage>(
             return amsg;
         }
     }
+    console.error("message", amsg);
     throw new VerbalWebError("Received WebSocket message is invalid", { cause });
 }
 
 /**
  * Parse WebSocket message data into JSON and binary parts.
  */
-async function toJsonBinaryParts(data: unknown, isBinary: boolean): Promise<{ json: string; binary?: ArrayBuffer }> {
-    // Handle binary messages
-    if (isBinary) {
-        // Get data as ArrayBuffer
-        let buffer;
-        if (typeof data === "object" && data instanceof Blob) {
-            buffer = await data.arrayBuffer();
-        } else if (typeof data === "object" && data instanceof ArrayBuffer) {
-            buffer = data;
-        } else {
-            throw new VerbalWebError("WebSocket binary message data is not an ArrayBuffer or Blob");
-        }
+function toJsonBinaryParts(data: unknown): { json: string; binary?: ArrayBuffer } {
+    // Handle string messages
+    if (typeof data === "string") {
+        return { json: data };
+    }
 
+    // Handle binary messages
+    else if (typeof data === "object" && data instanceof ArrayBuffer) {
         // Find nil-terminated JSON string and rest is binary data
-        const view = new Uint8Array(buffer);
+        const view = new Uint8Array(data);
         let jsonLength = 0;
         while (jsonLength < view.length && view[jsonLength] !== 0) {
             jsonLength++;
@@ -58,13 +50,10 @@ async function toJsonBinaryParts(data: unknown, isBinary: boolean): Promise<{ js
         };
     }
 
-    // Handle text messages
+    // Unexpected data type
     else {
-        if (typeof data === "string") {
-            return { json: data };
-        } else {
-            throw new VerbalWebError("WebSocket non-binary message data is not a string");
-        }
+        console.error("Data", data);
+        throw new VerbalWebError("WebSocket message data is not a string or an ArrayBuffer");
     }
 }
 

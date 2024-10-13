@@ -7,6 +7,7 @@ import {
     isApiFrontendChatMessage,
 } from "../shared/api";
 import { Chat, InitialChatStateOverrides } from "../shared/chat";
+import { apiMessageToWsData, wsDataToApiMessage } from "../shared/wsdata";
 import { ChatCompletionMessage, ChatCompletionProvider, ChatCompletionRequest } from "./ChatCompletionProvider";
 import { ModerationCache } from "./ModerationCache";
 import { ModerationProvider, ModerationRejectedError } from "./ModerationProvider";
@@ -62,6 +63,16 @@ interface ChatCompletionState {
     moderationChunker: TextChunker;
 }
 
+function toStandardWebSocketData(data: unknown): string | ArrayBuffer {
+    if (typeof data === "string" || (typeof data === "object" && data instanceof ArrayBuffer)) {
+        return data;
+    } else if (Buffer.isBuffer(data)) {
+        return data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+    } else {
+        throw new Error("Unsupported Web Socket data type");
+    }
+}
+
 /**
  * A server serving a single chat client web socket session.
  */
@@ -84,8 +95,6 @@ export class ChatServer {
     /** Chat completion provider */
     private readonly chatCompletion;
 
-    private readonly pendingWebSocketMessages: { data: unknown; isBinary: boolean }[] = [];
-
     private inactivityTimer?: NodeJS.Timeout;
 
     constructor(
@@ -105,8 +114,8 @@ export class ChatServer {
         this.chatCompletion = chatCompletion;
         this.initWebSocketInactivityTimeout();
 
-        this.ws.on("message", (data, isBinary) => {
-            this.onWebSocketMessage(data, isBinary);
+        this.ws.on("message", (data) => {
+            this.onWebSocketMessage(data);
         });
         this.ws.on("error", (err) => {
             this.onWebSocketError(err);
@@ -140,50 +149,17 @@ export class ChatServer {
 
     private sendMessage(msg: ApiBackendChatMessage, desc: string) {
         this.debugData("Sending %s", msg, desc);
-        this.ws.send(JSON.stringify(msg));
+        this.ws.send(apiMessageToWsData(msg));
     }
 
     // On web socket message
-    private onWebSocketMessage(data: unknown, isBinary: boolean) {
+    private onWebSocketMessage(data: unknown) {
         try {
-            this.pendingWebSocketMessages.push({ data, isBinary });
-            if (this.pendingWebSocketMessages.length === 1) {
-                this.processPendingWebSocketMessages();
-            }
+            const amsg = wsDataToApiMessage(toStandardWebSocketData(data), isApiFrontendChatMessage);
+            this.processChatMessage(amsg);
         } catch (err: unknown) {
             this.handleError(err);
         }
-    }
-
-    // Process next web socket message
-    private processPendingWebSocketMessages() {
-        const msg = this.pendingWebSocketMessages.shift();
-        if (msg) {
-            this.processWebSocketMessage(msg.data, msg.isBinary)
-                .catch((err: unknown) => {
-                    this.handleError(err);
-                })
-                .finally(() => {
-                    this.processPendingWebSocketMessages();
-                });
-        }
-    }
-
-    // Process web socket message
-    private processWebSocketMessage(data: unknown, isBinary: boolean): Promise<void> {
-        let processed = false;
-        if (!isBinary && (typeof data === "string" || Buffer.isBuffer(data))) {
-            const amsg: unknown = JSON.parse(data.toString());
-            if (isApiFrontendChatMessage(amsg)) {
-                this.processChatMessage(amsg);
-                processed = true;
-            }
-        }
-        if (!processed) {
-            this.error("Received an unrecognized message");
-            this.debugData("Unrecognized input message", data);
-        }
-        return Promise.resolve();
     }
 
     // Process a chat message
