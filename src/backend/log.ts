@@ -1,4 +1,5 @@
 import { describeError } from "../shared/error";
+import { isObject } from "../shared/util";
 import { RequestContext } from "./RequestContext";
 
 /** Prefix used for logging */
@@ -73,6 +74,9 @@ export function logTrace(msg: string, ctx?: RequestContext, ...params: unknown[]
 
 export function logInterfaceData(msg: string, ctx: RequestContext, data: unknown, ...params: unknown[]) {
     if (logLevel >= 3) {
+        if (isObject(data) && typeof data.binary === "object" && data.binary instanceof ArrayBuffer) {
+            data = { ...data, binary: `<${data.binary.byteLength.toString()} bytes of binary data>` };
+        }
         logDebug(msg + ": " + JSON.stringify(data, undefined, 2), ctx, ...params);
     }
 }

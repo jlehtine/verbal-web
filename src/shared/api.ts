@@ -29,6 +29,12 @@ export interface TypedMessage<T extends string> extends Record<string, unknown> 
     type: T;
 }
 
+/** API message containing binary data */
+export interface BinaryMessage<T extends string> extends TypedMessage<T> {
+    /** Binary data */
+    binary: ArrayBuffer;
+}
+
 /** Chat initialization by the frontend */
 export interface ChatInit extends TypedMessage<"init">, ChatState {}
 
