@@ -3,10 +3,10 @@ import { TypedEvent, TypedEventTarget } from "../shared/event";
 import { logDebug, logThrownError } from "./log";
 
 const FFT_SIZE = 1024;
-const SILENCE_THRESHOLD = 0.03;
-const SOUND_THRESHOLD = 0.01;
-const SILENCE_DURATION_MILLIS = 3000;
-const SOUND_DURATION_MILLIS = 100;
+const SILENCE_THRESHOLD = 0.01;
+const SILENCE_DURATION_MILLIS = 2000;
+const SOUND_DURATION_MILLIS = 1000;
+const RMS_AVERAGING_WINDOW = 20;
 
 export type AudioErrorCode = "general" | "notfound" | "notallowed" | "processing";
 
@@ -22,6 +22,10 @@ export class SpeechRecorder extends TypedEventTarget<SpeechRecorder, SpeechRecor
     private readonly params: SpeechRecorderParams;
     private started = false;
     private stopped = false;
+    private readonly rmsSamples = new Float32Array(RMS_AVERAGING_WINDOW);
+    private rmsSampleHead = 0;
+    private rmsSampleNum = 0;
+    private rmsSampleSum = 0;
     private silenceStartedAt: number | undefined;
     private soundStartedAt: number | undefined;
     private soundDetected = false;
@@ -200,7 +204,18 @@ export class SpeechRecorder extends TypedEventTarget<SpeechRecorder, SpeechRecor
                 const v = tdata[i] - mean;
                 sqsum += v * v;
             }
-            const rms = Math.sqrt(sqsum / buflen);
+            const rmsnow = Math.sqrt(sqsum / buflen);
+
+            // RMS averaging
+            if (this.rmsSampleNum < RMS_AVERAGING_WINDOW) {
+                this.rmsSampleNum++;
+            } else {
+                this.rmsSampleSum -= this.rmsSamples[this.rmsSampleHead];
+            }
+            this.rmsSamples[this.rmsSampleHead] = rmsnow;
+            this.rmsSampleSum += rmsnow;
+            this.rmsSampleHead = (this.rmsSampleHead + 1) % RMS_AVERAGING_WINDOW;
+            const rms = this.rmsSampleSum / this.rmsSampleNum;
 
             // Silence detection
             let silence;
@@ -220,7 +235,7 @@ export class SpeechRecorder extends TypedEventTarget<SpeechRecorder, SpeechRecor
                 this.silenceStartedAt = undefined;
                 silence = false;
             }
-            if (!this.soundDetected && rms > SOUND_THRESHOLD) {
+            if (!this.soundDetected && rms > SILENCE_THRESHOLD) {
                 if (this.soundStartedAt === undefined) {
                     this.soundStartedAt = timestamp;
                 }

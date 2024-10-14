@@ -10,7 +10,6 @@ import { useTranslation } from "react-i18next";
 
 const CANVAS_WIDTH = 128;
 const CANVAS_HEIGHT = 48;
-const MIN_RMS = 0.001;
 const MIN_DB = -60;
 const MAX_DB = -3;
 
@@ -75,7 +74,7 @@ export default function AudioInput({ onClose, sttConf, client }: AudioInputProps
                         // Visualize audio waveform
                         const rms = event.rms;
                         ctx.fillStyle = "blue";
-                        if (rms > MIN_RMS) {
+                        if (!event.silence) {
                             let maxabs = 0;
                             for (let i = 0; i < buflen; i++) {
                                 const abs = Math.abs(tdata[i]);
@@ -107,7 +106,7 @@ export default function AudioInput({ onClose, sttConf, client }: AudioInputProps
                         ctx.fillRect(0, CANVAS_HEIGHT / 2, CANVAS_WIDTH, 2);
 
                         // Visualize dB volume level
-                        if (rms > MIN_RMS) {
+                        if (!event.silence) {
                             const db = 20 * Math.log10(rms);
                             if (db >= MIN_DB) {
                                 const wr = ((CANVAS_WIDTH / 2) * (db - MIN_DB)) / (MAX_DB - MIN_DB);
