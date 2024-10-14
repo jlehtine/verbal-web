@@ -113,6 +113,8 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
 
     private pendingAudioMessage: ChatAudioMessageNew | undefined;
 
+    private pendingPrepareChat = false;
+
     private readonly backendUrl;
 
     constructor(backendUrl: string, initialState: InitialChatState) {
@@ -120,6 +122,14 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
         super();
         this.backendUrl = backendUrl;
         this.chat = new Chat(initialState);
+        this.updateState();
+    }
+
+    /**
+     * Prepares the chat connectivity for use when input is expected.
+     */
+    prepareChat() {
+        this.pendingPrepareChat = true;
         this.updateState();
     }
 
@@ -308,7 +318,10 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
         }
 
         // Ready to send chat content to backend?
-        else if (this.chat.backendProcessing && (!this.sharedConfig.auth?.required || this.authInitialized)) {
+        else if (
+            (this.chat.backendProcessing || this.pendingPrepareChat) &&
+            (!this.sharedConfig.auth?.required || this.authInitialized)
+        ) {
             // Need chat initialization?
             if (!this.chatInitialized || this.chat.error !== undefined) {
                 if (this.ensureWebSocket()) {
@@ -317,6 +330,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
                     this.chat.update(init);
                     this.sendMessage(init);
                     this.chatInitialized = true;
+                    this.pendingPrepareChat = false;
                     if (this.pendingAudioMessage) {
                         this.chat.update(this.pendingAudioMessage);
                     }

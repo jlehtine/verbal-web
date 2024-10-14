@@ -51,7 +51,17 @@ export default function ChatView({ client, fullHeight }: ChatViewProps) {
     // true when waiting for response from backend, used to disable submit-button and display progress circle
     const [waitingForResponse, setWaitingForResponse] = useState(false);
     const [inputEmpty, setInputEmpty] = useState(true);
-    const [audioInput, setAudioInput] = useState(false);
+    const [audioInput, setAudioInput] = useState<number>();
+
+    // Open audio input
+    function openAudioInput() {
+        setAudioInput(Date.now());
+    }
+
+    // Close audio input
+    function closeAudioInput() {
+        setAudioInput(undefined);
+    }
 
     // Set user input
     const setUserInput = (userInput: string) => {
@@ -171,7 +181,7 @@ export default function ChatView({ client, fullHeight }: ChatViewProps) {
                                     setInputEmpty={setInputEmpty}
                                     inputRef={inputRef}
                                     useAudioInput={() => {
-                                        setAudioInput(true);
+                                        openAudioInput();
                                     }}
                                 />
                             </Box>
@@ -191,11 +201,12 @@ export default function ChatView({ client, fullHeight }: ChatViewProps) {
                     </Box>
                 )}
             </Box>
-            {client.sharedConfig?.speechToText && (
+            {audioInput !== undefined && client.sharedConfig?.speechToText && (
                 <AudioInputDialog
-                    open={audioInput}
+                    open={true}
+                    key={audioInput}
                     onClose={() => {
-                        setAudioInput(false);
+                        closeAudioInput();
                     }}
                     isSmallScreen={isSmallScreen}
                     sttConf={client.sharedConfig.speechToText}

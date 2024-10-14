@@ -1,8 +1,7 @@
 import { SpeechToTextConfig } from "../shared/api";
-import { VerbalWebError } from "../shared/error";
 import { ChatClient } from "./ChatClient";
-import { AudioErrorCode, toAudioErrorCode } from "./audio";
-import { logDebug, logError } from "./log";
+import { AudioErrorCode, SpeechRecorder } from "./SpeechRecorder";
+import { logThrownError } from "./log";
 import { Alert, Button, Dialog, DialogActions, DialogContent, DialogProps, DialogTitle, Stack } from "@mui/material";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -22,69 +21,34 @@ export default function AudioInputDialog({ onClose, isSmallScreen, sttConf, clie
     const [processing, setProcessing] = useState(false);
 
     useEffect(() => {
-        let stopped = false;
-        let mediaRecorder: MediaRecorder | undefined;
-        let mediaStream: MediaStream | undefined;
-        const stopRecording = () => {
-            stopped = true;
-            if (mediaRecorder !== undefined && mediaRecorder.state !== "inactive") {
-                logDebug("Stop audio recording");
-                mediaRecorder.stop();
-            }
-            if (mediaStream !== undefined) {
-                mediaStream.getTracks().forEach((track) => {
-                    track.stop();
-                });
-                mediaStream = undefined;
-            }
-        };
         if (props.open) {
-            navigator.mediaDevices
-                .getUserMedia({
-                    audio: {
-                        channelCount: 1,
-                        sampleRate: 8000,
-                        sampleSize: 8,
-                        autoGainControl: true,
-                        noiseSuppression: true,
-                    },
-                })
-                .then((stream) => {
-                    mediaStream = stream;
-                    if (stopped) {
-                        stopRecording();
-                        return;
-                    }
-                    mediaRecorder = new MediaRecorder(stream, {
-                        mimeType: getAudioType(sttConf.supportedAudioTypes),
+            const recorder = new SpeechRecorder({ supportedAudioTypes: sttConf.supportedAudioTypes });
+            recorder.addEventListener("state", () => {
+                if (recorder.error !== error) {
+                    setError(recorder.error);
+                }
+                if (recorder.recording && onStop === undefined) {
+                    setOnStop(() => () => {
+                        recorder.stop();
                     });
-                    mediaRecorder.ondataavailable = (event: BlobEvent) => {
-                        if (event.data.size > 0) {
-                            logDebug("Processing recorded audio");
-                            setProcessing(true);
-                            client
-                                .submitAudioMessage(event.data)
-                                .then(onClose)
-                                .catch((err: unknown) => {
-                                    logError("Failed to process audio: %o", err);
-                                    setError("processing");
-                                });
-                        }
-                    };
-                    logDebug("Start audio recording");
-                    mediaRecorder.start();
-                    setOnStop(() => stopRecording);
-                })
-                .catch((err: unknown) => {
-                    logError("Audio failed: %o", err);
-                    setError(toAudioErrorCode(err));
-                    stopRecording();
-                });
+
+                    // Prepare chat connectivity, for faster response
+                    client.prepareChat();
+                }
+            });
+            recorder.addEventListener("audio", (event) => {
+                setProcessing(true);
+                client
+                    .submitAudioMessage(event.blob)
+                    .then(onClose)
+                    .catch((err: unknown) => {
+                        logThrownError("Failed to process audio", err);
+                        setError("processing");
+                    });
+            });
+            recorder.start();
             return () => {
-                stopRecording();
-                setError(undefined);
-                setOnStop(undefined);
-                setProcessing(false);
+                recorder.close();
             };
         }
     }, [props.open]);
@@ -123,13 +87,4 @@ export default function AudioInputDialog({ onClose, isSmallScreen, sttConf, clie
             </DialogActions>
         </Dialog>
     );
-}
-
-function getAudioType(supportedTypes: string[]) {
-    for (const type of supportedTypes) {
-        if (MediaRecorder.isTypeSupported(type)) {
-            return type;
-        }
-    }
-    throw new VerbalWebError("No supported audio format available");
 }
