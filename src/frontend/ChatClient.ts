@@ -129,6 +129,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
      * Prepares the chat connectivity for use when input is expected.
      */
     prepareChat() {
+        this.initWebSocketInactivityTimeout();
         this.pendingPrepareChat = true;
         this.updateState();
     }
