@@ -1,17 +1,24 @@
 import {
     ApiBackendChatMessage,
     ApiFrontendChatMessage,
+    ChatAudioMessageNew,
+    ChatAudioTranscription,
     ChatMessageError,
     ChatMessageErrorCode,
+    ChatMessageNew,
     ChatMessagePart,
     isApiFrontendChatMessage,
+    isChatAudioMessageNew,
 } from "../shared/api";
 import { Chat, InitialChatStateOverrides } from "../shared/chat";
+import { VerbalWebError } from "../shared/error";
+import { apiMessageToWsData, wsDataToApiMessage } from "../shared/wsdata";
 import { ChatCompletionMessage, ChatCompletionProvider, ChatCompletionRequest } from "./ChatCompletionProvider";
 import { ModerationCache } from "./ModerationCache";
 import { ModerationProvider, ModerationRejectedError } from "./ModerationProvider";
 import { RequestContext, contextFrom } from "./RequestContext";
 import { TextChunker, chunkText } from "./TextChunker";
+import { TranscriptionProvider, TranscriptionRequest } from "./TranscriptionProvider";
 import { logDebug, logError, logInfo, logInterfaceData, logThrownError } from "./log";
 import { continueRandomErrors, pauseRandomErrors } from "./randomErrors";
 import { Request } from "express";
@@ -62,6 +69,16 @@ interface ChatCompletionState {
     moderationChunker: TextChunker;
 }
 
+function toStandardWebSocketData(data: unknown): string | ArrayBuffer {
+    if (typeof data === "string" || (typeof data === "object" && data instanceof ArrayBuffer)) {
+        return data;
+    } else if (Buffer.isBuffer(data)) {
+        return data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+    } else {
+        throw new Error("Unsupported Web Socket data type");
+    }
+}
+
 /**
  * A server serving a single chat client web socket session.
  */
@@ -78,6 +95,9 @@ export class ChatServer {
     /** Web socket */
     private readonly ws;
 
+    /** Transcription provider */
+    private readonly transcription;
+
     /** Moderation provider */
     private readonly moderation;
 
@@ -89,6 +109,7 @@ export class ChatServer {
     constructor(
         req: Request,
         ws: WebSocket,
+        transcription: TranscriptionProvider | undefined,
         moderation: ModerationProvider,
         chatCompletion: ChatCompletionProvider,
         config?: ChatServerConfig,
@@ -99,12 +120,13 @@ export class ChatServer {
         this.config = config;
         this.chat = new Chat(undefined, serverOverrides);
         this.ws = ws;
+        this.transcription = transcription;
         this.moderation = new ModerationCache(moderation);
         this.chatCompletion = chatCompletion;
         this.initWebSocketInactivityTimeout();
 
-        this.ws.on("message", (data, isBinary) => {
-            this.onWebSocketMessage(data, isBinary);
+        this.ws.on("message", (data) => {
+            this.onWebSocketMessage(data);
         });
         this.ws.on("error", (err) => {
             this.onWebSocketError(err);
@@ -132,30 +154,20 @@ export class ChatServer {
         logDebug(msg, this.requestContext, ...params);
     }
 
-    private debugData(msg: string, data: unknown, ...params: unknown[]) {
+    private debugData(msg: string, data: Record<string, unknown>, ...params: unknown[]) {
         logInterfaceData(msg, this.requestContext, data, ...params);
     }
 
     private sendMessage(msg: ApiBackendChatMessage, desc: string) {
         this.debugData("Sending %s", msg, desc);
-        this.ws.send(JSON.stringify(msg));
+        this.ws.send(apiMessageToWsData(msg));
     }
 
     // On web socket message
-    private onWebSocketMessage(data: unknown, isBinary: boolean) {
+    private onWebSocketMessage(data: unknown) {
         try {
-            let processed = false;
-            if (!isBinary && (typeof data === "string" || Buffer.isBuffer(data))) {
-                const amsg: unknown = JSON.parse(data.toString());
-                if (isApiFrontendChatMessage(amsg)) {
-                    this.processChatMessage(amsg);
-                    processed = true;
-                }
-            }
-            if (!processed) {
-                this.error("Received an unrecognized message");
-                this.debugData("Unrecognized input message", data);
-            }
+            const amsg = wsDataToApiMessage(toStandardWebSocketData(data), isApiFrontendChatMessage);
+            this.processChatMessage(amsg);
         } catch (err: unknown) {
             this.handleError(err);
         }
@@ -168,9 +180,14 @@ export class ChatServer {
             this.chat.update(amsg);
             if (this.chat.backendProcessing) {
                 continueRandomErrors();
-                this.info("Chat completion requested");
                 this.clearInactivityTimer();
-                this.doChatCompletion();
+                if (isChatAudioMessageNew(amsg)) {
+                    this.info("Audio message received");
+                    this.doTranscription(amsg);
+                } else {
+                    this.info("Chat completion requested");
+                    this.doChatCompletion();
+                }
             } else {
                 this.initWebSocketInactivityTimeout();
             }
@@ -218,6 +235,38 @@ export class ChatServer {
         if (this.inactivityTimer !== undefined) {
             clearTimeout(this.inactivityTimer);
             this.inactivityTimer = undefined;
+        }
+    }
+
+    /** Handles an audio transcription request */
+    private doTranscription(amsg: ChatAudioMessageNew) {
+        if (this.transcription !== undefined) {
+            const request: TranscriptionRequest = {
+                requestContext: this.requestContext,
+                user: this.requestContext.session?.id,
+                audio: amsg.binary,
+                type: amsg.mimeType,
+            };
+            this.transcription
+                .transcribe(request)
+                .then((transcription) => {
+                    if (transcription.length === 0) {
+                        throw new VerbalWebError("Empty transcription");
+                    }
+                    const msg: ChatMessageNew = { type: "msgnew", content: transcription };
+                    this.chat.update(msg);
+                    if (this.ws.readyState === WebSocket.OPEN) {
+                        const tmsg: ChatAudioTranscription = { type: "audtrsc", transcription };
+                        this.sendMessage(tmsg, "an audio transcription");
+                        this.info("Starting chat completion of the audio transcription");
+                        this.doChatCompletion();
+                    }
+                })
+                .catch((err: unknown) => {
+                    this.handleError(err);
+                });
+        } else {
+            this.handleError(new VerbalWebError("Audio transcription not available"));
         }
     }
 

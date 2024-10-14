@@ -1,21 +1,27 @@
 import { VerbalWebError } from "../shared/error";
 import { retryWithBackoff } from "../shared/retry";
 import { ChatCompletionProvider, ChatCompletionRequest } from "./ChatCompletionProvider";
+import { Engine } from "./Engine";
 import { ModerationProvider, ModerationResult } from "./ModerationProvider";
 import { RequestContext } from "./RequestContext";
+import { TranscriptionProvider, TranscriptionRequest } from "./TranscriptionProvider";
 import { logFatal, logInfo, logInterfaceData, logThrownError } from "./log";
 import { asyncrnderr, isrnderr, withrnderr } from "./randomErrors";
 import OpenAI from "openai";
 
 const DEFAULT_CHAT_MODEL = "gpt-4o";
+const DEFAULT_TRANSCRIPTION_MODEL = "whisper-1";
 
 /** Max backoff attempts */
 const BACKOFF_MAX_ATTEMPTS = 5;
 
+/** Audio mime type to file name suffix regexp */
+const AUDIO_TYPE_SUFFIX_REGEXP = /\/(\w+)/;
+
 /**
  * AI engine based on Open AI services.
  */
-export class OpenAIEngine implements ChatCompletionProvider, ModerationProvider {
+export class OpenAIEngine implements Engine, ChatCompletionProvider, ModerationProvider, TranscriptionProvider {
     readonly textChunkerParams = {
         maxChunkSize: 2000,
         minChunkSize: 500,
@@ -34,6 +40,18 @@ export class OpenAIEngine implements ChatCompletionProvider, ModerationProvider 
         this.openai = new OpenAI({
             apiKey: apiKey,
         });
+    }
+
+    moderationProvider(): ModerationProvider {
+        return this;
+    }
+
+    chatCompletionProvider(): ChatCompletionProvider {
+        return this;
+    }
+
+    transcriptionProvider(): TranscriptionProvider {
+        return this;
     }
 
     moderation(requestContext: RequestContext, ...content: string[]): Promise<ModerationResult[]> {
@@ -119,6 +137,33 @@ export class OpenAIEngine implements ChatCompletionProvider, ModerationProvider 
                 ),
             (err) => {
                 logThrownError("Chat completion failed, retrying...", err, request.requestContext);
+            },
+            BACKOFF_MAX_ATTEMPTS,
+        );
+    }
+
+    supportedTranscriptionAudioTypes(): string[] {
+        return ["webm", "mp4", "mp3", "mpeg", "wav"].map((subtype) => "audio/" + subtype);
+    }
+
+    transcribe(request: TranscriptionRequest): Promise<string> {
+        const params: OpenAI.Audio.TranscriptionCreateParams = {
+            file: new File([request.audio], "speech." + (AUDIO_TYPE_SUFFIX_REGEXP.exec(request.type)?.[1] ?? "bin"), {
+                type: request.type,
+            }),
+            model: request.model ?? DEFAULT_TRANSCRIPTION_MODEL,
+        };
+        logInterfaceData("Sending transcription request", request.requestContext, params);
+        return retryWithBackoff(
+            () =>
+                withrnderr("wtrans", this.openai.audio.transcriptions.create(params)).then(
+                    asyncrnderr("atrans", (response) => {
+                        logInterfaceData("Received transcription response", request.requestContext, response);
+                        return response.text;
+                    }),
+                ),
+            (err) => {
+                logThrownError("Transcription failed, retrying...", err, request.requestContext);
             },
             BACKOFF_MAX_ATTEMPTS,
         );

@@ -1,4 +1,18 @@
 {
+    "audio": {
+        "error": {
+            "general": "Det gick inte att initiera ljudfunktionerna.",
+            "notallowed": "Ljud är inte tillåtet. Kontrollera webbläsarinställningar och webbplatsens behörigheter.",
+            "notfound": "Ingen kompatibel ljudingångsenhet hittades.",
+            "processing": "Det gick inte att bearbeta ljud."
+        },
+        "initializingRecording": "Initierar ljudinspelning. Vänligen tillåt ljudåtkomst för att använda röststyrning.",
+        "input": "Talkontroll",
+        "processing": "Bearbetar ljud...",
+        "recording": "Jag lyssnar på ditt tal. Sluta genom att ta en paus eller trycka på knappen.",
+        "stopRecording": "Sluta inspelning"
+    },
+    "close": "Stäng",
     "dialog": {
         "title": "AI-assistent"
     },
