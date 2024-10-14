@@ -2,10 +2,15 @@ import { VerbalWebError } from "../shared/error";
 import { TypedEvent, TypedEventTarget } from "../shared/event";
 import { logDebug, logThrownError } from "./log";
 
+const SILENCE_THRESHOLD = 0.05;
+const SILENCE_DURATION_MILLIS = 3000;
+const SOUND_DURATION_MILLIS = 500;
+
 export type AudioErrorCode = "general" | "notfound" | "notallowed" | "processing";
 
 export interface SpeechRecorderParams {
     supportedAudioTypes: string[];
+    stopAfterSilenceMillis?: boolean;
 }
 
 /**
@@ -15,12 +20,19 @@ export class SpeechRecorder extends TypedEventTarget<SpeechRecorder, SpeechRecor
     private readonly params: SpeechRecorderParams;
     private started = false;
     private stopped = false;
+    private silenceStartedAt: number | undefined;
+    private soundStartedAt: number | undefined;
+    private soundDetected = false;
+    private tryRequestAnimationFrame = typeof requestAnimationFrame === "function";
 
     recording = false;
     error: AudioErrorCode | undefined;
 
     private mediaRecorder: MediaRecorder | undefined;
     private mediaStream: MediaStream | undefined;
+    private audioContext: AudioContext | undefined;
+    private audioSource: MediaStreamAudioSourceNode | undefined;
+    private analyser: AnalyserNode | undefined;
 
     constructor(params: SpeechRecorderParams) {
         super();
@@ -48,10 +60,14 @@ export class SpeechRecorder extends TypedEventTarget<SpeechRecorder, SpeechRecor
                 })
                 .then((stream) => {
                     this.mediaStream = stream;
+
+                    // Abort if already stopped
                     if (this.stopped) {
                         this.stop();
                         return;
                     }
+
+                    // Initialize media recorder
                     this.mediaRecorder = new MediaRecorder(stream, {
                         mimeType: getAudioType(this.params.supportedAudioTypes),
                     });
@@ -67,6 +83,21 @@ export class SpeechRecorder extends TypedEventTarget<SpeechRecorder, SpeechRecor
                             this.dispatchEvent(audioEvent);
                         }
                     };
+
+                    // Initialize audio context
+                    try {
+                        this.audioContext = new AudioContext();
+                        this.audioSource = this.audioContext.createMediaStreamSource(stream);
+                        this.analyser = this.audioContext.createAnalyser();
+                        this.analyser.fftSize = 256;
+                        this.audioSource.connect(this.analyser);
+                        this.scheduleAnalyzeAudio();
+                        logDebug("Started audio analysis");
+                    } catch (err: unknown) {
+                        logThrownError("Audio analysis initialization failed", err);
+                    }
+
+                    // Start audio recording
                     logDebug("Start audio recording");
                     this.mediaRecorder.start();
                     this.recording = true;
@@ -92,6 +123,20 @@ export class SpeechRecorder extends TypedEventTarget<SpeechRecorder, SpeechRecor
             return;
         }
         this.stopped = true;
+        if (this.analyser !== undefined) {
+            this.analyser.disconnect();
+            this.analyser = undefined;
+        }
+        if (this.audioSource !== undefined) {
+            this.audioSource.disconnect();
+            this.audioSource = undefined;
+        }
+        if (this.audioContext !== undefined) {
+            this.audioContext.close().catch((err: unknown) => {
+                logThrownError("AudioContext close failed", err);
+            });
+            this.audioContext = undefined;
+        }
         if (this.mediaRecorder !== undefined && this.mediaRecorder.state !== "inactive") {
             logDebug("Stop audio recording");
             this.mediaRecorder.stop();
@@ -108,12 +153,77 @@ export class SpeechRecorder extends TypedEventTarget<SpeechRecorder, SpeechRecor
      * Closes the recorder.
      */
     close() {
+        this.clearListeners();
         this.stop();
         this.mediaRecorder = undefined;
     }
 
     private stateChanged() {
         this.dispatchEvent({ target: this, type: "state" });
+    }
+
+    private scheduleAnalyzeAudio() {
+        if (!this.stopped) {
+            if (this.tryRequestAnimationFrame) {
+                try {
+                    requestAnimationFrame((timestamp) => {
+                        this.analyzeAudio(timestamp);
+                    });
+                    return;
+                } catch (err: unknown) {
+                    logThrownError("requestAnimationFrame failed, falling back to setting timeouts", err);
+                    this.tryRequestAnimationFrame = false;
+                }
+            }
+            setTimeout(() => {
+                this.analyzeAudio(performance.now());
+            }, 1000 / 60);
+        }
+    }
+
+    private analyzeAudio(timestamp: number) {
+        if (!this.stopped && this.analyser) {
+            // RMS volume level
+            const buflen = this.analyser.frequencyBinCount;
+            const tdata = new Float32Array(buflen);
+            this.analyser.getFloatTimeDomainData(tdata);
+            let sum = 0;
+            for (let i = 0; i < buflen; i++) {
+                sum += tdata[i];
+            }
+            const mean = sum / buflen;
+            let sqsum = 0;
+            for (let i = 0; i < buflen; i++) {
+                const v = tdata[i] - mean;
+                sqsum += v * v;
+            }
+            const rms = Math.sqrt(sqsum / buflen);
+
+            // Silence detection
+            if (rms < SILENCE_THRESHOLD) {
+                if (this.silenceStartedAt === undefined) {
+                    this.silenceStartedAt = timestamp;
+                }
+                if (
+                    this.soundDetected &&
+                    this.params.stopAfterSilenceMillis &&
+                    timestamp - this.silenceStartedAt > SILENCE_DURATION_MILLIS
+                ) {
+                    this.stop();
+                }
+            } else {
+                this.silenceStartedAt = undefined;
+                if (this.soundStartedAt === undefined) {
+                    this.soundStartedAt = timestamp;
+                }
+                if (timestamp - this.soundStartedAt > SOUND_DURATION_MILLIS) {
+                    this.soundDetected = true;
+                }
+            }
+
+            // Schedule next round
+            this.scheduleAnalyzeAudio();
+        }
     }
 }
 

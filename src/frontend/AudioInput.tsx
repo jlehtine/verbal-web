@@ -24,7 +24,10 @@ export default function AudioInput({ onClose, sttConf, client }: AudioInputProps
     const [onStop, setOnStop] = useState<() => void>();
 
     useEffect(() => {
-        const recorder = new SpeechRecorder({ supportedAudioTypes: sttConf.supportedAudioTypes });
+        const recorder = new SpeechRecorder({
+            supportedAudioTypes: sttConf.supportedAudioTypes,
+            stopAfterSilenceMillis: true,
+        });
         recorder.addEventListener("state", () => {
             if (recorder.error !== error) {
                 setError(recorder.error);
