@@ -10,7 +10,7 @@ export type AudioErrorCode = "general" | "notfound" | "notallowed" | "processing
 
 export interface SpeechRecorderParams {
     supportedAudioTypes: string[];
-    stopAfterSilenceMillis?: boolean;
+    stopOnSilence?: boolean;
 }
 
 /**
@@ -206,7 +206,7 @@ export class SpeechRecorder extends TypedEventTarget<SpeechRecorder, SpeechRecor
                 }
                 if (
                     this.soundDetected &&
-                    this.params.stopAfterSilenceMillis &&
+                    this.params.stopOnSilence &&
                     timestamp - this.silenceStartedAt > SILENCE_DURATION_MILLIS
                 ) {
                     this.stop();
