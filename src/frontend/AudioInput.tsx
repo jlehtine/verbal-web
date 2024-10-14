@@ -4,24 +4,25 @@ import { AudioErrorCode, SpeechRecorder } from "./SpeechRecorder";
 import { logThrownError } from "./log";
 import CloseIcon from "@mui/icons-material/Close";
 import StopIcon from "@mui/icons-material/Stop";
-import { Alert, IconButton, Stack } from "@mui/material";
+import { Alert, Box, IconButton, Stack, useTheme } from "@mui/material";
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-const CANVAS_WIDTH = 128;
-const CANVAS_HEIGHT = 48;
+const CANVAS_SIZE = 64;
 const MIN_DB = -60;
-const MAX_DB = -3;
+const MAX_DB = -3.1;
+const SILENCE_RADIUS = 3;
+const BUFFER_SAMPLES = 64;
 
 export interface AudioInputProps {
     onClose: () => void;
-    isSmallScreen: boolean;
     sttConf: SpeechToTextConfig;
     client: ChatClient;
 }
 
 export default function AudioInput({ onClose, sttConf, client }: AudioInputProps) {
     const { t } = useTranslation();
+    const theme = useTheme();
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     const [error, setError] = useState<AudioErrorCode>();
@@ -68,13 +69,16 @@ export default function AudioInput({ onClose, sttConf, client }: AudioInputProps
                         const tdata = new Float32Array(buflen);
                         analyser.getFloatTimeDomainData(tdata);
 
-                        // Clear canvas
-                        ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+                        // Volume in dB
+                        const db = 20 * Math.log10(event.rms);
 
-                        // Visualize audio waveform
-                        const rms = event.rms;
-                        ctx.fillStyle = "blue";
-                        if (!event.silence) {
+                        // Clear canvas
+                        ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+                        ctx.fillStyle = theme.palette.primary.main;
+
+                        // Visualize volume and audio waveform
+                        if (!event.silence && db > MIN_DB) {
+                            // Calculate the scaling factor for wave form
                             let maxabs = 0;
                             for (let i = 0; i < buflen; i++) {
                                 const abs = Math.abs(tdata[i]);
@@ -82,40 +86,41 @@ export default function AudioInput({ onClose, sttConf, client }: AudioInputProps
                                     maxabs = abs;
                                 }
                             }
-                            let index = 0;
-                            for (let i = 0; i < CANVAS_WIDTH; i++) {
-                                const nextIndex = Math.floor(((i + 1) / CANVAS_WIDTH) * buflen);
-                                let rv = 0;
-                                for (let j = index; j < nextIndex; j++) {
-                                    const d = tdata[j];
-                                    if (rv === 0 || Math.abs(d) > Math.abs(rv)) {
-                                        rv = d;
-                                    }
+                            const normf = maxabs === 0 ? 1 : 1 / maxabs;
+
+                            // Volume factor
+                            const dbf = Math.min((db - MIN_DB) / (MAX_DB - MIN_DB), 1);
+                            const wf = (dbf * CANVAS_SIZE) / 4;
+                            const vf = dbf * (CANVAS_SIZE / 2 - wf - SILENCE_RADIUS);
+
+                            // Draw waveform amplified by volume factor
+                            const samples = Math.min(BUFFER_SAMPLES, buflen);
+                            const points = 2 * samples - 2;
+                            ctx.beginPath();
+                            for (let i = 0; i < points; i++) {
+                                const index = i < samples ? i : 2 * samples - i - 1;
+                                const angle = (i / points + event.timestamp / 10000) * Math.PI * 2;
+                                const radius = SILENCE_RADIUS + vf + tdata[index] * normf * wf;
+                                if (i === 0) {
+                                    ctx.moveTo(
+                                        CANVAS_SIZE / 2 + Math.cos(angle) * radius,
+                                        CANVAS_SIZE / 2 + Math.sin(angle) * radius,
+                                    );
+                                } else {
+                                    ctx.lineTo(
+                                        CANVAS_SIZE / 2 + Math.cos(angle) * radius,
+                                        CANVAS_SIZE / 2 + Math.sin(angle) * radius,
+                                    );
                                 }
-                                const value = rv / maxabs;
-                                const y0 = CANVAS_HEIGHT / 2;
-                                const y1 = y0 + (CANVAS_HEIGHT / 2) * value;
-                                const y = y0 < y1 ? y0 : y1;
-                                const h = Math.abs(y0 - y1);
-                                ctx.fillRect(i, y, 1, h);
-                                index = nextIndex;
                             }
+                            ctx.fill();
                         }
 
-                        // Always display a horizontal line at the center
-                        ctx.fillRect(0, CANVAS_HEIGHT / 2, CANVAS_WIDTH, 2);
-
-                        // Visualize dB volume level
-                        if (!event.silence) {
-                            const db = 20 * Math.log10(rms);
-                            if (db >= MIN_DB) {
-                                const wr = ((CANVAS_WIDTH / 2) * (db - MIN_DB)) / (MAX_DB - MIN_DB);
-                                ctx.strokeStyle = "red";
-                                ctx.lineWidth = 4;
-                                ctx.beginPath();
-                                ctx.ellipse(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, wr, wr / 5, 0, 0, 2 * Math.PI);
-                                ctx.stroke();
-                            }
+                        // Or visualize silence
+                        else {
+                            ctx.beginPath();
+                            ctx.ellipse(CANVAS_SIZE / 2, CANVAS_SIZE / 2, 3, 3, 0, 0, 2 * Math.PI);
+                            ctx.fill();
                         }
                     }
                 } catch (err: unknown) {
@@ -133,30 +138,34 @@ export default function AudioInput({ onClose, sttConf, client }: AudioInputProps
     }, []);
 
     return (
-        <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ mt: 3, mb: 3, mr: 2 }}>
-            {error !== undefined ? (
-                <Alert severity="error" variant="filled">
-                    {t("audio.error." + error)}
-                </Alert>
-            ) : processing ? (
-                <Alert severity="info">{t("audio.processing")}</Alert>
-            ) : onStop === undefined ? (
-                <Alert severity="info">{t("audio.initializingRecording")}</Alert>
-            ) : (
-                <Stack direction="row" spacing={2}>
-                    <Alert severity="info">{t("audio.recording")}</Alert>
-                    <canvas width={CANVAS_WIDTH} height={CANVAS_HEIGHT} ref={canvasRef}></canvas>
-                </Stack>
-            )}
-            {error !== undefined || processing || onStop === undefined ? (
-                <IconButton onClick={onClose}>
-                    <CloseIcon />
-                </IconButton>
-            ) : (
-                <IconButton onClick={onStop} sx={{ color: "red" }}>
-                    <StopIcon />
-                </IconButton>
-            )}
-        </Stack>
+        <Box sx={{ mt: 2 }}>
+            <Stack direction="row" spacing={2} justifyContent="flex-end" alignItems="center">
+                {error !== undefined ? (
+                    <Alert severity="error" variant="filled">
+                        {t("audio.error." + error)}
+                    </Alert>
+                ) : processing ? (
+                    <Alert severity="info">{t("audio.processing")}</Alert>
+                ) : onStop === undefined ? (
+                    <Alert severity="info">{t("audio.initializingRecording")}</Alert>
+                ) : (
+                    <Stack direction="row" spacing={2} alignItems="center">
+                        <Alert severity="info">{t("audio.recording")}</Alert>
+                        <canvas width={CANVAS_SIZE} height={CANVAS_SIZE} ref={canvasRef}></canvas>
+                    </Stack>
+                )}
+                <Box sx={{ pt: 1.5, pb: 1.5, pr: 1.5 }}>
+                    {error !== undefined || processing || onStop === undefined ? (
+                        <IconButton onClick={onClose}>
+                            <CloseIcon />
+                        </IconButton>
+                    ) : (
+                        <IconButton onClick={onStop} sx={{ color: theme.palette.error.main }}>
+                            <StopIcon />
+                        </IconButton>
+                    )}
+                </Box>
+            </Stack>
+        </Box>
     );
 }

@@ -169,7 +169,6 @@ export default function ChatView({ client, fullHeight }: ChatViewProps) {
                             onClose={() => {
                                 closeAudioInput();
                             }}
-                            isSmallScreen={isSmallScreen}
                             sttConf={client.sharedConfig.speechToText}
                             client={client}
                         />
