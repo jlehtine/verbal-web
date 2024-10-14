@@ -2,9 +2,11 @@ import { VerbalWebError } from "../shared/error";
 import { TypedEvent, TypedEventTarget } from "../shared/event";
 import { logDebug, logThrownError } from "./log";
 
-const SILENCE_THRESHOLD = 0.05;
+const FFT_SIZE = 1024;
+const SILENCE_THRESHOLD = 0.03;
+const SOUND_THRESHOLD = 0.01;
 const SILENCE_DURATION_MILLIS = 3000;
-const SOUND_DURATION_MILLIS = 500;
+const SOUND_DURATION_MILLIS = 100;
 
 export type AudioErrorCode = "general" | "notfound" | "notallowed" | "processing";
 
@@ -74,7 +76,7 @@ export class SpeechRecorder extends TypedEventTarget<SpeechRecorder, SpeechRecor
                     this.mediaRecorder.ondataavailable = (event: BlobEvent) => {
                         if (event.data.size > 0) {
                             logDebug("Processing recorded audio");
-                            const audioEvent: SpeechRecorderAudio = {
+                            const audioEvent: SpeechRecorderAudioEvent = {
                                 target: this,
                                 type: "audio",
                                 blob: event.data,
@@ -89,7 +91,7 @@ export class SpeechRecorder extends TypedEventTarget<SpeechRecorder, SpeechRecor
                         this.audioContext = new AudioContext();
                         this.audioSource = this.audioContext.createMediaStreamSource(stream);
                         this.analyser = this.audioContext.createAnalyser();
-                        this.analyser.fftSize = 256;
+                        this.analyser.fftSize = FFT_SIZE;
                         this.audioSource.connect(this.analyser);
                         this.scheduleAnalyzeAudio();
                         logDebug("Started audio analysis");
@@ -182,11 +184,12 @@ export class SpeechRecorder extends TypedEventTarget<SpeechRecorder, SpeechRecor
     }
 
     private analyzeAudio(timestamp: number) {
-        if (!this.stopped && this.analyser) {
+        const analyser = this.analyser;
+        if (!this.stopped && analyser) {
             // RMS volume level
-            const buflen = this.analyser.frequencyBinCount;
+            const buflen = analyser.frequencyBinCount;
             const tdata = new Float32Array(buflen);
-            this.analyser.getFloatTimeDomainData(tdata);
+            analyser.getFloatTimeDomainData(tdata);
             let sum = 0;
             for (let i = 0; i < buflen; i++) {
                 sum += tdata[i];
@@ -200,6 +203,7 @@ export class SpeechRecorder extends TypedEventTarget<SpeechRecorder, SpeechRecor
             const rms = Math.sqrt(sqsum / buflen);
 
             // Silence detection
+            let silence;
             if (rms < SILENCE_THRESHOLD) {
                 if (this.silenceStartedAt === undefined) {
                     this.silenceStartedAt = timestamp;
@@ -211,8 +215,12 @@ export class SpeechRecorder extends TypedEventTarget<SpeechRecorder, SpeechRecor
                 ) {
                     this.stop();
                 }
+                silence = true;
             } else {
                 this.silenceStartedAt = undefined;
+                silence = false;
+            }
+            if (!this.soundDetected && rms > SOUND_THRESHOLD) {
                 if (this.soundStartedAt === undefined) {
                     this.soundStartedAt = timestamp;
                 }
@@ -220,6 +228,17 @@ export class SpeechRecorder extends TypedEventTarget<SpeechRecorder, SpeechRecor
                     this.soundDetected = true;
                 }
             }
+
+            // Send analyser event
+            const event: SpeechRecorderAnalyserEvent = {
+                target: this,
+                type: "analyser",
+                timestamp,
+                analyser,
+                rms,
+                silence,
+            };
+            this.dispatchEvent(event);
 
             // Schedule next round
             this.scheduleAnalyzeAudio();
@@ -237,13 +256,21 @@ function getAudioType(supportedAudioTypes: string[]) {
 }
 
 interface SpeechRecorderEventMap {
-    state: SpeechRecorderState;
-    audio: SpeechRecorderAudio;
+    state: SpeechRecorderStateEvent;
+    analyser: SpeechRecorderAnalyserEvent;
+    audio: SpeechRecorderAudioEvent;
 }
 
-export type SpeechRecorderState = TypedEvent<SpeechRecorder, "state">;
+export type SpeechRecorderStateEvent = TypedEvent<SpeechRecorder, "state">;
 
-export interface SpeechRecorderAudio extends TypedEvent<SpeechRecorder, "audio"> {
+export interface SpeechRecorderAnalyserEvent extends TypedEvent<SpeechRecorder, "analyser"> {
+    timestamp: number;
+    analyser: AnalyserNode;
+    rms: number;
+    silence: boolean;
+}
+
+export interface SpeechRecorderAudioEvent extends TypedEvent<SpeechRecorder, "audio"> {
     blob: Blob;
     timecode: number;
 }
