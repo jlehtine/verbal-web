@@ -1,5 +1,5 @@
 import { ChatMessage } from "../shared/api";
-import AudioInputDialog from "./AudioInputDialog";
+import AudioInput from "./AudioInput";
 import { ChatClient, ChatConnectionState } from "./ChatClient";
 import LoadingIndicator from "./LoadingIndicator";
 import MarkdownContent from "./MarkdownContent";
@@ -156,14 +156,24 @@ export default function ChatView({ client, fullHeight }: ChatViewProps) {
                     </Box>
                 </Suspense>
                 <Box ref={tailRef} {...(fullHeight ? { sx: { flex: "0 0 auto" } } : {})}>
-                    {errorMessage ? (
+                    {errorMessage && (
                         <Box sx={{ mt: 2, ...(isSmallScreen || waitingForResponse ? {} : { pl: 12 }) }}>
                             <Alert variant="filled" severity="error">
                                 {errorMessage}
                             </Alert>
                         </Box>
-                    ) : null}
-                    {!waitingForResponse && (
+                    )}
+                    {audioInput !== undefined && client.sharedConfig?.speechToText ? (
+                        <AudioInput
+                            key={audioInput}
+                            onClose={() => {
+                                closeAudioInput();
+                            }}
+                            isSmallScreen={isSmallScreen}
+                            sttConf={client.sharedConfig.speechToText}
+                            client={client}
+                        />
+                    ) : !waitingForResponse ? (
                         <Box
                             sx={{
                                 mt: 2,
@@ -186,10 +196,9 @@ export default function ChatView({ client, fullHeight }: ChatViewProps) {
                                 />
                             </Box>
                         </Box>
-                    )}
-                    {waitingForResponse ? (
+                    ) : (
                         <LinearProgress color={errorMessage ? "error" : "primary"} sx={{ marginTop: 1 }} />
-                    ) : null}
+                    )}
                 </Box>
                 {poweredByHtml.length > 0 && (
                     <Box {...(fullHeight ? { sx: { flex: "0 0 auto" } } : {})}>
@@ -201,18 +210,6 @@ export default function ChatView({ client, fullHeight }: ChatViewProps) {
                     </Box>
                 )}
             </Box>
-            {audioInput !== undefined && client.sharedConfig?.speechToText && (
-                <AudioInputDialog
-                    open={true}
-                    key={audioInput}
-                    onClose={() => {
-                        closeAudioInput();
-                    }}
-                    isSmallScreen={isSmallScreen}
-                    sttConf={client.sharedConfig.speechToText}
-                    client={client}
-                />
-            )}
         </>
     );
 }
@@ -287,14 +284,14 @@ function ChatInput({
                         <InputAdornment position="end">
                             {speechToTextSupported && inputEmpty ? (
                                 <Tooltip title={t("audio.input")}>
-                                    <IconButton color="primary" onClick={useAudioInput} sx={{ p: 0 }}>
+                                    <IconButton color="primary" onClick={useAudioInput}>
                                         <MicIcon />
                                     </IconButton>
                                 </Tooltip>
                             ) : (
                                 !inputEmpty && (
                                     <Tooltip title={t("input.submit")}>
-                                        <IconButton color="primary" onClick={doSubmit} sx={{ p: 0 }}>
+                                        <IconButton color="primary" onClick={doSubmit}>
                                             <AssistantIcon />
                                         </IconButton>
                                     </Tooltip>
