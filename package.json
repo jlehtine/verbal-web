@@ -94,7 +94,7 @@
         "start": "node server.js -v --static static-example"
     },
     "lint-staged": {
-        "**/*.{ts,tsx}": "eslint",
+        "src/**/*.{ts,tsx}": "eslint",
         "**/*": "prettier --write --ignore-unknown"
     },
     "browserslist": [

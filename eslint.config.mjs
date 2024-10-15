@@ -8,6 +8,7 @@ export default tseslint.config(
     ...tseslint.configs.stylisticTypeChecked,
     ...tseslint.configs.strictTypeChecked,
     {
+        files: ["src/**/*.{ts,tsx}"],
         languageOptions: {
             parserOptions: {
                 project: true,
@@ -15,7 +16,7 @@ export default tseslint.config(
         },
     },
     {
-        files: ["**/*.test.ts"],
+        files: ["src/**/*.test.ts"],
         ...jest.configs["flat/recommended"],
         ...jest.configs["flat/style"],
     },
