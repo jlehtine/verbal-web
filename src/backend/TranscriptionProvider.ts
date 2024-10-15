@@ -4,9 +4,6 @@ import { RequestContext } from "./RequestContext";
  * Request for transcription.
  */
 export interface TranscriptionRequest {
-    /** Context details for the request */
-    requestContext: RequestContext;
-
     /** Model identifier */
     model?: string;
 
@@ -34,8 +31,9 @@ export interface TranscriptionProvider {
     /**
      * Transcribe speech to text. Returns asynchronously the transcription.
      *
+     * @param requestContext context details for the request
      * @param request speech-to-text request
      * @returns transcription
      */
-    transcribe(request: TranscriptionRequest): Promise<string>;
+    transcribe(requestContext: RequestContext, request: TranscriptionRequest): Promise<string>;
 }

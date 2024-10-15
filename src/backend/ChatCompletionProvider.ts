@@ -4,9 +4,6 @@ import { RequestContext } from "./RequestContext";
  * Generic chat completion request.
  */
 export interface ChatCompletionRequest {
-    /** Context details for the request */
-    requestContext: RequestContext;
-
     /** Model identifier */
     model?: string;
 
@@ -32,8 +29,9 @@ export interface ChatCompletionProvider {
     /**
      * Perform chat completion. Returns asynchronously iterable list of updates.
      *
+     * @param requestContext context details for the request
      * @param request chat completion request
      * @return one or more updates asynchronously as API backend messages
      */
-    chatCompletion(request: ChatCompletionRequest): Promise<AsyncIterable<string>>;
+    chatCompletion(requestContext: RequestContext, request: ChatCompletionRequest): Promise<AsyncIterable<string>>;
 }

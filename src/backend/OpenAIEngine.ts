@@ -92,14 +92,14 @@ export class OpenAIEngine implements Engine, ChatCompletionProvider, ModerationP
         );
     }
 
-    chatCompletion(request: ChatCompletionRequest): Promise<AsyncIterable<string>> {
+    chatCompletion(requestContext: RequestContext, request: ChatCompletionRequest): Promise<AsyncIterable<string>> {
         const params: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
             model: request.model ?? DEFAULT_CHAT_MODEL,
             user: request.user,
             messages: request.messages,
             stream: true,
         };
-        logInterfaceData("Sending chat completion request", request.requestContext, params);
+        logInterfaceData("Sending chat completion request", requestContext, params);
         return retryWithBackoff(
             () =>
                 withrnderr("wchat", this.openai.chat.completions.create(params)).then(
@@ -118,7 +118,7 @@ export class OpenAIEngine implements Engine, ChatCompletionProvider, ModerationP
                                                     } else {
                                                         logInterfaceData(
                                                             "Received a chat completion chunk",
-                                                            request.requestContext,
+                                                            requestContext,
                                                             value,
                                                         );
                                                         return { value: value.choices[0]?.delta?.content ?? "" };
@@ -136,7 +136,7 @@ export class OpenAIEngine implements Engine, ChatCompletionProvider, ModerationP
                     }),
                 ),
             (err) => {
-                logThrownError("Chat completion failed, retrying...", err, request.requestContext);
+                logThrownError("Chat completion failed, retrying...", err, requestContext);
             },
             BACKOFF_MAX_ATTEMPTS,
         );
@@ -146,24 +146,24 @@ export class OpenAIEngine implements Engine, ChatCompletionProvider, ModerationP
         return ["webm", "mp4", "mp3", "mpeg", "wav"].map((subtype) => "audio/" + subtype);
     }
 
-    transcribe(request: TranscriptionRequest): Promise<string> {
+    transcribe(requestContext: RequestContext, request: TranscriptionRequest): Promise<string> {
         const params: OpenAI.Audio.TranscriptionCreateParams = {
             file: new File([request.audio], "speech." + (AUDIO_TYPE_SUFFIX_REGEXP.exec(request.type)?.[1] ?? "bin"), {
                 type: request.type,
             }),
             model: request.model ?? DEFAULT_TRANSCRIPTION_MODEL,
         };
-        logInterfaceData("Sending transcription request", request.requestContext, params);
+        logInterfaceData("Sending transcription request", requestContext, params);
         return retryWithBackoff(
             () =>
                 withrnderr("wtrans", this.openai.audio.transcriptions.create(params)).then(
                     asyncrnderr("atrans", (response) => {
-                        logInterfaceData("Received transcription response", request.requestContext, response);
+                        logInterfaceData("Received transcription response", requestContext, response);
                         return response.text;
                     }),
                 ),
             (err) => {
-                logThrownError("Transcription failed, retrying...", err, request.requestContext);
+                logThrownError("Transcription failed, retrying...", err, requestContext);
             },
             BACKOFF_MAX_ATTEMPTS,
         );

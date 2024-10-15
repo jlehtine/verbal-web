@@ -242,13 +242,12 @@ export class ChatServer {
     private doTranscription(amsg: ChatAudioMessageNew) {
         if (this.transcription !== undefined) {
             const request: TranscriptionRequest = {
-                requestContext: this.requestContext,
                 user: this.requestContext.session?.id,
                 audio: amsg.binary,
                 type: amsg.mimeType,
             };
             this.transcription
-                .transcribe(request)
+                .transcribe(this.requestContext, request)
                 .then((transcription) => {
                     if (transcription.length === 0) {
                         throw new VerbalWebError("Empty transcription");
@@ -284,7 +283,6 @@ export class ChatServer {
 
         // Construct a chat completion request
         const request: ChatCompletionRequest = {
-            requestContext: this.requestContext,
             model: this.chat.state.model,
             user: this.requestContext.session?.id,
             messages: [...systemInstructions, ...this.chat.state.messages],
@@ -307,7 +305,7 @@ export class ChatServer {
                     moderationChunker: new TextChunker(this.moderation.textChunkerParams),
                 };
                 this.chatCompletion
-                    .chatCompletion(request)
+                    .chatCompletion(this.requestContext, request)
                     .then((iterable) => {
                         const iterator = iterable[Symbol.asyncIterator]();
                         const doIter = () => {
