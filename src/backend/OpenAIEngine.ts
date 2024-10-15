@@ -2,7 +2,7 @@ import { VerbalWebError } from "../shared/error";
 import { retryWithBackoff } from "../shared/retry";
 import { ChatCompletionProvider, ChatCompletionRequest } from "./ChatCompletionProvider";
 import { Engine } from "./Engine";
-import { ModerationProvider, ModerationResult } from "./ModerationProvider";
+import { ModerationProvider, ModerationRequest, ModerationResult } from "./ModerationProvider";
 import { RequestContext } from "./RequestContext";
 import { TranscriptionProvider, TranscriptionRequest } from "./TranscriptionProvider";
 import { logFatal, logInfo, logInterfaceData, logThrownError } from "./log";
@@ -54,14 +54,14 @@ export class OpenAIEngine implements Engine, ChatCompletionProvider, ModerationP
         return this;
     }
 
-    moderation(requestContext: RequestContext, ...content: string[]): Promise<ModerationResult[]> {
+    moderation(requestContext: RequestContext, request: ModerationRequest): Promise<ModerationResult[]> {
         return Promise.all(
-            content.map((c) => {
-                const request: OpenAI.ModerationCreateParams = { input: c };
-                logInterfaceData("Sending moderation request", requestContext, request);
+            request.content.map((c) => {
+                const req: OpenAI.ModerationCreateParams = { model: request.model, input: c };
+                logInterfaceData("Sending moderation request", requestContext, req);
                 return retryWithBackoff(
                     () =>
-                        withrnderr("wmod", this.openai.moderations.create(request)).then(
+                        withrnderr("wmod", this.openai.moderations.create(req)).then(
                             asyncrnderr("amod", (response) => {
                                 logInterfaceData("Received moderation response", requestContext, response);
                                 if (response.results.length !== 1) {

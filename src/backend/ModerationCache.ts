@@ -1,4 +1,4 @@
-import { ModerationProvider, ModerationRejectedError, ModerationResult } from "./ModerationProvider";
+import { ModerationProvider, ModerationRejectedError, ModerationRequest, ModerationResult } from "./ModerationProvider";
 import { RequestContext } from "./RequestContext";
 
 const MODERATION_CACHE_EXPIRE_MILLIS = process.env.VW_MODERATION_CACHE_EXPIRE_SECONDS
@@ -38,8 +38,8 @@ export class ModerationCache implements ModerationProvider {
         return this.moderationProvider.textChunkerParams;
     }
 
-    checkModeration(requestContext: RequestContext, ...content: string[]): Promise<void> {
-        return this.moderation(requestContext, ...content).then((mrs) => {
+    checkModeration(requestContext: RequestContext, request: ModerationRequest): Promise<void> {
+        return this.moderation(requestContext, request).then((mrs) => {
             for (const mr of mrs) {
                 if (mr.flagged) {
                     throw new ModerationRejectedError(mr.reason);
@@ -48,9 +48,9 @@ export class ModerationCache implements ModerationProvider {
         });
     }
 
-    moderation(requestContext: RequestContext, ...content: string[]): Promise<ModerationResult[]> {
+    moderation(requestContext: RequestContext, request: ModerationRequest): Promise<ModerationResult[]> {
         this.cleanModerationCache();
-        const cachedResults = new Map(content.map((c) => [c, this.cache.get(c)?.result]));
+        const cachedResults = new Map(request.content.map((c) => [c, this.cache.get(c)?.result]));
         const res: ModerationResult[] = [];
         for (const r of cachedResults) {
             const mr = r[1];
@@ -64,7 +64,7 @@ export class ModerationCache implements ModerationProvider {
         const contentToCheck = [
             ...new Set([...cachedResults.entries()].filter((r) => r[1] === undefined).map((r) => r[0])),
         ];
-        return this.moderationProvider.moderation(requestContext, ...contentToCheck).then((results) => {
+        return this.moderationProvider.moderation(requestContext, { content: contentToCheck }).then((results) => {
             results.forEach((r) => this.cache.set(r.content, { created: Date.now(), result: r }));
             const resultsMap = new Map(results.map((r) => [r.content, r]));
             return [

@@ -1,4 +1,4 @@
-import { ModerationProvider, ModerationResult } from "./ModerationProvider";
+import { ModerationProvider, ModerationRequest, ModerationResult } from "./ModerationProvider";
 import { RequestContext } from "./RequestContext";
 import { TextChunkerParams } from "./TextChunker";
 
@@ -13,7 +13,7 @@ export class NoModerationProvider implements ModerationProvider {
         minChunkOverlap: 0,
     };
 
-    moderation(requestContext: RequestContext, ...content: string[]): Promise<ModerationResult[]> {
-        return Promise.resolve(content.map((c) => ({ content: c, flagged: false })));
+    moderation(requestContext: RequestContext, request: ModerationRequest): Promise<ModerationResult[]> {
+        return Promise.resolve(request.content.map((c) => ({ content: c, flagged: false })));
     }
 }

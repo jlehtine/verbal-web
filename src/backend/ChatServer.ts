@@ -47,6 +47,12 @@ export interface ChatServerConfig {
 
 /** Internal chat completion state */
 interface ChatCompletionState {
+    /** Moderation model */
+    moderationModel?: string;
+
+    /** User identifier */
+    user?: string;
+
     /** Chat completion received so far */
     completion: string;
 
@@ -293,10 +299,11 @@ export class ChatServer {
             .map((m) => m.content)
             .flatMap((c) => chunkText(this.moderation.textChunkerParams, c));
         this.moderation
-            .checkModeration(this.requestContext, ...moderationContent)
+            .checkModeration(this.requestContext, { user: request.user, content: moderationContent })
             .then(() => {
                 // Perform (streaming) chat completion
                 const state: ChatCompletionState = {
+                    user: request.user,
                     completion: "",
                     done: false,
                     sent: 0,
@@ -360,7 +367,11 @@ export class ChatServer {
                 const moderationInput = state.completion.slice(value.start, value.end);
                 state.moderationPending = true;
                 this.moderation
-                    .checkModeration(this.requestContext, moderationInput)
+                    .checkModeration(this.requestContext, {
+                        model: state.moderationModel,
+                        user: state.user,
+                        content: [moderationInput],
+                    })
                     .then(() => {
                         state.moderationPending = false;
                         state.moderated = value.end;

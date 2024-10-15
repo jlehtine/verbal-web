@@ -10,6 +10,20 @@ export class ModerationRejectedError extends VerbalWebError {
     }
 }
 
+/**
+ * Generic moderation request.
+ */
+export interface ModerationRequest {
+    /** Model identifier */
+    model?: string;
+
+    /** User identifier */
+    user?: string;
+
+    /** Content to be checked */
+    content: string[];
+}
+
 /** Moderation result for individual content */
 export interface ModerationResult {
     /** Content */
@@ -35,8 +49,7 @@ export interface ModerationProvider {
      * either `true` if accepted or `false` if rejected. Results array
      * may stop after the first flagged content.
      *
-     * @param requestContext Context details for the request
-     * @param content content to be checked
+     * @param request moderation request
      */
-    moderation(requestContext: RequestContext, ...content: string[]): Promise<ModerationResult[]>;
+    moderation(requestContext: RequestContext, request: ModerationRequest): Promise<ModerationResult[]>;
 }
