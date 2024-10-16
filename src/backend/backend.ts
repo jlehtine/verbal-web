@@ -60,6 +60,8 @@ options:
         session expiration time in days (default is 30 days, or a month)
     --disable-speech-to-text
         disable speech-to-text feature, if available
+    --disable-realtime
+        disable realtime conversation feature, if available
     -v, --verbose
         increase logging, use multiple times for even more verbose logging
     --random-errors
@@ -76,6 +78,7 @@ let allowUsers = parseAllowUsers(process.env.VW_ALLOW_USERS);
 let googleOAuthClientId = process.env.VW_GOOGLE_OAUTH_CLIENT_ID;
 let sessionExpirationDays = parseNumber(process.env.VW_SESSION_EXPIRATION) ?? 30;
 let enableSpeechToText = parseBoolean(process.env.VW_ENABLE_SPEECH_TO_TEXT) ?? true;
+let enableRealtime = parseBoolean(process.env.VW_ENABLE_REALTIME) ?? true;
 let logLevel = process.env.VW_LOG_LEVEL ? parseInt(process.env.VW_LOG_LEVEL) : 0;
 let randomErrors = process.env.VW_RANDOM_ERRORS !== undefined;
 for (let i = 2; i < process.argv.length; i++) {
@@ -100,6 +103,8 @@ for (let i = 2; i < process.argv.length; i++) {
         sessionExpirationDays = parseNumber(safeNextArg(process.argv, ++i));
     } else if (a === "--disable-speech-to-text") {
         enableSpeechToText = false;
+    } else if (a === "--disable-realtime") {
+        enableRealtime = false;
     } else if (a === "-v" || a === "--verbose") {
         logLevel++;
     } else if (a === "--random-errors") {
@@ -223,6 +228,7 @@ const engine: Engine = new OpenAIEngine();
 const moderation = engine.moderationProvider();
 const chatCompletion = engine.chatCompletionProvider();
 const transcription = enableSpeechToText ? engine.transcriptionProvider() : undefined;
+const realtime = enableRealtime ? engine.realtimeProvider() : undefined;
 
 // Use WebSocket Express
 const backend = new WebSocketExpress();
@@ -333,6 +339,14 @@ function handleConfRequest(req: Request, res: Response) {
             : {}),
         ...(transcription
             ? { speechToText: { supportedAudioTypes: transcription.supportedTranscriptionAudioTypes() } }
+            : {}),
+        ...(realtime
+            ? {
+                  realtime: {
+                      supportedInputAudioTypes: realtime.supportedRealtimeInputAudioTypes(),
+                      supportedOutputAudioTypes: realtime.supportedRealtimeOutputAudioTypes(),
+                  },
+              }
             : {}),
     };
     res.json(clientConf);

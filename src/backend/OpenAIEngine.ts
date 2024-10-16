@@ -60,6 +60,10 @@ export class OpenAIEngine
         return this;
     }
 
+    realtimeProvider(): RealtimeProvider {
+        return this;
+    }
+
     moderation(requestContext: RequestContext, request: ModerationRequest): Promise<ModerationResult[]> {
         return Promise.all(
             request.content.map((c) => {
