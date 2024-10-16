@@ -1,5 +1,6 @@
 import { VerbalWebError } from "../shared/error";
 import { TypedEvent, TypedEventTarget } from "../shared/event";
+import { AudioAnalyserEvent, AudioAnalyserEventMap, AudioAnalyserEventTarget } from "./AudioAnalyserEvent";
 import { logDebug, logThrownError } from "./log";
 
 const FFT_SIZE = 1024;
@@ -18,7 +19,10 @@ export interface SpeechRecorderParams {
 /**
  * Records speech from the microphone.
  */
-export class SpeechRecorder extends TypedEventTarget<SpeechRecorder, SpeechRecorderEventMap> {
+export class SpeechRecorder
+    extends TypedEventTarget<SpeechRecorder, SpeechRecorderEventMap>
+    implements AudioAnalyserEventTarget<SpeechRecorder>
+{
     private readonly params: SpeechRecorderParams;
     private started = false;
     private stopped = false;
@@ -245,7 +249,7 @@ export class SpeechRecorder extends TypedEventTarget<SpeechRecorder, SpeechRecor
             }
 
             // Send analyser event
-            const event: SpeechRecorderAnalyserEvent = {
+            const event: AudioAnalyserEvent<SpeechRecorder> = {
                 target: this,
                 type: "analyser",
                 timestamp,
@@ -270,20 +274,12 @@ function getAudioType(supportedAudioTypes: string[]) {
     throw new VerbalWebError("No supported audio format available");
 }
 
-interface SpeechRecorderEventMap {
+interface SpeechRecorderEventMap extends AudioAnalyserEventMap<SpeechRecorder> {
     state: SpeechRecorderStateEvent;
-    analyser: SpeechRecorderAnalyserEvent;
     audio: SpeechRecorderAudioEvent;
 }
 
 export type SpeechRecorderStateEvent = TypedEvent<SpeechRecorder, "state">;
-
-export interface SpeechRecorderAnalyserEvent extends TypedEvent<SpeechRecorder, "analyser"> {
-    timestamp: number;
-    analyser: AnalyserNode;
-    rms: number;
-    silence: boolean;
-}
 
 export interface SpeechRecorderAudioEvent extends TypedEvent<SpeechRecorder, "audio"> {
     blob: Blob;
