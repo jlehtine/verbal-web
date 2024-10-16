@@ -281,20 +281,19 @@ function ChatInput({
                     onKeyDown: onInputKeyDown,
                     endAdornment: (
                         <InputAdornment position="end">
-                            {speechToTextSupported && inputEmpty ? (
+                            {speechToTextSupported && inputEmpty && (
                                 <Tooltip title={t("audio.input")}>
                                     <IconButton color="primary" onClick={useAudioInput}>
                                         <MicIcon />
                                     </IconButton>
                                 </Tooltip>
-                            ) : (
-                                !inputEmpty && (
-                                    <Tooltip title={t("input.submit")}>
-                                        <IconButton color="primary" onClick={doSubmit}>
-                                            <AssistantIcon />
-                                        </IconButton>
-                                    </Tooltip>
-                                )
+                            )}
+                            {!inputEmpty && (
+                                <Tooltip title={t("input.submit")}>
+                                    <IconButton color="primary" onClick={doSubmit}>
+                                        <AssistantIcon />
+                                    </IconButton>
+                                </Tooltip>
                             )}
                         </InputAdornment>
                     ),
