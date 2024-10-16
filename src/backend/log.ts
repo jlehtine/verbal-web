@@ -25,7 +25,7 @@ export function setLogLevel(level: number) {
     logLevel = level;
 }
 
-export function logFatal(msg: string, ...params: unknown[]) {
+export function logFatal(msg: string, ...params: unknown[]): never {
     console.error(msg, ...params);
     return process.exit(1);
 }
