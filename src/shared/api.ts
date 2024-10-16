@@ -6,6 +6,8 @@ export interface SharedConfig {
     auth?: AuthConfig;
     /** Speech-to-text configuration, if speech-to-text support */
     speechToText?: SpeechToTextConfig;
+    /** Realtime conversation configuration, if realtime supported */
+    realtime?: RealtimeConfig;
 }
 
 /** Authentication configuration */
@@ -22,14 +24,27 @@ export interface SpeechToTextConfig {
     supportedAudioTypes: string[];
 }
 
+/** Realtime configuration */
+export interface RealtimeConfig {
+    /** Supported realtime audio input types */
+    supportedInputAudioTypes: string[];
+    /** Supported realtime audio output types */
+    supportedOutputAudioTypes: string[];
+}
+
 /** API chat messages */
 export type ApiChatMessage = ApiFrontendChatMessage | ApiBackendChatMessage;
 
 /** API messages sent by the frontend over web socket */
-export type ApiFrontendChatMessage = ChatInit | ChatMessageNew | ChatAudioMessageNew;
+export type ApiFrontendChatMessage =
+    | ChatInit
+    | ChatMessageNew
+    | ChatAudioMessageNew
+    | ChatRealtimeAudio
+    | ChatRealtimeStop;
 
 /** API messages sent by the backend over web socket */
-export type ApiBackendChatMessage = ChatMessagePart | ChatAudioTranscription | ChatMessageError;
+export type ApiBackendChatMessage = ChatMessagePart | ChatAudioTranscription | ChatMessageError | ChatRealtimeAudio;
 
 /** API message of specific type */
 export interface TypedMessage<T extends string> extends Record<string, unknown> {
@@ -59,6 +74,15 @@ export interface ChatState {
 
     /** Current messages */
     messages: ChatMessage[];
+
+    /** Whether to request real time conversation */
+    realtime?: boolean;
+
+    /** Real time input audio type, if real time conversation */
+    realtimeInputAudioType?: string;
+
+    /** Realtime output audio type, if real time conversation */
+    realtimeOutputAudioType?: string;
 }
 
 /** Chat message */
@@ -115,6 +139,10 @@ export interface ChatMessageError extends TypedMessage<"msgerror"> {
     /** Error code */
     code: ChatMessageErrorCode;
 }
+
+export type ChatRealtimeAudio = BinaryMessage<"rtaud">;
+
+export type ChatRealtimeStop = TypedMessage<"rtstop">;
 
 function isTypedMessage(v: unknown): v is TypedMessage<string> {
     return isObject(v) && typeof v.type === "string";
