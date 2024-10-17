@@ -44,7 +44,12 @@ export type ApiFrontendChatMessage =
     | ChatRealtimeStop;
 
 /** API messages sent by the backend over web socket */
-export type ApiBackendChatMessage = ChatMessagePart | ChatAudioTranscription | ChatMessageError | ChatRealtimeAudio;
+export type ApiBackendChatMessage =
+    | ChatMessagePart
+    | ChatAudioTranscription
+    | ChatMessageError
+    | ChatRealtimeStarted
+    | ChatRealtimeAudio;
 
 /** API message of specific type */
 export interface TypedMessage<T extends string> extends Record<string, unknown> {
@@ -91,11 +96,13 @@ export interface ChatInitRealtime extends ChatInitCommon {
 /** Common parts of chat initialization */
 export interface ChatInitCommon extends TypedMessage<"init"> {
     /** Mode: "chat" for traditional chat or "realtime" for realtime conversation */
-    mode: "chat" | "realtime";
+    mode: ChatMode;
 
     /** Initial chat state */
     state: ChatState;
 }
+
+export type ChatMode = "chat" | "realtime";
 
 /** Chat message */
 export interface ChatMessage {
@@ -143,6 +150,8 @@ export type ChatMessageErrorCode =
     | "chat"
     /** Moderation rejected content */
     | "moderation"
+    /** Realtime conversation error */
+    | "realtime"
     /** Usage limits exceeded */
     | "limit";
 
@@ -153,6 +162,8 @@ export interface ChatMessageError extends TypedMessage<"msgerror"> {
 }
 
 export type ChatRealtimeAudio = BinaryMessage<"rtaud">;
+
+export type ChatRealtimeStarted = TypedMessage<"rtstarted">;
 
 export type ChatRealtimeStop = TypedMessage<"rtstop">;
 
@@ -173,11 +184,25 @@ function isBinaryMessageOfType<T extends string>(v: unknown, type: T): v is Bina
 }
 
 export function isApiFrontendChatMessage(v: unknown): v is ApiFrontendChatMessage {
-    return isTypedMessage(v) && (isChatInit(v) || isChatMessageNew(v) || isChatAudioMessageNew(v));
+    return (
+        isTypedMessage(v) &&
+        (isChatInit(v) ||
+            isChatMessageNew(v) ||
+            isChatAudioMessageNew(v) ||
+            isChatRealtimeAudio(v) ||
+            isChatRealtimeStop(v))
+    );
 }
 
 export function isApiBackendChatMessage(v: unknown): v is ApiBackendChatMessage {
-    return isTypedMessage(v) && (isChatMessagePart(v) || isChatAudioTranscription(v) || isChatMessageError(v));
+    return (
+        isTypedMessage(v) &&
+        (isChatMessagePart(v) ||
+            isChatAudioTranscription(v) ||
+            isChatMessageError(v) ||
+            isChatRealtimeStarted(v) ||
+            isChatRealtimeAudio(v))
+    );
 }
 
 function isChatState(v: unknown): v is ChatState {
@@ -246,5 +271,17 @@ export function isChatMessageError(v: unknown): v is ChatMessageError {
 }
 
 export function isChatMessageErrorCode(v: unknown): v is ChatMessageErrorCode {
-    return typeof v === "string" && ["auth", "connection", "chat", "moderation", "limit"].includes(v);
+    return typeof v === "string" && ["auth", "connection", "chat", "realtime", "moderation", "limit"].includes(v);
+}
+
+export function isChatRealtimeStarted(v: unknown): v is ChatRealtimeStarted {
+    return isTypedMessageOfType(v, "rtstarted");
+}
+
+export function isChatRealtimeAudio(v: unknown): v is ChatRealtimeAudio {
+    return isBinaryMessageOfType(v, "rtaud");
+}
+
+export function isChatRealtimeStop(v: unknown): v is ChatRealtimeStop {
+    return isTypedMessageOfType(v, "rtstop");
 }

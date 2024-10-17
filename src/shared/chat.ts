@@ -11,7 +11,6 @@ import {
     isChatMessagePart,
 } from "./api";
 import { lastOf } from "./array";
-import { VerbalWebError } from "./error";
 
 /**
  * A model of a chat state and how it changes in response to API messages.
@@ -44,10 +43,12 @@ export class Chat {
 
     /**
      * Updates chat state according to the specified API message.
+     * Returns whether chat state was updated.
      *
      * @param amsg API message
      */
-    update(amsg: ApiChatMessage): void {
+    update(amsg: ApiChatMessage): boolean {
+        let updated = true;
         if (isChatInit(amsg)) {
             this.state = { ...amsg.state, ...this.serverOverrides };
             this.error = undefined;
@@ -86,9 +87,14 @@ export class Chat {
                     this.backendProcessing = true;
                 }
             }
-        } else {
-            throw new VerbalWebError("Unexpected API message");
         }
+
+        // Ignore other messages
+        else {
+            updated = false;
+        }
+
+        return updated;
     }
 }
 

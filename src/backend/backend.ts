@@ -292,7 +292,7 @@ backend.post("/vw/auth/login/:idp", (req, res) => {
 backend.ws(CHAT_PATH, (req, res) => {
     res.accept()
         .then((ws) => {
-            new ChatServer(req, ws, transcription, moderation, chatCompletion, config, serverOverrides);
+            new ChatServer(req, ws, transcription, moderation, chatCompletion, realtime, config, serverOverrides);
         })
         .catch((err: unknown) => {
             logThrownError("Failed to accept web socket connection [%s]", err, undefined, req.ip);

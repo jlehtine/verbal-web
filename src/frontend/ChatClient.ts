@@ -3,6 +3,8 @@ import {
     ChatAudioMessageNew,
     ChatInit,
     ChatMessageNew,
+    ChatRealtimeAudio,
+    ChatRealtimeStop,
     SharedConfig,
     isApiBackendChatMessage,
     isChatMessageError,
@@ -13,6 +15,7 @@ import { VerbalWebError } from "../shared/error";
 import { TypedEvent, TypedEventTarget } from "../shared/event";
 import { retryWithBackoff } from "../shared/retry";
 import { apiMessageToWsData, wsDataToApiMessage } from "../shared/wsdata";
+import { SUPPORTED_REALTIME_INPUT_AUDIO_TYPE } from "./SpeechRecorder";
 import { logDebug, logThrownError } from "./log";
 import { StatusCodes } from "http-status-codes";
 
@@ -93,6 +96,8 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
     /** Chat client connection state */
     connectionState = ChatConnectionState.UNCONNECTED;
 
+    realtimeStarted = false;
+
     private ws?: WebSocket;
 
     private numErrors = 0;
@@ -115,6 +120,8 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
 
     private pendingPrepareChat = false;
 
+    private realtime = false;
+
     private readonly backendUrl;
 
     constructor(backendUrl: string, initialState: InitialChatState) {
@@ -128,10 +135,12 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
     /**
      * Prepares the chat connectivity for use when input is expected.
      */
-    prepareChat() {
-        this.initWebSocketInactivityTimeout();
-        this.pendingPrepareChat = true;
-        this.updateState();
+    prepareChat(reinit = false) {
+        this.initInactivityTimeout();
+        if (!this.chatInitialized || reinit) {
+            this.pendingPrepareChat = true;
+            this.updateState();
+        }
     }
 
     /**
@@ -162,13 +171,54 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
     }
 
     /**
+     * Start a realtime conversation.
+     */
+    startRealtime() {
+        logDebug("Starting a realtime conversation");
+        this.realtime = true;
+        this.prepareChat(true);
+    }
+
+    /**
+     * Submit realtime audio data.
+     *
+     * @param buffer audio data
+     */
+    submitRealtimeAudio(buffer: ArrayBuffer) {
+        if (this.realtime) {
+            const amsg: ChatRealtimeAudio = { type: "rtaud", binary: buffer };
+            this.submitApiMessage(amsg);
+        }
+    }
+
+    /**
+     * Stop a realtime conversation.
+     */
+    stopRealtime() {
+        if (!this.realtime) return;
+        logDebug("Stopping a realtime conversation");
+        this.realtime = false;
+        this.realtimeStarted = false;
+
+        // Clear any pending realtime audio messages
+        this.pendingMessages = this.pendingMessages.filter((msg) => msg.type !== "rtaud");
+
+        // Send a stop message, if connected to an initialized chat
+        if (this.chatInitialized && this.ws && this.ws.readyState === WebSocket.OPEN) {
+            const amsg: ChatRealtimeStop = { type: "rtstop" };
+            this.sendMessage(amsg);
+        }
+    }
+
+    /**
      * Submits an API message to the backend. Also updates the chat state.
      *
      * @param message API message to send
      */
     submitApiMessage(message: ApiFrontendChatMessage) {
-        this.chat.update(message);
-        this.chatEvent();
+        if (this.chat.update(message)) {
+            this.chatEvent();
+        }
         this.pendingMessages.push(message);
         this.updateState();
     }
@@ -329,36 +379,47 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
             (!this.sharedConfig.auth?.required || this.authInitialized)
         ) {
             // Need chat initialization?
-            if (!this.chatInitialized || this.chat.error !== undefined) {
+            if (!this.chatInitialized || this.chat.error !== undefined || this.pendingPrepareChat) {
                 if (this.ensureWebSocket()) {
-                    logDebug("Sending the chat initialization");
-                    const init: ChatInit = { type: "init", state: this.chat.state, mode: "chat" };
+                    logDebug(`Sending the ${this.realtime ? "realtime" : "chat"} initialization`);
+                    const init: ChatInit = {
+                        type: "init",
+                        state: this.chat.state,
+                        ...(this.realtime
+                            ? {
+                                  mode: "realtime",
+                                  realtimeInputAudioType: SUPPORTED_REALTIME_INPUT_AUDIO_TYPE,
+                                  realtimeOutputAudioType: SUPPORTED_REALTIME_INPUT_AUDIO_TYPE,
+                              }
+                            : { mode: "chat" }),
+                    };
+                    this.chat.update(init);
                     this.sendMessage(init);
                     this.chatInitialized = true;
                     this.pendingPrepareChat = false;
                     this.updateState();
-                    this.handlePendingMessages();
                 }
-            }
-
-            // Can send the supplied message?
-            else if (msg) {
-                logDebug("Sending a chat update");
-                this.sendMessage(msg);
-            }
-
-            // Can send the pending messages
-            else {
+            } else {
+                // Send the pending messages
                 this.handlePendingMessages();
+
+                // Can send the supplied message?
+                if (msg && this.ensureWebSocket()) {
+                    logDebug("Sending a chat update");
+                    this.sendMessage(msg);
+                }
             }
         }
     }
 
     private handlePendingMessages() {
-        while (this.pendingMessages.length > 0) {
-            const msg = this.pendingMessages.shift();
-            if (msg) {
-                this.sendMessage(msg);
+        if (this.pendingMessages.length === 0) return;
+        if (this.ensureWebSocket()) {
+            while (this.pendingMessages.length > 0) {
+                const msg = this.pendingMessages.shift();
+                if (msg) {
+                    this.sendMessage(msg);
+                }
             }
         }
     }
@@ -391,7 +452,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
     private sendMessage(msg: ApiFrontendChatMessage) {
         if (this.ws === undefined) throw new VerbalWebError("Web socket not created");
         this.ws.send(apiMessageToWsData(msg));
-        this.clearInactivityTimer();
+        this.updateInactivityTimeout();
     }
 
     /**
@@ -432,7 +493,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
             this.clearRetryTimer();
             this.updateState();
             this.chatEvent();
-            this.initWebSocketInactivityTimeout();
+            this.initInactivityTimeout();
         }
     }
 
@@ -441,23 +502,41 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
         if (ws === this.ws && ws.readyState === WebSocket.OPEN) {
             try {
                 const amsg = wsDataToApiMessage(ev.data, isApiBackendChatMessage);
-                logDebug("Received a chat update");
-                this.chat.update(amsg);
-                this.numErrors = 0;
-                this.chatEvent();
-                if (isChatMessageError(amsg) && amsg.code === "auth") {
-                    if (this.ws.readyState !== WebSocket.CLOSED && this.ws.readyState !== WebSocket.CLOSING) {
-                        logDebug("Authentication missing, must re-authenticate");
-                        this.authInitialized = false;
-                        this.authChecked = false;
-                        this.connectionState = ChatConnectionState.UNCONNECTED;
-                        this.ws.close();
-                        this.initializationEvent();
-                        this.resetConnectionState();
-                        this.updateState();
+
+                // Handle realtime start
+                if (amsg.type === "rtstarted") {
+                    this.realtimeStarted = true;
+                    this.chatEvent();
+                }
+
+                // Handle realtime audio
+                else if (amsg.type === "rtaud") {
+                    if (this.realtime && this.realtimeStarted) {
+                        const event: RealtimeAudioEvent = { target: this, type: "rtaudio", data: amsg.binary };
+                        this.dispatchEvent(event);
                     }
-                } else {
-                    this.initWebSocketInactivityTimeout();
+                }
+
+                // Handle a chat update
+                else {
+                    logDebug("Received a chat update");
+                    this.chat.update(amsg);
+                    this.numErrors = 0;
+                    this.chatEvent();
+                    if (isChatMessageError(amsg) && amsg.code === "auth") {
+                        if (this.ws.readyState !== WebSocket.CLOSED && this.ws.readyState !== WebSocket.CLOSING) {
+                            logDebug("Authentication missing, must re-authenticate");
+                            this.authInitialized = false;
+                            this.authChecked = false;
+                            this.connectionState = ChatConnectionState.UNCONNECTED;
+                            this.ws.close();
+                            this.initializationEvent();
+                            this.resetConnectionState();
+                            this.updateState();
+                        }
+                    } else {
+                        this.updateInactivityTimeout();
+                    }
                 }
             } catch (err: unknown) {
                 logThrownError("Failed to process a backend message", err);
@@ -487,7 +566,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
     }
 
     private resetConnectionState() {
-        this.clearInactivityTimer();
+        this.clearInactivityTimeout();
         this.chatInitialized = false;
     }
 
@@ -496,7 +575,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
      */
     private retryWebSocket() {
         this.clearRetryTimer();
-        this.clearInactivityTimer();
+        this.clearInactivityTimeout();
         const backoffBase = BACKOFF_BASE_MILLIS * Math.pow(2, this.numErrors);
         const backoff = backoffBase + Math.random() * backoffBase;
         logDebug("Retrying to connect in %d milliseconds", backoff);
@@ -518,10 +597,21 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
     }
 
     /**
+     * Initialize or clear web socket inactivity timeout, depending on the current state.
+     */
+    private updateInactivityTimeout() {
+        if (this.chat.backendProcessing) {
+            this.clearInactivityTimeout();
+        } else {
+            this.initInactivityTimeout();
+        }
+    }
+
+    /**
      * Initializes or re-initializes the inactivity timeout for the web socket.
      */
-    private initWebSocketInactivityTimeout() {
-        this.clearInactivityTimer();
+    private initInactivityTimeout() {
+        this.clearInactivityTimeout();
         if (!this.ws || (this.ws.readyState !== WebSocket.OPEN && this.ws.readyState !== WebSocket.CONNECTING)) return;
         this.inactivityTimer = setTimeout(() => {
             this.inactivityTimer = undefined;
@@ -541,7 +631,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
     /**
      * Clears the inactivity timer, if it is pending.
      */
-    private clearInactivityTimer() {
+    private clearInactivityTimeout() {
         if (this.inactivityTimer !== undefined) {
             clearTimeout(this.inactivityTimer);
             this.inactivityTimer = undefined;
@@ -556,7 +646,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
 
         // Clear any pending timers
         this.clearRetryTimer();
-        this.clearInactivityTimer();
+        this.clearInactivityTimeout();
 
         // Close WebSocket
         if (this.ws && this.ws.readyState !== WebSocket.CLOSED && this.ws.readyState !== WebSocket.CLOSING) {
@@ -637,6 +727,7 @@ function httpStatusError(res: Response, msg: string): string {
 interface ChatClientEventMap {
     init: InitializationEvent;
     chat: ChatEvent;
+    rtaudio: RealtimeAudioEvent;
 }
 
 /** An event dispatched on initialization updates */
@@ -646,3 +737,11 @@ export type InitializationEvent = TypedEvent<ChatClient, "init">;
  * An event dispatched on chat changes.
  */
 export type ChatEvent = TypedEvent<ChatClient, "chat">;
+
+/**
+ * An event dispatched on realtime audio data.
+ */
+export interface RealtimeAudioEvent extends TypedEvent<ChatClient, "rtaudio"> {
+    /** Realtime audio data */
+    data: ArrayBuffer;
+}

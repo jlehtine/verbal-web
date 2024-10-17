@@ -1,3 +1,4 @@
+import { TypedEvent, TypedEventTarget } from "../shared/event";
 import { RequestContext } from "./RequestContext";
 
 /**
@@ -27,37 +28,12 @@ export interface RealtimeConversationRequest {
 
     /** Input audio transcription model, or null to disable */
     inputAudioTranscriptionModel?: string | null;
-
-    /** Callback for real-time conversation events */
-    callback: RealtimeConversationCallback;
-}
-
-/**
- * Real-time callback.
- */
-export interface RealtimeConversationCallback {
-    /**
-     * Called on error. Use conversation.isClosed() to check if the conversation is still open.
-     *
-     * @param error error
-     */
-    onError: (error: unknown) => void;
-
-    /**
-     * Called when start of speech is detected.
-     */
-    onSpeechStarted: () => void;
-
-    /**
-     * Called when stop of speech is detected.
-     */
-    onSpeechStopped: () => void;
 }
 
 /**
  * Real-time conversation.
  */
-export interface RealtimeConversation {
+export interface RealtimeConversation extends TypedEventTarget<RealtimeConversation, RealtimeConversationEventMap> {
     /**
      * Append user audio data to the audio buffer.
      *
@@ -112,4 +88,23 @@ export interface RealtimeProvider {
         requestContext: RequestContext,
         request: RealtimeConversationRequest,
     ): Promise<RealtimeConversation>;
+}
+
+/** Realtime conversation events */
+export interface RealtimeConversationEventMap {
+    state: TypedEvent<RealtimeConversation, "state">;
+    error: RealtimeConversionErrorEvent;
+    audio: RealtimeConversionAudioEvent;
+}
+
+/** Realtime conversation error event. Check target.isClosed() to check if the conversation has closed. */
+export interface RealtimeConversionErrorEvent extends TypedEvent<RealtimeConversation, "error"> {
+    /** Error */
+    error: unknown;
+}
+
+/** Realtime conversation audio event */
+export interface RealtimeConversionAudioEvent extends TypedEvent<RealtimeConversation, "audio"> {
+    /** Audio data */
+    audio: ArrayBuffer;
 }

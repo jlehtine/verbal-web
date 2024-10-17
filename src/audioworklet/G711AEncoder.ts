@@ -1,33 +1,57 @@
 import { alaw } from "alawmulaw";
 
 const TARGET_SAMPLE_RATE = 8000;
+const AUDIO_BUFFER_LENGTH = 1024;
 
 /**
  * Encodes raw audio data to G.711 A-law format and publishes it to the main thread as message port events.
  */
 class G711AEncoder extends AudioWorkletProcessor {
     private offset = 0;
+    private array = new Uint8Array(AUDIO_BUFFER_LENGTH);
+    private buffer = this.array.buffer;
+    private bufferBytes = 0;
 
     process(inputs: Float32Array[][]) {
         const input = inputs[0];
+
+        // Check if no more data available
+        if (input.length === 0) {
+            return false;
+        }
 
         // Convert to mono and target rate
         const inp = this.toSampleRate(this.toMono(input), sampleRate, TARGET_SAMPLE_RATE);
 
         // Convert to PCM 16-bit signed integer
         const buflen = inp.length;
-        const pcm16Input = new Int16Array(buflen);
+        const pcm16 = new Int16Array(buflen);
         for (let i = 0; i < buflen; i++) {
-            pcm16Input[i] = Math.round(inp[i] * 32767);
+            pcm16[i] = Math.round(inp[i] * 32767);
         }
 
         // Encode to G.711 A-law
-        const g711aOutput = alaw.encode(pcm16Input);
+        const pcma = alaw.encode(pcm16);
 
-        // Publish to main thread as ArrayBuffer
-        this.port.postMessage({ g711aOutput });
+        // Buffer and publish to main thread
+        if (this.bufferBytes == 0 && pcma.byteLength >= AUDIO_BUFFER_LENGTH) {
+            this.port.postMessage(pcma);
+        } else {
+            let bytesConsumed = 0;
+            while (bytesConsumed < pcma.length) {
+                const remaining = AUDIO_BUFFER_LENGTH - this.bufferBytes;
+                const toCopy = Math.min(remaining, pcma.length - bytesConsumed);
+                this.array.set(pcma.subarray(bytesConsumed, bytesConsumed + toCopy), this.bufferBytes);
+                this.bufferBytes += toCopy;
+                bytesConsumed += toCopy;
+                if (this.bufferBytes === AUDIO_BUFFER_LENGTH) {
+                    this.port.postMessage(this.array);
+                    this.bufferBytes = 0;
+                }
+            }
+        }
 
-        return false;
+        return true;
     }
 
     private toMono(input: Float32Array[]): Float32Array {

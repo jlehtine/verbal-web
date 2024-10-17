@@ -40,9 +40,11 @@ export default function AudioInput(props: AudioInputProps) {
 
     const [error, setError] = useState<AudioErrorCode>();
     const [processing, setProcessing] = useState(false);
+    const [realtimePending, setRealtimePending] = useState(false);
     const [onStop, setOnStop] = useState<() => void>();
 
     useEffect(() => {
+        let realtimeStarted = false;
         const recorder = new SpeechRecorder(
             mode === "stt"
                 ? {
@@ -58,44 +60,71 @@ export default function AudioInput(props: AudioInputProps) {
         );
         recorder.addEventListener("state", () => {
             if (recorder.error !== error) {
+                recorder.close();
                 setError(recorder.error);
             }
             if (recorder.recording && onStop === undefined) {
-                setOnStop(() => () => {
-                    recorder.stop();
-                    if (mode === "stt") {
-                        setProcessing(true);
-                    } else {
-                        // TODO Stop realtime
-                        onClose();
+                if (mode === "realtime") {
+                    if (!realtimeStarted) {
+                        setRealtimePending(true);
+                        client.startRealtime();
+                        realtimeStarted = true;
                     }
-                });
-
-                // Prepare chat connectivity, for faster response
-                client.prepareChat();
+                } else {
+                    // Prepare chat connectivity, for faster response
+                    client.prepareChat();
+                    setOnStop(() => () => {
+                        recorder.stop();
+                        setProcessing(true);
+                    });
+                }
             }
         });
         recorder.addEventListener("audio", (event) => {
-            if (mode === "stt") {
-                client
-                    .submitAudioMessage(event.blob)
-                    .then(onClose)
-                    .catch((err: unknown) => {
-                        logThrownError("Failed to process audio", err);
-                        setError("processing");
-                    });
-            } else {
-                // TODO Send realtime audio
-            }
+            client
+                .submitAudioMessage(event.blob)
+                .then(onClose)
+                .catch((err: unknown) => {
+                    logThrownError("Failed to process audio", err);
+                    setError("processing");
+                });
         });
         recorder.addEventListener("analyser", (event) => {
             if (refAudioAnalyserEventFunc.current) {
                 refAudioAnalyserEventFunc.current(event);
             }
         });
+        const onChatEvent = () => {
+            if (client.chat.error !== undefined) {
+                recorder.close();
+                if (error === undefined) {
+                    if (mode === "realtime") {
+                        setError("realtime");
+                    } else {
+                        setError("processing");
+                    }
+                }
+            }
+            if (client.realtimeStarted && onStop === undefined) {
+                setRealtimePending(false);
+                recorder.addEventListener("rtaudio", (event) => {
+                    client.submitRealtimeAudio(event.buffer);
+                });
+                setOnStop(() => () => {
+                    recorder.close();
+                    client.stopRealtime();
+                    onClose();
+                });
+            }
+        };
+        client.addEventListener("chat", onChatEvent);
         recorder.start();
         return () => {
             recorder.close();
+            client.removeEventListener("chat", onChatEvent);
+            if (mode === "realtime") {
+                client.stopRealtime();
+            }
         };
     }, []);
 
@@ -108,6 +137,8 @@ export default function AudioInput(props: AudioInputProps) {
                     </Alert>
                 ) : processing ? (
                     <Alert severity="info">{t("audio.processing")}</Alert>
+                ) : realtimePending ? (
+                    <Alert severity="info">{t("audio.realtimePending")}</Alert>
                 ) : onStop === undefined ? (
                     <Alert severity="info">{t("audio.initializingRecording")}</Alert>
                 ) : (

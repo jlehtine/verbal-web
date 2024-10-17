@@ -11,10 +11,9 @@ const SILENCE_DURATION_MILLIS = 2000;
 const SOUND_DURATION_MILLIS = 1000;
 const RMS_AVERAGING_WINDOW = 20;
 
-const REALTIME_BUFFER_LENGTH = 1024;
-const SUPPORTED_REALTIME_INPUT_AUDIO_TYPE = "audio/PCMA";
+export const SUPPORTED_REALTIME_INPUT_AUDIO_TYPE = "audio/PCMA";
 
-export type AudioErrorCode = "general" | "notfound" | "notallowed" | "processing";
+export type AudioErrorCode = "general" | "notfound" | "notallowed" | "processing" | "realtime";
 
 export type SpeechRecorderParams = SpeechRecorderSttParams | SpeechRecorderRealtimeParams;
 
@@ -129,64 +128,8 @@ export class SpeechRecorder
                         }
                     }
 
-                    // Initialize G711 A-law encoder, for realtime
-                    if (mode === "realtime" && this.audioContext && this.audioSource) {
-                        this.audioContext.audioWorklet
-                            .addModule("G711AEncoder.js")
-                            .then(() => {
-                                if (!this.stopped && this.audioContext && this.audioSource) {
-                                    const array = new Uint8Array(REALTIME_BUFFER_LENGTH);
-                                    const buffer = array.buffer;
-                                    let bufferBytes = 0;
-                                    this.g711aEncoder = new AudioWorkletNode(this.audioContext, "G711AEncoder");
-                                    this.audioSource.connect(this.g711aEncoder);
-                                    this.g711aEncoder.port.addEventListener("message", (event) => {
-                                        const data: unknown = event.data;
-                                        if (typeof data === "object" && data instanceof Uint8Array) {
-                                            const sendAudioEvent = (ab: ArrayBuffer) => {
-                                                const audioEvent: SpeechRecorderAudioEvent = {
-                                                    target: this,
-                                                    type: "audio",
-                                                    blob: new Blob([ab], { type: SUPPORTED_REALTIME_INPUT_AUDIO_TYPE }),
-                                                };
-                                                this.dispatchEvent(audioEvent);
-                                            };
-                                            const databuf = data.buffer;
-                                            if (bufferBytes === 0 && databuf.byteLength >= REALTIME_BUFFER_LENGTH) {
-                                                sendAudioEvent(
-                                                    data.byteOffset === 0 && databuf.byteLength === data.length
-                                                        ? databuf
-                                                        : databuf.slice(data.byteOffset, data.byteOffset + data.length),
-                                                );
-                                            } else {
-                                                let dataConsumed = 0;
-                                                while (dataConsumed < data.length) {
-                                                    const remaining = REALTIME_BUFFER_LENGTH - bufferBytes;
-                                                    const toCopy = Math.min(remaining, data.length - dataConsumed);
-                                                    new Uint8Array(buffer, bufferBytes, toCopy).set(
-                                                        data.subarray(dataConsumed, dataConsumed + toCopy),
-                                                    );
-                                                    bufferBytes += toCopy;
-                                                    dataConsumed += toCopy;
-                                                    if (bufferBytes === REALTIME_BUFFER_LENGTH) {
-                                                        sendAudioEvent(buffer);
-                                                        bufferBytes = 0;
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    });
-                                    this.recording = true;
-                                    this.stateChanged();
-                                }
-                            })
-                            .catch((err: unknown) => {
-                                this.handleError(err);
-                            });
-                    }
-
+                    // Initialize audio analyser, if possible
                     try {
-                        // Initialize audio analyser, if possible
                         if (this.audioContext && this.audioSource) {
                             this.analyser = this.audioContext.createAnalyser();
                             this.analyser.fftSize = FFT_SIZE;
@@ -196,6 +139,36 @@ export class SpeechRecorder
                         }
                     } catch (err: unknown) {
                         logThrownError("Audio visualization failed", err);
+                    }
+
+                    // Initialize G711 A-law encoder, for realtime
+                    if (mode === "realtime" && this.audioContext && this.audioSource) {
+                        logDebug("Initializing G711 A-law encoder");
+                        this.audioContext.audioWorklet
+                            .addModule("G711AEncoder.js")
+                            .then(() => {
+                                if (!this.stopped && this.audioContext && this.audioSource) {
+                                    this.g711aEncoder = new AudioWorkletNode(this.audioContext, "G711AEncoder");
+                                    this.g711aEncoder.port.onmessage = (event) => {
+                                        const data: unknown = event.data;
+                                        if (data instanceof Uint8Array) {
+                                            const audioEvent: SpeechRecorderRealtimeAudioEvent = {
+                                                target: this,
+                                                type: "rtaudio",
+                                                buffer: data.buffer,
+                                            };
+                                            this.dispatchEvent(audioEvent);
+                                        }
+                                    };
+                                    this.audioSource.connect(this.g711aEncoder);
+                                    this.recording = true;
+                                    this.stateChanged();
+                                    logDebug("G711 A-law encoder started");
+                                }
+                            })
+                            .catch((err: unknown) => {
+                                this.handleError(err);
+                            });
                     }
 
                     // Start audio recording, for speech-to-text
@@ -385,12 +358,17 @@ export function getRealtimeInputAudioType(supportedInputAudioTypes: string[]) {
 interface SpeechRecorderEventMap extends AudioAnalyserEventMap<SpeechRecorder> {
     state: SpeechRecorderStateEvent;
     audio: SpeechRecorderAudioEvent;
+    rtaudio: SpeechRecorderRealtimeAudioEvent;
 }
 
 export type SpeechRecorderStateEvent = TypedEvent<SpeechRecorder, "state">;
 
 export interface SpeechRecorderAudioEvent extends TypedEvent<SpeechRecorder, "audio"> {
     blob: Blob;
+}
+
+export interface SpeechRecorderRealtimeAudioEvent extends TypedEvent<SpeechRecorder, "rtaudio"> {
+    buffer: ArrayBuffer;
 }
 
 function toAudioErrorCode(err: unknown): AudioErrorCode {

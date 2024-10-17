@@ -22,7 +22,8 @@ export function wsDataToApiMessage<T extends ApiChatMessage>(data: unknown, type
             return amsg;
         }
     }
-    throw new VerbalWebError("Received WebSocket message is invalid", { cause });
+    console.error("Invalid API message", data);
+    throw new VerbalWebError("Received WebSocket message is invalid: ", { cause });
 }
 
 /**
@@ -60,7 +61,7 @@ function toJsonBinaryParts(data: unknown): { json: string; binary?: ArrayBuffer 
  */
 export function apiMessageToWsData(amsg: ApiChatMessage): string | ArrayBuffer {
     const { binary, ...msgRest } = amsg;
-    if (typeof binary === "object" && binary instanceof ArrayBuffer) {
+    if (binary instanceof ArrayBuffer) {
         const json = JSON.stringify(msgRest);
         const jsonBytes = new TextEncoder().encode(json);
         const buffer = new ArrayBuffer(jsonBytes.length + 1 + binary.byteLength);
@@ -69,6 +70,9 @@ export function apiMessageToWsData(amsg: ApiChatMessage): string | ArrayBuffer {
         view[json.length] = 0;
         view.set(new Uint8Array(binary), json.length + 1);
         return buffer;
+    } else if (binary !== undefined) {
+        console.error("Invalid API message binary data", binary);
+        throw new VerbalWebError("API message binary data is not an ArrayBuffer");
     } else {
         return JSON.stringify(amsg);
     }

@@ -4,12 +4,14 @@
             "general": "Ääniominaisuuksien alustaminen epäonnistui.",
             "notallowed": "Ääni ei ole sallittu. Tarkista selaimen asetukset ja verkkosivun käyttöoikeudet.",
             "notfound": "Yhteensopivaa äänilähdettä ei löytynyt.",
-            "processing": "Äänen käsittely epäonnistui."
+            "processing": "Äänen käsittely epäonnistui.",
+            "realtime": "Puhekeskustelussa tapahtui virhe."
         },
         "initializingRecording": "Äänen tallennusta valmistellaan. Sallithan äänen tallennuksen käyttääksesi puheentunnistusta.",
         "input": "Puheentunnistus",
         "processing": "Käsitellään ääntä...",
         "realtime": "Puhekeskustelu",
+        "realtimePending": "Puhekeskustelua käynnistetään...",
         "recording": "Kuuntelen puhettasi. Lopeta pitämällä tauko tai painamalla napista.",
         "stopRecording": "Lopeta tallennus"
     },

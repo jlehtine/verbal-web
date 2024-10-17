@@ -1,15 +1,22 @@
 import { VerbalWebError } from "../shared/error";
-import { TypedEvent, TypedEventTarget } from "../shared/event";
+import { TypedEventTarget } from "../shared/event";
 import {
     isRealtimeErrorMessage,
     isRealtimeMessage,
-    isRealtimeMessageOfType,
+    isRealtimeResponseAudioDeltaMessage,
+    isRealtimeSessionUpdatedMessage,
     RealtimeAudioFormat,
     RealtimeInputAudioBufferAppendMessage,
     RealtimeInputAudioBufferCommitMessage,
     RealtimeSessionUpdateMessage,
 } from "./OpenAIRealtimeMessages";
-import { RealtimeConversation, RealtimeConversationRequest } from "./RealtimeProvider";
+import {
+    RealtimeConversation,
+    RealtimeConversationEventMap,
+    RealtimeConversationRequest,
+    RealtimeConversionAudioEvent,
+    RealtimeConversionErrorEvent,
+} from "./RealtimeProvider";
 import { RequestContext } from "./RequestContext";
 import { logDebug, logInterfaceData, logThrownError } from "./log";
 import WebSocket from "ws";
@@ -20,7 +27,7 @@ const REALTIME_URL = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-pre
 const DEFAULT_INPUT_AUDIO_TRANSCRIPTION_MODEL = "whisper-1";
 
 export class OpenAIRealtimeConversation
-    extends TypedEventTarget<OpenAIRealtimeConversation, OpenAIRealtimeConversationEvents>
+    extends TypedEventTarget<RealtimeConversation, RealtimeConversationEventMap>
     implements RealtimeConversation
 {
     private readonly requestContext;
@@ -33,7 +40,7 @@ export class OpenAIRealtimeConversation
 
     constructor(requestContext: RequestContext, request: RealtimeConversationRequest, apiKey: string) {
         super();
-        logDebug("Opening a WebSocket connection for OpenAI realtime session");
+        logDebug("Opening a WebSocket connection for OpenAI realtime session", requestContext);
         this.requestContext = requestContext;
         this.request = request;
         this.ws = new WebSocket(REALTIME_URL, {
@@ -42,6 +49,7 @@ export class OpenAIRealtimeConversation
                 "OpenAI-Beta": "realtime=v1",
             },
         });
+        this.ws.binaryType = "nodebuffer";
         this.ws.on("open", () => {
             this.onWebSocketOpen();
         });
@@ -57,26 +65,42 @@ export class OpenAIRealtimeConversation
     }
 
     private onWebSocketOpen(): void {
-        logDebug("Realtime WebSocket connected");
+        logDebug("Realtime WebSocket connected", this.requestContext);
+        if (this.closed) {
+            this.ws.close();
+            return;
+        }
         this.connected = true;
         this.stateChanged();
     }
 
     private onWebSocketMessage(data: WebSocket.Data): void {
         try {
-            logInterfaceData("Received realtime message", this.requestContext, data);
+            if (typeof data === "object" && data instanceof Buffer) {
+                data = data.toString("utf-8");
+            }
             if (typeof data === "string") {
                 const msg: unknown = JSON.parse(data);
+                logInterfaceData("Received realtime message", this.requestContext, msg);
                 if (isRealtimeMessage(msg)) {
                     // error
-                    if (isRealtimeMessageOfType(msg, "error") && isRealtimeErrorMessage(msg)) {
+                    if (isRealtimeErrorMessage(msg)) {
                         this.handleError(new Error(`Realtime error: ${msg.error.code} : ${msg.error.message}`));
                     }
 
                     // session updated
-                    else if (isRealtimeMessageOfType(msg, "session.updated")) {
-                        this.initialized = true;
-                        this.stateChanged();
+                    else if (isRealtimeSessionUpdatedMessage(msg)) {
+                        if (!this.initialized) {
+                            this.initialized = true;
+                            this.stateChanged();
+                        }
+                    }
+
+                    // audio data
+                    else if (isRealtimeResponseAudioDeltaMessage(msg)) {
+                        const audioData = Buffer.from(msg.delta, "base64").buffer;
+                        const event: RealtimeConversionAudioEvent = { target: this, type: "audio", audio: audioData };
+                        this.dispatchEvent(event);
                     }
                 }
             }
@@ -86,15 +110,11 @@ export class OpenAIRealtimeConversation
     }
 
     private onWebSocketError(err: Error): void {
-        logThrownError("Realtime WebSocket error", err);
-        if (this.error === undefined) {
-            this.error = new VerbalWebError("Realtime WebSocket error", { cause: err });
-        }
-        this.stateChanged();
+        this.handleError(new VerbalWebError("Realtime WebSocket error", { cause: err }));
     }
 
     private onWebSocketClose(): void {
-        logDebug("Realtime WebSocket closed");
+        logDebug("Realtime WebSocket closed", this.requestContext);
         this.closed = true;
         this.stateChanged();
     }
@@ -147,6 +167,8 @@ export class OpenAIRealtimeConversation
 
     private handleError(err: unknown) {
         logThrownError("Realtime conversation error", err, this.requestContext);
+        const event: RealtimeConversionErrorEvent = { target: this, type: "error", error: this.error };
+        this.dispatchEvent(event);
         if (this.error === undefined) {
             this.error =
                 typeof err === "object" && err instanceof Error ? err : new Error("Realtime error", { cause: err });
@@ -196,7 +218,14 @@ export class OpenAIRealtimeConversation
                     this.addEventListener("state", eventListener);
                     this.sendMessage(updateSessionReq);
                 })
-                .catch(reject);
+                .catch((err: unknown) => {
+                    this.closeWebSocket();
+                    reject(
+                        err instanceof Error
+                            ? err
+                            : new Error("Failed to initialize realtime conversation", { cause: err }),
+                    );
+                });
         });
     }
 
@@ -222,10 +251,6 @@ export class OpenAIRealtimeConversation
     isClosed(): boolean {
         return this.closed;
     }
-}
-
-interface OpenAIRealtimeConversationEvents {
-    state: TypedEvent<OpenAIRealtimeConversation, "state">;
 }
 
 function toAudioFormat(type: string): RealtimeAudioFormat {

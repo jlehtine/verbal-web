@@ -1,6 +1,6 @@
 import { isObject } from "../shared/util";
 
-export interface RealtimeMessage<T extends string> {
+export interface RealtimeMessage<T extends string> extends Record<string, unknown> {
     event_id?: string;
     type: T;
 }
@@ -179,6 +179,18 @@ export function isRealtimeMessageOfType<T extends string>(
     return message.type === type;
 }
 
-export function isRealtimeErrorMessage(message: RealtimeMessage<"error">): message is RealtimeErrorMessage {
-    return true;
+export function isRealtimeErrorMessage(message: RealtimeMessage<string>): message is RealtimeErrorMessage {
+    return isRealtimeMessageOfType(message, "error");
+}
+
+export function isRealtimeSessionUpdatedMessage(
+    message: RealtimeMessage<string>,
+): message is RealtimeSessionUpdatedMessage {
+    return isRealtimeMessageOfType(message, "session.updated");
+}
+
+export function isRealtimeResponseAudioDeltaMessage(
+    message: RealtimeMessage<string>,
+): message is RealtimeResponseAudioDeltaMessage {
+    return isRealtimeMessageOfType(message, "response.audio.delta") && typeof message.delta === "string";
 }
