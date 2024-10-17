@@ -1,5 +1,6 @@
 {
     "audio": {
+        "conversationInProgress": "Ljudkonversationen pågår. Sluta genom att trycka på knappen.",
         "error": {
             "general": "Det gick inte att initiera ljudfunktionerna.",
             "notallowed": "Ljud är inte tillåtet. Kontrollera webbläsarinställningar och webbplatsens behörigheter.",

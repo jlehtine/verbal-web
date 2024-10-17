@@ -151,7 +151,9 @@ export default function AudioInput(props: AudioInputProps) {
                     <Alert severity="info">{t("audio.initializingRecording")}</Alert>
                 ) : (
                     <Stack direction="row" spacing={2} alignItems="center">
-                        <Alert severity="info">{t("audio.recording")}</Alert>
+                        <Alert severity="info">
+                            {t(mode === "realtime" ? "audio.conversationInProgress" : "audio.recording")}
+                        </Alert>
                         <AudioVisualization
                             size={VISUALIZATION_SIZE}
                             refAudioAnalyserEventFunc={refAudioAnalyserEventFunc}

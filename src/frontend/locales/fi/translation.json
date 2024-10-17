@@ -1,5 +1,6 @@
 {
     "audio": {
+        "conversationInProgress": "Puhekeskustelu on käynnissä. Lopeta painamalla napista.",
         "error": {
             "general": "Ääniominaisuuksien alustaminen epäonnistui.",
             "notallowed": "Ääni ei ole sallittu. Tarkista selaimen asetukset ja verkkosivun käyttöoikeudet.",

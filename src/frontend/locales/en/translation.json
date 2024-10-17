@@ -1,5 +1,6 @@
 {
     "audio": {
+        "conversationInProgress": "Audio conversation is in progress. Stop by pressing the button.",
         "error": {
             "general": "Failed to initialize audio features.",
             "notallowed": "Audio is not allowed. Please check browser settings and web page permissions.",
