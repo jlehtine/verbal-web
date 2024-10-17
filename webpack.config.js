@@ -81,6 +81,7 @@ module.exports = [
         mode: "production",
         entry: {
             G711AEncoder: path.resolve(__dirname, "src", "audioworklet", "G711AEncoder.ts"),
+            PCM16SLEDecoder: path.resolve(__dirname, "src", "audioworklet", "PCM16SLEDecoder.ts"),
         },
         output: {
             path: path.resolve(__dirname, "dist", "assets"),

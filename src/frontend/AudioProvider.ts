@@ -3,15 +3,18 @@ import { TypedEvent, TypedEventTarget } from "../shared/event";
 import { AudioAnalyserEvent, AudioAnalyserEventMap, AudioAnalyserEventTarget } from "./AudioAnalyserEvent";
 import { logDebug, logThrownError } from "./log";
 
-const TARGET_SAMPLE_RATE = 8000;
-const TARGET_SAMPLE_SIZE = 16;
+const INPUT_SAMPLE_RATE = 8000;
+const INPUT_SAMPLE_SIZE = 16;
 const FFT_SIZE = 1024;
 const SILENCE_THRESHOLD = 0.01;
 const SILENCE_DURATION_MILLIS = 2000;
 const SOUND_DURATION_MILLIS = 1000;
 const RMS_AVERAGING_WINDOW = 20;
+const OUTPUT_SAMPLE_RATE = 24000;
 
 export const SUPPORTED_REALTIME_INPUT_AUDIO_TYPE = "audio/PCMA";
+export const SUPPORTED_REALTIME_OUTPUT_AUDIO_TYPE =
+    "audio/pcm;rate=24000;bits=16;encoding=signed-int;channels=1;big-endian=false";
 
 export type AudioErrorCode = "general" | "notfound" | "notallowed" | "processing" | "realtime";
 
@@ -53,9 +56,11 @@ export class AudioProvider
 
     private mediaRecorder: MediaRecorder | undefined;
     private mediaStream: MediaStream | undefined;
-    private audioContext: AudioContext | undefined;
+    private audioInContext: AudioContext | undefined;
+    private audioOutContext: AudioContext | undefined;
     private audioSource: MediaStreamAudioSourceNode | undefined;
     private g711aEncoder: AudioWorkletNode | undefined;
+    private pcm16sleDecoder: AudioWorkletNode | undefined;
     private analyser: AnalyserNode | undefined;
 
     constructor(params: AudioParams) {
@@ -77,8 +82,8 @@ export class AudioProvider
                 .getUserMedia({
                     audio: {
                         channelCount: 1,
-                        sampleRate: TARGET_SAMPLE_RATE,
-                        sampleSize: TARGET_SAMPLE_SIZE,
+                        sampleRate: INPUT_SAMPLE_RATE,
+                        sampleSize: INPUT_SAMPLE_SIZE,
                         autoGainControl: true,
                         noiseSuppression: true,
                     },
@@ -96,6 +101,7 @@ export class AudioProvider
                     // Check realtime audio type
                     if (mode === "realtime") {
                         getRealtimeInputAudioType(this.params.supportedInputAudioTypes);
+                        getRealtimeOutputAudioType(this.params.supportedOutputAudioTypes);
                     }
 
                     // Initialize media recorder, for speech-to-text
@@ -116,10 +122,10 @@ export class AudioProvider
                         });
                     }
 
-                    // Initialize audio context and source
+                    // Initialize input audio context and source
                     try {
-                        this.audioContext = new AudioContext();
-                        this.audioSource = this.audioContext.createMediaStreamSource(stream);
+                        this.audioInContext = new AudioContext({ sampleRate: INPUT_SAMPLE_RATE });
+                        this.audioSource = this.audioInContext.createMediaStreamSource(stream);
                     } catch (err: unknown) {
                         if (mode === "realtime") {
                             throw err;
@@ -130,8 +136,8 @@ export class AudioProvider
 
                     // Initialize audio analyser, if possible
                     try {
-                        if (this.audioContext && this.audioSource) {
-                            this.analyser = this.audioContext.createAnalyser();
+                        if (this.audioInContext && this.audioSource) {
+                            this.analyser = this.audioInContext.createAnalyser();
                             this.analyser.fftSize = FFT_SIZE;
                             this.audioSource.connect(this.analyser);
                             this.scheduleAnalyzeAudio();
@@ -141,14 +147,15 @@ export class AudioProvider
                         logThrownError("Audio visualization failed", err);
                     }
 
-                    // Initialize G711 A-law encoder, for realtime
-                    if (mode === "realtime" && this.audioContext && this.audioSource) {
+                    // Realtime audio processing
+                    if (mode === "realtime" && this.audioInContext && this.audioSource) {
+                        // Initialize G711 A-law encoder for input
                         logDebug("Initializing G711 A-law encoder");
-                        this.audioContext.audioWorklet
+                        this.audioInContext.audioWorklet
                             .addModule("G711AEncoder.js")
                             .then(() => {
-                                if (!this.stopped && this.audioContext && this.audioSource) {
-                                    this.g711aEncoder = new AudioWorkletNode(this.audioContext, "G711AEncoder");
+                                if (!this.stopped && this.audioInContext && this.audioSource) {
+                                    this.g711aEncoder = new AudioWorkletNode(this.audioInContext, "G711AEncoder");
                                     this.g711aEncoder.port.onmessage = (event) => {
                                         const data: unknown = event.data;
                                         if (data instanceof Uint8Array) {
@@ -163,7 +170,26 @@ export class AudioProvider
                                     this.audioSource.connect(this.g711aEncoder);
                                     this.recording = true;
                                     this.stateChanged();
-                                    logDebug("G711 A-law encoder started");
+                                    logDebug("G711 A-law encoder initialized");
+                                }
+                            })
+                            .catch((err: unknown) => {
+                                this.handleError(err);
+                            });
+
+                        // Initialize PCM 16-bit signed little-endian decoder for output
+                        this.audioOutContext = new AudioContext({ sampleRate: OUTPUT_SAMPLE_RATE });
+                        logDebug("Initializing PCM 16-bit signed little-endian decoder");
+                        this.audioOutContext.audioWorklet
+                            .addModule("PCM16SLEDecoder.js")
+                            .then(() => {
+                                if (!this.stopped && this.audioOutContext) {
+                                    this.pcm16sleDecoder = new AudioWorkletNode(
+                                        this.audioOutContext,
+                                        "PCM16SLEDecoder",
+                                    );
+                                    this.pcm16sleDecoder.connect(this.audioOutContext.destination);
+                                    logDebug("PCM 16-bit signed little-endian decoder initialized");
                                 }
                             })
                             .catch((err: unknown) => {
@@ -193,6 +219,12 @@ export class AudioProvider
         this.close();
     }
 
+    playAudio(audio: ArrayBuffer) {
+        if (!this.stopped && this.pcm16sleDecoder !== undefined) {
+            this.pcm16sleDecoder.port.postMessage(audio);
+        }
+    }
+
     /**
      * Stops recording.
      */
@@ -213,11 +245,22 @@ export class AudioProvider
             this.audioSource.disconnect();
             this.audioSource = undefined;
         }
-        if (this.audioContext !== undefined) {
-            this.audioContext.close().catch((err: unknown) => {
-                logThrownError("AudioContext close failed", err);
+        if (this.audioInContext !== undefined) {
+            this.audioInContext.close().catch((err: unknown) => {
+                logThrownError("Input AudioContext close failed", err);
             });
-            this.audioContext = undefined;
+            this.audioInContext = undefined;
+        }
+        if (this.pcm16sleDecoder !== undefined) {
+            this.pcm16sleDecoder.port.postMessage("close");
+            this.pcm16sleDecoder.disconnect();
+            this.pcm16sleDecoder = undefined;
+        }
+        if (this.audioOutContext !== undefined) {
+            this.audioOutContext.close().catch((err: unknown) => {
+                logThrownError("Output AudioContext close failed", err);
+            });
+            this.audioOutContext = undefined;
         }
         if (this.mediaRecorder !== undefined && this.mediaRecorder.state !== "inactive") {
             this.mediaRecorder.stop();
@@ -349,6 +392,15 @@ function getMediaRecorderAudioType(supportedAudioTypes: string[]) {
 export function getRealtimeInputAudioType(supportedInputAudioTypes: string[]) {
     for (const audioType of supportedInputAudioTypes) {
         if (audioType === SUPPORTED_REALTIME_INPUT_AUDIO_TYPE) {
+            return audioType;
+        }
+    }
+    throw new VerbalWebError("No supported audio format available");
+}
+
+export function getRealtimeOutputAudioType(supportedOutputAudioTypes: string[]) {
+    for (const audioType of supportedOutputAudioTypes) {
+        if (audioType === SUPPORTED_REALTIME_OUTPUT_AUDIO_TYPE) {
             return audioType;
         }
     }

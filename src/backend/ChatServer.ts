@@ -206,11 +206,13 @@ export class ChatServer {
 
             // Start realtime conversation
             if (amsg.type === "init" && amsg.mode === "realtime") {
+                this.initWebSocketInactivityTimeout();
                 this.handleRealtimeInit(amsg);
             }
 
             // Realtime audio
             else if (amsg.type === "rtaud") {
+                this.initWebSocketInactivityTimeout();
                 this.handleRealtimeAudio(amsg);
             }
 

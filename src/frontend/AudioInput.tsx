@@ -3,7 +3,7 @@ import { AudioAnalyserEventFunc } from "./AudioAnalyserEvent";
 import { AudioMode } from "./AudioMode";
 import { AudioErrorCode, AudioProvider } from "./AudioProvider";
 import { AudioVisualization } from "./AudioVisualization";
-import { ChatClient } from "./ChatClient";
+import { ChatClient, RealtimeAudioEvent } from "./ChatClient";
 import { logThrownError } from "./log";
 import CloseIcon from "@mui/icons-material/Close";
 import StopIcon from "@mui/icons-material/Stop";
@@ -94,6 +94,7 @@ export default function AudioInput(props: AudioInputProps) {
                 refAudioAnalyserEventFunc.current(event);
             }
         });
+
         const onChatEvent = () => {
             if (client.chat.error !== undefined) {
                 audioProvider.close();
@@ -117,10 +118,17 @@ export default function AudioInput(props: AudioInputProps) {
                 });
             }
         };
+
+        const onRealtimeAudio = (event: RealtimeAudioEvent) => {
+            audioProvider.playAudio(event.data);
+        };
+
         client.addEventListener("chat", onChatEvent);
+        client.addEventListener("rtaudio", onRealtimeAudio);
         audioProvider.start();
         return () => {
             audioProvider.close();
+            client.removeEventListener("rtaudio", onRealtimeAudio);
             client.removeEventListener("chat", onChatEvent);
             if (mode === "realtime") {
                 client.stopRealtime();
