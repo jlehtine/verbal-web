@@ -7,6 +7,7 @@ const MIN_DB = -60;
 const MAX_DB = -3.1;
 const SILENCE_RADIUS = 3;
 const BUFFER_SAMPLES = 64;
+const UPDATE_INTERVAL_MILLIS = 100;
 
 export interface AudioVisualizationProps {
     size: number;
@@ -19,8 +20,14 @@ export function AudioVisualization({ size, refAudioAnalyserEventFunc }: AudioVis
 
     useEffect(() => {
         let canvasFailed = false;
+        let lastRendered: number;
         const audioAnalyserEventFunc: AudioAnalyserEventFunc<unknown> = (event) => {
             if (canvasRef.current) {
+                if (lastRendered && event.timestamp - lastRendered < UPDATE_INTERVAL_MILLIS) {
+                    return;
+                } else {
+                    lastRendered = event.timestamp;
+                }
                 try {
                     const c = canvasRef.current;
                     const ctx = c.getContext("2d", { alpha: true, willReadFrequently: false });
