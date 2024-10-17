@@ -49,7 +49,7 @@ export class Chat {
      */
     update(amsg: ApiChatMessage): void {
         if (isChatInit(amsg)) {
-            this.state = { ...amsg, ...this.serverOverrides };
+            this.state = { ...amsg.state, ...this.serverOverrides };
             this.error = undefined;
             this.backendProcessing = lastOf(this.state.messages)?.role === "user";
         } else if (isChatMessageNew(amsg) || isChatAudioMessageNew(amsg)) {

@@ -59,7 +59,7 @@ export interface BinaryMessage<T extends string> extends TypedMessage<T> {
 }
 
 /** Chat initialization by the frontend */
-export interface ChatInit extends TypedMessage<"init">, ChatState {}
+export type ChatInit = ChatInitSimple | ChatInitRealtime;
 
 /** Chat state */
 export interface ChatState {
@@ -74,15 +74,27 @@ export interface ChatState {
 
     /** Current messages */
     messages: ChatMessage[];
+}
 
-    /** Whether to request real time conversation */
-    realtime?: boolean;
+/** Simple chat initialization */
+export interface ChatInitSimple extends ChatInitCommon {
+    mode: "chat";
+}
 
-    /** Real time input audio type, if real time conversation */
-    realtimeInputAudioType?: string;
+/** Realtime chat initialization */
+export interface ChatInitRealtime extends ChatInitCommon {
+    mode: "realtime";
+    realtimeInputAudioType: string;
+    realtimeOutputAudioType: string;
+}
 
-    /** Realtime output audio type, if real time conversation */
-    realtimeOutputAudioType?: string;
+/** Common parts of chat initialization */
+export interface ChatInitCommon extends TypedMessage<"init"> {
+    /** Mode: "chat" for traditional chat or "realtime" for realtime conversation */
+    mode: "chat" | "realtime";
+
+    /** Initial chat state */
+    state: ChatState;
 }
 
 /** Chat message */
@@ -168,15 +180,35 @@ export function isApiBackendChatMessage(v: unknown): v is ApiBackendChatMessage 
     return isTypedMessage(v) && (isChatMessagePart(v) || isChatAudioTranscription(v) || isChatMessageError(v));
 }
 
-export function isChatInit(v: unknown): v is ChatInit {
+function isChatState(v: unknown): v is ChatState {
     return (
-        isTypedMessageOfType(v, "init") &&
+        isObject(v) &&
         ["string", "undefined"].includes(typeof v.pageContent) &&
         ["string", "undefined"].includes(typeof v.initialInstruction) &&
         ["string", "undefined"].includes(typeof v.model) &&
         Array.isArray(v.messages) &&
         v.messages.map(isChatMessage).reduce((a, b) => a && b, true)
     );
+}
+
+function isChatInitCommon(v: TypedMessage<"init">): v is ChatInitCommon {
+    return (v.mode === "chat" || v.mode === "realtime") && isChatState(v.state);
+}
+
+function isChatInitSimple(v: ChatInitCommon): v is ChatInitSimple {
+    return v.mode === "chat";
+}
+
+function isChatInitRealtime(v: ChatInitCommon): v is ChatInitRealtime {
+    return (
+        v.mode === "realtime" &&
+        typeof v.realtimeInputAudioType === "string" &&
+        typeof v.realtimeOutputAudioType === "string"
+    );
+}
+
+export function isChatInit(v: unknown): v is ChatInit {
+    return isTypedMessageOfType(v, "init") && isChatInitCommon(v) && (isChatInitSimple(v) || isChatInitRealtime(v));
 }
 
 export function isChatMessage(v: unknown): v is ChatMessage {

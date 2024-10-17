@@ -327,7 +327,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
             if (!this.chatInitialized || this.chat.error !== undefined) {
                 if (this.ensureWebSocket()) {
                     logDebug("Sending the chat initialization");
-                    const init: ChatInit = { ...this.chat.state, type: "init" };
+                    const init: ChatInit = { type: "init", state: this.chat.state, mode: "chat" };
                     this.chat.update(init);
                     this.sendMessage(init);
                     this.chatInitialized = true;
