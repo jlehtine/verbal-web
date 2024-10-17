@@ -15,15 +15,15 @@ export const SUPPORTED_REALTIME_INPUT_AUDIO_TYPE = "audio/PCMA";
 
 export type AudioErrorCode = "general" | "notfound" | "notallowed" | "processing" | "realtime";
 
-export type SpeechRecorderParams = SpeechRecorderSttParams | SpeechRecorderRealtimeParams;
+export type AudioParams = AudioSttParams | AudioRealtimeParams;
 
-export interface SpeechRecorderSttParams {
+export interface AudioSttParams {
     mode: "stt";
     supportedAudioTypes: string[];
     stopOnSilence?: boolean;
 }
 
-export interface SpeechRecorderRealtimeParams {
+export interface AudioRealtimeParams {
     mode: "realtime";
     supportedInputAudioTypes: string[];
     supportedOutputAudioTypes: string[];
@@ -32,11 +32,11 @@ export interface SpeechRecorderRealtimeParams {
 /**
  * Records speech from the microphone.
  */
-export class SpeechRecorder
-    extends TypedEventTarget<SpeechRecorder, SpeechRecorderEventMap>
-    implements AudioAnalyserEventTarget<SpeechRecorder>
+export class AudioProvider
+    extends TypedEventTarget<AudioProvider, AudioProviderEventMap>
+    implements AudioAnalyserEventTarget<AudioProvider>
 {
-    private readonly params: SpeechRecorderParams;
+    private readonly params: AudioParams;
     private started = false;
     private stopped = false;
     private readonly rmsSamples = new Float32Array(RMS_AVERAGING_WINDOW);
@@ -58,7 +58,7 @@ export class SpeechRecorder
     private g711aEncoder: AudioWorkletNode | undefined;
     private analyser: AnalyserNode | undefined;
 
-    constructor(params: SpeechRecorderParams) {
+    constructor(params: AudioParams) {
         super();
         this.params = params;
     }
@@ -69,7 +69,7 @@ export class SpeechRecorder
     start() {
         const mode = this.params.mode;
         if (this.started) {
-            throw new VerbalWebError("SpeechRecorder already started");
+            throw new VerbalWebError("AudioProvider already started");
         }
         this.started = true;
         try {
@@ -106,7 +106,7 @@ export class SpeechRecorder
                         this.mediaRecorder.addEventListener("dataavailable", (event: BlobEvent) => {
                             if (event.data.size > 0) {
                                 logDebug("Processing recorded audio");
-                                const audioEvent: SpeechRecorderAudioEvent = {
+                                const audioEvent: AudioProviderAudioEvent = {
                                     target: this,
                                     type: "audio",
                                     blob: event.data,
@@ -152,7 +152,7 @@ export class SpeechRecorder
                                     this.g711aEncoder.port.onmessage = (event) => {
                                         const data: unknown = event.data;
                                         if (data instanceof Uint8Array) {
-                                            const audioEvent: SpeechRecorderRealtimeAudioEvent = {
+                                            const audioEvent: AudioProviderRealtimeAudioEvent = {
                                                 target: this,
                                                 type: "rtaudio",
                                                 buffer: data.buffer,
@@ -321,7 +321,7 @@ export class SpeechRecorder
             }
 
             // Send analyser event
-            const event: AudioAnalyserEvent<SpeechRecorder> = {
+            const event: AudioAnalyserEvent<AudioProvider> = {
                 target: this,
                 type: "analyser",
                 timestamp,
@@ -355,19 +355,19 @@ export function getRealtimeInputAudioType(supportedInputAudioTypes: string[]) {
     throw new VerbalWebError("No supported audio format available");
 }
 
-interface SpeechRecorderEventMap extends AudioAnalyserEventMap<SpeechRecorder> {
-    state: SpeechRecorderStateEvent;
-    audio: SpeechRecorderAudioEvent;
-    rtaudio: SpeechRecorderRealtimeAudioEvent;
+interface AudioProviderEventMap extends AudioAnalyserEventMap<AudioProvider> {
+    state: AudioProviderStateEvent;
+    audio: AudioProviderAudioEvent;
+    rtaudio: AudioProviderRealtimeAudioEvent;
 }
 
-export type SpeechRecorderStateEvent = TypedEvent<SpeechRecorder, "state">;
+export type AudioProviderStateEvent = TypedEvent<AudioProvider, "state">;
 
-export interface SpeechRecorderAudioEvent extends TypedEvent<SpeechRecorder, "audio"> {
+export interface AudioProviderAudioEvent extends TypedEvent<AudioProvider, "audio"> {
     blob: Blob;
 }
 
-export interface SpeechRecorderRealtimeAudioEvent extends TypedEvent<SpeechRecorder, "rtaudio"> {
+export interface AudioProviderRealtimeAudioEvent extends TypedEvent<AudioProvider, "rtaudio"> {
     buffer: ArrayBuffer;
 }
 

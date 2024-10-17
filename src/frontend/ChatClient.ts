@@ -15,7 +15,7 @@ import { VerbalWebError } from "../shared/error";
 import { TypedEvent, TypedEventTarget } from "../shared/event";
 import { retryWithBackoff } from "../shared/retry";
 import { apiMessageToWsData, wsDataToApiMessage } from "../shared/wsdata";
-import { SUPPORTED_REALTIME_INPUT_AUDIO_TYPE } from "./SpeechRecorder";
+import { SUPPORTED_REALTIME_INPUT_AUDIO_TYPE } from "./AudioProvider";
 import { logDebug, logThrownError } from "./log";
 import { StatusCodes } from "http-status-codes";
 

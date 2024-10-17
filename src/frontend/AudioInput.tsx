@@ -1,9 +1,9 @@
 import { RealtimeConfig, SpeechToTextConfig } from "../shared/api";
 import { AudioAnalyserEventFunc } from "./AudioAnalyserEvent";
 import { AudioMode } from "./AudioMode";
+import { AudioErrorCode, AudioProvider } from "./AudioProvider";
 import { AudioVisualization } from "./AudioVisualization";
 import { ChatClient } from "./ChatClient";
-import { AudioErrorCode, SpeechRecorder } from "./SpeechRecorder";
 import { logThrownError } from "./log";
 import CloseIcon from "@mui/icons-material/Close";
 import StopIcon from "@mui/icons-material/Stop";
@@ -45,7 +45,7 @@ export default function AudioInput(props: AudioInputProps) {
 
     useEffect(() => {
         let realtimeStarted = false;
-        const recorder = new SpeechRecorder(
+        const audioProvider = new AudioProvider(
             mode === "stt"
                 ? {
                       mode,
@@ -58,12 +58,12 @@ export default function AudioInput(props: AudioInputProps) {
                       supportedOutputAudioTypes: props.realtimeConf.supportedOutputAudioTypes,
                   },
         );
-        recorder.addEventListener("state", () => {
-            if (recorder.error !== error) {
-                recorder.close();
-                setError(recorder.error);
+        audioProvider.addEventListener("state", () => {
+            if (audioProvider.error !== error) {
+                audioProvider.close();
+                setError(audioProvider.error);
             }
-            if (recorder.recording && onStop === undefined) {
+            if (audioProvider.recording && onStop === undefined) {
                 if (mode === "realtime") {
                     if (!realtimeStarted) {
                         setRealtimePending(true);
@@ -74,13 +74,13 @@ export default function AudioInput(props: AudioInputProps) {
                     // Prepare chat connectivity, for faster response
                     client.prepareChat();
                     setOnStop(() => () => {
-                        recorder.stop();
+                        audioProvider.stop();
                         setProcessing(true);
                     });
                 }
             }
         });
-        recorder.addEventListener("audio", (event) => {
+        audioProvider.addEventListener("audio", (event) => {
             client
                 .submitAudioMessage(event.blob)
                 .then(onClose)
@@ -89,14 +89,14 @@ export default function AudioInput(props: AudioInputProps) {
                     setError("processing");
                 });
         });
-        recorder.addEventListener("analyser", (event) => {
+        audioProvider.addEventListener("analyser", (event) => {
             if (refAudioAnalyserEventFunc.current) {
                 refAudioAnalyserEventFunc.current(event);
             }
         });
         const onChatEvent = () => {
             if (client.chat.error !== undefined) {
-                recorder.close();
+                audioProvider.close();
                 if (error === undefined) {
                     if (mode === "realtime") {
                         setError("realtime");
@@ -107,20 +107,20 @@ export default function AudioInput(props: AudioInputProps) {
             }
             if (client.realtimeStarted && onStop === undefined) {
                 setRealtimePending(false);
-                recorder.addEventListener("rtaudio", (event) => {
+                audioProvider.addEventListener("rtaudio", (event) => {
                     client.submitRealtimeAudio(event.buffer);
                 });
                 setOnStop(() => () => {
-                    recorder.close();
+                    audioProvider.close();
                     client.stopRealtime();
                     onClose();
                 });
             }
         };
         client.addEventListener("chat", onChatEvent);
-        recorder.start();
+        audioProvider.start();
         return () => {
-            recorder.close();
+            audioProvider.close();
             client.removeEventListener("chat", onChatEvent);
             if (mode === "realtime") {
                 client.stopRealtime();
