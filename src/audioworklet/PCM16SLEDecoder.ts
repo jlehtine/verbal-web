@@ -9,6 +9,7 @@ class PCM16SLEDecoder extends AudioWorkletProcessor {
     private view: DataView = new DataView(this.buffers[0].buffer);
     private bufferHead = 0;
     private bufferTail = 0;
+    private littleEndian;
 
     constructor() {
         super();
@@ -33,6 +34,7 @@ class PCM16SLEDecoder extends AudioWorkletProcessor {
                 this.closed = true;
             }
         };
+        this.littleEndian = new Int16Array(new Uint8Array([1, 0]).buffer)[0] === 1;
     }
 
     process(inputs: Float32Array[][], outputs: Float32Array[][]) {
@@ -48,7 +50,7 @@ class PCM16SLEDecoder extends AudioWorkletProcessor {
             const remaining =
                 this.buffers.length == 1 ? this.bufferHead - this.bufferTail : AUDIO_BUFFER_LENGTH - this.bufferTail;
             const toConvert = Math.min(remaining, outputlen - converted);
-            pcm16sleToFloat32(this.view, this.bufferTail, toConvert, output0, converted);
+            this.pcm16sleToFloat32(this.buffers[0], this.view, this.bufferTail, toConvert, output0, converted);
             converted += toConvert;
             this.bufferTail += toConvert;
             if (this.bufferTail >= AUDIO_BUFFER_LENGTH) {
@@ -65,11 +67,24 @@ class PCM16SLEDecoder extends AudioWorkletProcessor {
 
         return true;
     }
-}
 
-function pcm16sleToFloat32(view: DataView, offset: number, length: number, output: Float32Array, outputOffset = 0) {
-    for (let i = 0; i < length; i++) {
-        output[outputOffset + i] = view.getInt16(offset + i * 2, true) / 32768;
+    private pcm16sleToFloat32(
+        buffer: Int16Array,
+        view: DataView,
+        offset: number,
+        length: number,
+        output: Float32Array,
+        outputOffset = 0,
+    ) {
+        if (this.littleEndian) {
+            for (let i = 0; i < length; i++) {
+                output[outputOffset + i] = buffer[offset + i] / 32768;
+            }
+        } else {
+            for (let i = 0; i < length; i++) {
+                output[outputOffset + i] = view.getInt16(offset + i * 2, true) / 32768;
+            }
+        }
     }
 }
 
