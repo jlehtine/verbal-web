@@ -3,17 +3,31 @@ import { TypedEvent, TypedEventTarget } from "../shared/event";
 import { AudioAnalyserEvent, AudioAnalyserEventMap, AudioAnalyserEventTarget } from "./AudioAnalyserEvent";
 import { logDebug, logThrownError } from "./log";
 
+const TARGET_SAMPLE_RATE = 8000;
+const TARGET_SAMPLE_SIZE = 16;
 const FFT_SIZE = 1024;
 const SILENCE_THRESHOLD = 0.01;
 const SILENCE_DURATION_MILLIS = 2000;
 const SOUND_DURATION_MILLIS = 1000;
 const RMS_AVERAGING_WINDOW = 20;
 
+const REALTIME_BUFFER_LENGTH = 1024;
+const SUPPORTED_REALTIME_INPUT_AUDIO_TYPE = "audio/PCMA";
+
 export type AudioErrorCode = "general" | "notfound" | "notallowed" | "processing";
 
-export interface SpeechRecorderParams {
+export type SpeechRecorderParams = SpeechRecorderSttParams | SpeechRecorderRealtimeParams;
+
+export interface SpeechRecorderSttParams {
+    mode: "stt";
     supportedAudioTypes: string[];
     stopOnSilence?: boolean;
+}
+
+export interface SpeechRecorderRealtimeParams {
+    mode: "realtime";
+    supportedInputAudioTypes: string[];
+    supportedOutputAudioTypes: string[];
 }
 
 /**
@@ -42,6 +56,7 @@ export class SpeechRecorder
     private mediaStream: MediaStream | undefined;
     private audioContext: AudioContext | undefined;
     private audioSource: MediaStreamAudioSourceNode | undefined;
+    private g711aEncoder: AudioWorkletNode | undefined;
     private analyser: AnalyserNode | undefined;
 
     constructor(params: SpeechRecorderParams) {
@@ -53,6 +68,7 @@ export class SpeechRecorder
      * Starts recording.
      */
     start() {
+        const mode = this.params.mode;
         if (this.started) {
             throw new VerbalWebError("SpeechRecorder already started");
         }
@@ -62,8 +78,8 @@ export class SpeechRecorder
                 .getUserMedia({
                     audio: {
                         channelCount: 1,
-                        sampleRate: 8000,
-                        sampleSize: 8,
+                        sampleRate: TARGET_SAMPLE_RATE,
+                        sampleSize: TARGET_SAMPLE_SIZE,
                         autoGainControl: true,
                         noiseSuppression: true,
                     },
@@ -76,66 +92,149 @@ export class SpeechRecorder
                         this.stop();
                         return;
                     }
+                    logDebug("Start audio recording");
 
-                    // Initialize media recorder
-                    this.mediaRecorder = new MediaRecorder(stream, {
-                        mimeType: getAudioType(this.params.supportedAudioTypes),
-                    });
-                    this.mediaRecorder.ondataavailable = (event: BlobEvent) => {
-                        if (event.data.size > 0) {
-                            logDebug("Processing recorded audio");
-                            const audioEvent: SpeechRecorderAudioEvent = {
-                                target: this,
-                                type: "audio",
-                                blob: event.data,
-                                timecode: Date.now(),
-                            };
-                            this.dispatchEvent(audioEvent);
-                        }
-                    };
+                    // Check realtime audio type
+                    if (mode === "realtime") {
+                        getRealtimeInputAudioType(this.params.supportedInputAudioTypes);
+                    }
 
-                    // Initialize audio context
+                    // Initialize media recorder, for speech-to-text
+                    if (mode === "stt") {
+                        this.mediaRecorder = new MediaRecorder(stream, {
+                            mimeType: getMediaRecorderAudioType(this.params.supportedAudioTypes),
+                        });
+                        this.mediaRecorder.addEventListener("dataavailable", (event: BlobEvent) => {
+                            if (event.data.size > 0) {
+                                logDebug("Processing recorded audio");
+                                const audioEvent: SpeechRecorderAudioEvent = {
+                                    target: this,
+                                    type: "audio",
+                                    blob: event.data,
+                                };
+                                this.dispatchEvent(audioEvent);
+                            }
+                        });
+                    }
+
+                    // Initialize audio context and source
                     try {
                         this.audioContext = new AudioContext();
                         this.audioSource = this.audioContext.createMediaStreamSource(stream);
-                        this.analyser = this.audioContext.createAnalyser();
-                        this.analyser.fftSize = FFT_SIZE;
-                        this.audioSource.connect(this.analyser);
-                        this.scheduleAnalyzeAudio();
-                        logDebug("Started audio analysis");
                     } catch (err: unknown) {
-                        logThrownError("Audio analysis initialization failed", err);
+                        if (mode === "realtime") {
+                            throw err;
+                        } else {
+                            logThrownError("Audio visualization failed", err);
+                        }
                     }
 
-                    // Start audio recording
-                    logDebug("Start audio recording");
-                    this.mediaRecorder.start();
-                    this.recording = true;
-                    this.stateChanged();
+                    // Initialize G711 A-law encoder, for realtime
+                    if (mode === "realtime" && this.audioContext && this.audioSource) {
+                        this.audioContext.audioWorklet
+                            .addModule("G711AEncoder.js")
+                            .then(() => {
+                                if (!this.stopped && this.audioContext && this.audioSource) {
+                                    const array = new Uint8Array(REALTIME_BUFFER_LENGTH);
+                                    const buffer = array.buffer;
+                                    let bufferBytes = 0;
+                                    this.g711aEncoder = new AudioWorkletNode(this.audioContext, "G711AEncoder");
+                                    this.audioSource.connect(this.g711aEncoder);
+                                    this.g711aEncoder.port.addEventListener("message", (event) => {
+                                        const data: unknown = event.data;
+                                        if (typeof data === "object" && data instanceof Uint8Array) {
+                                            const sendAudioEvent = (ab: ArrayBuffer) => {
+                                                const audioEvent: SpeechRecorderAudioEvent = {
+                                                    target: this,
+                                                    type: "audio",
+                                                    blob: new Blob([ab], { type: SUPPORTED_REALTIME_INPUT_AUDIO_TYPE }),
+                                                };
+                                                this.dispatchEvent(audioEvent);
+                                            };
+                                            const databuf = data.buffer;
+                                            if (bufferBytes === 0 && databuf.byteLength >= REALTIME_BUFFER_LENGTH) {
+                                                sendAudioEvent(
+                                                    data.byteOffset === 0 && databuf.byteLength === data.length
+                                                        ? databuf
+                                                        : databuf.slice(data.byteOffset, data.byteOffset + data.length),
+                                                );
+                                            } else {
+                                                let dataConsumed = 0;
+                                                while (dataConsumed < data.length) {
+                                                    const remaining = REALTIME_BUFFER_LENGTH - bufferBytes;
+                                                    const toCopy = Math.min(remaining, data.length - dataConsumed);
+                                                    new Uint8Array(buffer, bufferBytes, toCopy).set(
+                                                        data.subarray(dataConsumed, dataConsumed + toCopy),
+                                                    );
+                                                    bufferBytes += toCopy;
+                                                    dataConsumed += toCopy;
+                                                    if (bufferBytes === REALTIME_BUFFER_LENGTH) {
+                                                        sendAudioEvent(buffer);
+                                                        bufferBytes = 0;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    });
+                                    this.recording = true;
+                                    this.stateChanged();
+                                }
+                            })
+                            .catch((err: unknown) => {
+                                this.handleError(err);
+                            });
+                    }
+
+                    try {
+                        // Initialize audio analyser, if possible
+                        if (this.audioContext && this.audioSource) {
+                            this.analyser = this.audioContext.createAnalyser();
+                            this.analyser.fftSize = FFT_SIZE;
+                            this.audioSource.connect(this.analyser);
+                            this.scheduleAnalyzeAudio();
+                            logDebug("Started audio analysis");
+                        }
+                    } catch (err: unknown) {
+                        logThrownError("Audio visualization failed", err);
+                    }
+
+                    // Start audio recording, for speech-to-text
+                    if (this.mediaRecorder !== undefined) {
+                        this.mediaRecorder.start();
+                        this.recording = true;
+                        this.stateChanged();
+                    }
                 })
                 .catch((err: unknown) => {
-                    logThrownError("Audio failed", err);
-                    this.error = toAudioErrorCode(err);
-                    this.stateChanged();
+                    this.handleError(err);
                 });
         } catch (err: unknown) {
-            logThrownError("Audio failed", err);
-            this.error = toAudioErrorCode(err);
-            this.stateChanged();
+            this.handleError(err);
         }
+    }
+
+    private handleError(err: unknown) {
+        logThrownError("Audio initialization failed", err);
+        this.error = toAudioErrorCode(err);
+        this.stateChanged();
+        this.close();
     }
 
     /**
      * Stops recording.
      */
     stop() {
-        if (this.stopped) {
-            return;
+        if (!this.stopped) {
+            logDebug("Stop audio recording");
         }
         this.stopped = true;
         if (this.analyser !== undefined) {
             this.analyser.disconnect();
             this.analyser = undefined;
+        }
+        if (this.g711aEncoder !== undefined) {
+            this.g711aEncoder.disconnect();
+            this.g711aEncoder = undefined;
         }
         if (this.audioSource !== undefined) {
             this.audioSource.disconnect();
@@ -148,7 +247,6 @@ export class SpeechRecorder
             this.audioContext = undefined;
         }
         if (this.mediaRecorder !== undefined && this.mediaRecorder.state !== "inactive") {
-            logDebug("Stop audio recording");
             this.mediaRecorder.stop();
         }
         if (this.mediaStream !== undefined) {
@@ -223,13 +321,14 @@ export class SpeechRecorder
 
             // Silence detection
             let silence;
+            const stopOnSilence = this.params.mode === "stt" && this.params.stopOnSilence;
             if (rms < SILENCE_THRESHOLD) {
                 if (this.silenceStartedAt === undefined) {
                     this.silenceStartedAt = timestamp;
                 }
                 if (
                     this.soundDetected &&
-                    this.params.stopOnSilence &&
+                    stopOnSilence &&
                     timestamp - this.silenceStartedAt > SILENCE_DURATION_MILLIS
                 ) {
                     this.stop();
@@ -265,9 +364,18 @@ export class SpeechRecorder
     }
 }
 
-function getAudioType(supportedAudioTypes: string[]) {
+function getMediaRecorderAudioType(supportedAudioTypes: string[]) {
     for (const audioType of supportedAudioTypes) {
         if (MediaRecorder.isTypeSupported(audioType)) {
+            return audioType;
+        }
+    }
+    throw new VerbalWebError("No supported audio format available");
+}
+
+export function getRealtimeInputAudioType(supportedInputAudioTypes: string[]) {
+    for (const audioType of supportedInputAudioTypes) {
+        if (audioType === SUPPORTED_REALTIME_INPUT_AUDIO_TYPE) {
             return audioType;
         }
     }
@@ -283,7 +391,6 @@ export type SpeechRecorderStateEvent = TypedEvent<SpeechRecorder, "state">;
 
 export interface SpeechRecorderAudioEvent extends TypedEvent<SpeechRecorder, "audio"> {
     blob: Blob;
-    timecode: number;
 }
 
 function toAudioErrorCode(err: unknown): AudioErrorCode {

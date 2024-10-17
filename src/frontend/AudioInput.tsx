@@ -1,5 +1,6 @@
-import { SpeechToTextConfig } from "../shared/api";
+import { RealtimeConfig, SpeechToTextConfig } from "../shared/api";
 import { AudioAnalyserEventFunc } from "./AudioAnalyserEvent";
+import { AudioMode } from "./AudioMode";
 import { AudioVisualization } from "./AudioVisualization";
 import { ChatClient } from "./ChatClient";
 import { AudioErrorCode, SpeechRecorder } from "./SpeechRecorder";
@@ -12,13 +13,27 @@ import { useTranslation } from "react-i18next";
 
 const VISUALIZATION_SIZE = 64;
 
-export interface AudioInputProps {
+export type AudioInputProps = AudioInputSttProps | AudioInputRealtimeProps;
+
+interface AudioInputCommonProps {
+    mode: AudioMode;
     onClose: () => void;
-    sttConf: SpeechToTextConfig;
     client: ChatClient;
 }
 
-export default function AudioInput({ onClose, sttConf, client }: AudioInputProps) {
+interface AudioInputSttProps extends AudioInputCommonProps {
+    mode: "stt";
+    sttConf: SpeechToTextConfig;
+}
+
+interface AudioInputRealtimeProps extends AudioInputCommonProps {
+    mode: "realtime";
+    realtimeConf: RealtimeConfig;
+}
+
+export default function AudioInput(props: AudioInputProps) {
+    const { mode, onClose, client } = props;
+
     const { t } = useTranslation();
     const theme = useTheme();
     const refAudioAnalyserEventFunc = React.useRef<AudioAnalyserEventFunc<unknown>>();
@@ -28,10 +43,19 @@ export default function AudioInput({ onClose, sttConf, client }: AudioInputProps
     const [onStop, setOnStop] = useState<() => void>();
 
     useEffect(() => {
-        const recorder = new SpeechRecorder({
-            supportedAudioTypes: sttConf.supportedAudioTypes,
-            stopOnSilence: true,
-        });
+        const recorder = new SpeechRecorder(
+            mode === "stt"
+                ? {
+                      mode,
+                      supportedAudioTypes: props.sttConf.supportedAudioTypes,
+                      stopOnSilence: true,
+                  }
+                : {
+                      mode,
+                      supportedInputAudioTypes: props.realtimeConf.supportedInputAudioTypes,
+                      supportedOutputAudioTypes: props.realtimeConf.supportedOutputAudioTypes,
+                  },
+        );
         recorder.addEventListener("state", () => {
             if (recorder.error !== error) {
                 setError(recorder.error);
@@ -39,6 +63,12 @@ export default function AudioInput({ onClose, sttConf, client }: AudioInputProps
             if (recorder.recording && onStop === undefined) {
                 setOnStop(() => () => {
                     recorder.stop();
+                    if (mode === "stt") {
+                        setProcessing(true);
+                    } else {
+                        // TODO Stop realtime
+                        onClose();
+                    }
                 });
 
                 // Prepare chat connectivity, for faster response
@@ -46,14 +76,17 @@ export default function AudioInput({ onClose, sttConf, client }: AudioInputProps
             }
         });
         recorder.addEventListener("audio", (event) => {
-            setProcessing(true);
-            client
-                .submitAudioMessage(event.blob)
-                .then(onClose)
-                .catch((err: unknown) => {
-                    logThrownError("Failed to process audio", err);
-                    setError("processing");
-                });
+            if (mode === "stt") {
+                client
+                    .submitAudioMessage(event.blob)
+                    .then(onClose)
+                    .catch((err: unknown) => {
+                        logThrownError("Failed to process audio", err);
+                        setError("processing");
+                    });
+            } else {
+                // TODO Send realtime audio
+            }
         });
         recorder.addEventListener("analyser", (event) => {
             if (refAudioAnalyserEventFunc.current) {

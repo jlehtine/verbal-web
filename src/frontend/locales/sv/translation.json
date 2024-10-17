@@ -6,9 +6,10 @@
             "notfound": "Ingen kompatibel ljudingångsenhet hittades.",
             "processing": "Det gick inte att bearbeta ljud."
         },
-        "initializingRecording": "Initierar ljudinspelning. Vänligen tillåt ljudåtkomst för att använda röststyrning.",
-        "input": "Talkontroll",
+        "initializingRecording": "Initierar ljudinspelning. Vänligen tillåt ljudåtkomst för att använda taligenkänning.",
+        "input": "Taligenkänning",
         "processing": "Bearbetar ljud...",
+        "realtime": "Ljudkonversation",
         "recording": "Jag lyssnar på ditt tal. Sluta genom att ta en paus eller trycka på knappen.",
         "stopRecording": "Sluta inspelning"
     },

@@ -6,9 +6,10 @@
             "notfound": "Yhteensopivaa äänilähdettä ei löytynyt.",
             "processing": "Äänen käsittely epäonnistui."
         },
-        "initializingRecording": "Puheohjausta valmistellaan. Sallithan äänen tallennuksen käyttääksesi puheohjausta.",
-        "input": "Puheohjaus",
+        "initializingRecording": "Äänen tallennusta valmistellaan. Sallithan äänen tallennuksen käyttääksesi puheentunnistusta.",
+        "input": "Puheentunnistus",
         "processing": "Käsitellään ääntä...",
+        "realtime": "Puhekeskustelu",
         "recording": "Kuuntelen puhettasi. Lopeta pitämällä tauko tai painamalla napista.",
         "stopRecording": "Lopeta tallennus"
     },
