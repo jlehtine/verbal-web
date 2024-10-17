@@ -7,7 +7,8 @@ const INPUT_SAMPLE_RATE = 8000;
 const INPUT_SAMPLE_SIZE = 16;
 const FFT_SIZE = 1024;
 const SILENCE_THRESHOLD = 0.01;
-const SILENCE_DURATION_MILLIS = 2000;
+const SILENCE_DURATION_MILLIS = 500;
+const SILENCE_STOP_DURATION_MILLIS = 2000;
 const SOUND_DURATION_MILLIS = 1000;
 const RMS_AVERAGING_WINDOW = 20;
 const OUTPUT_SAMPLE_RATE = 24000;
@@ -48,6 +49,7 @@ export class AudioProvider
     private rmsSampleSum = 0;
     private silenceStartedAt: number | undefined;
     private soundStartedAt: number | undefined;
+    private silenceDetected = true;
     private soundDetected = false;
     private tryRequestAnimationFrame = typeof requestAnimationFrame === "function";
 
@@ -122,29 +124,21 @@ export class AudioProvider
                         });
                     }
 
-                    // Initialize input audio context and source
+                    // Initialize audio context and analyser
                     try {
                         this.audioInContext = new AudioContext({ sampleRate: INPUT_SAMPLE_RATE });
                         this.audioSource = this.audioInContext.createMediaStreamSource(stream);
+                        this.analyser = this.audioInContext.createAnalyser();
+                        this.analyser.fftSize = FFT_SIZE;
+                        this.audioSource.connect(this.analyser);
+                        this.scheduleAnalyzeAudio();
+                        logDebug("Started audio analysis");
                     } catch (err: unknown) {
                         if (mode === "realtime") {
                             throw err;
                         } else {
-                            logThrownError("Audio visualization failed", err);
+                            logThrownError("Audio context initialization failed", err);
                         }
-                    }
-
-                    // Initialize audio analyser, if possible
-                    try {
-                        if (this.audioInContext && this.audioSource) {
-                            this.analyser = this.audioInContext.createAnalyser();
-                            this.analyser.fftSize = FFT_SIZE;
-                            this.audioSource.connect(this.analyser);
-                            this.scheduleAnalyzeAudio();
-                            logDebug("Started audio analysis");
-                        }
-                    } catch (err: unknown) {
-                        logThrownError("Audio visualization failed", err);
                     }
 
                     // Realtime audio processing
@@ -158,7 +152,7 @@ export class AudioProvider
                                     this.g711aEncoder = new AudioWorkletNode(this.audioInContext, "G711AEncoder");
                                     this.g711aEncoder.port.onmessage = (event) => {
                                         const data: unknown = event.data;
-                                        if (data instanceof Uint8Array) {
+                                        if (!this.silenceDetected && data instanceof Uint8Array) {
                                             const audioEvent: AudioProviderRealtimeAudioEvent = {
                                                 target: this,
                                                 type: "rtaudio",
@@ -198,8 +192,9 @@ export class AudioProvider
                     }
 
                     // Start audio recording, for speech-to-text
-                    if (this.mediaRecorder !== undefined) {
+                    if (this.mediaRecorder) {
                         this.mediaRecorder.start();
+                        this.mediaRecorder.pause();
                         this.recording = true;
                         this.stateChanged();
                     }
@@ -342,16 +337,32 @@ export class AudioProvider
                 if (this.silenceStartedAt === undefined) {
                     this.silenceStartedAt = timestamp;
                 }
+                if (timestamp - this.silenceStartedAt > SILENCE_DURATION_MILLIS) {
+                    if (!this.silenceDetected) {
+                        logDebug("Silence detected");
+                        if (this.mediaRecorder && this.recording) {
+                            this.mediaRecorder.pause();
+                        }
+                    }
+                    this.silenceDetected = true;
+                }
                 if (
+                    timestamp - this.silenceStartedAt > SILENCE_STOP_DURATION_MILLIS &&
                     this.soundDetected &&
-                    stopOnSilence &&
-                    timestamp - this.silenceStartedAt > SILENCE_DURATION_MILLIS
+                    stopOnSilence
                 ) {
                     this.stop();
                 }
                 silence = true;
             } else {
+                if (this.silenceDetected) {
+                    logDebug("Sound detected");
+                    if (this.mediaRecorder && this.recording) {
+                        this.mediaRecorder.resume();
+                    }
+                }
                 this.silenceStartedAt = undefined;
+                this.silenceDetected = false;
                 silence = false;
             }
             if (!this.soundDetected && rms > SILENCE_THRESHOLD) {
