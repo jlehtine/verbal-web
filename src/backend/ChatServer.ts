@@ -242,7 +242,6 @@ export class ChatServer {
         if (this.config?.allowUsers === undefined || this.requestContext.session?.userEmail !== undefined) {
             return true;
         } else {
-            console.debug("session = " + JSON.stringify(this.requestContext.session));
             this.error("Unauthorized, requesting authentication");
             if (this.ws.readyState === WebSocket.OPEN) {
                 const errmsg: ChatMessageError = { type: "msgerror", code: "auth" };
