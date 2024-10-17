@@ -111,7 +111,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
 
     private chatInitialized = false;
 
-    private pendingAudioMessage: ChatAudioMessageNew | undefined;
+    private pendingMessages: ApiFrontendChatMessage[] = [];
 
     private pendingPrepareChat = false;
 
@@ -143,11 +143,10 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
         // Update chat model state
         const amsg: ChatMessageNew = { type: "msgnew", content: content };
         this.chat.update(amsg);
+        this.chatEvent();
 
         // Send the API message, if possible
         this.updateState(amsg);
-
-        this.chatEvent();
     }
 
     /**
@@ -159,13 +158,19 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
         // Update chat model state
         const binary = await blob.arrayBuffer();
         const amsg: ChatAudioMessageNew = { type: "audnew", mimeType: blob.type, binary };
-        this.chat.update(amsg);
-        this.pendingAudioMessage = amsg;
+        this.submitApiMessage(amsg);
+    }
 
-        // Send the API message, if possible
-        this.updateState();
-
+    /**
+     * Submits an API message to the backend. Also updates the chat state.
+     *
+     * @param message API message to send
+     */
+    submitApiMessage(message: ApiFrontendChatMessage) {
+        this.chat.update(message);
         this.chatEvent();
+        this.pendingMessages.push(message);
+        this.updateState();
     }
 
     /**
@@ -320,7 +325,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
 
         // Ready to send chat content to backend?
         else if (
-            (this.chat.backendProcessing || this.pendingPrepareChat) &&
+            (this.chat.backendProcessing || this.pendingPrepareChat || this.pendingMessages.length > 0) &&
             (!this.sharedConfig.auth?.required || this.authInitialized)
         ) {
             // Need chat initialization?
@@ -328,32 +333,32 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
                 if (this.ensureWebSocket()) {
                     logDebug("Sending the chat initialization");
                     const init: ChatInit = { type: "init", state: this.chat.state, mode: "chat" };
-                    this.chat.update(init);
                     this.sendMessage(init);
                     this.chatInitialized = true;
                     this.pendingPrepareChat = false;
-                    if (this.pendingAudioMessage) {
-                        this.chat.update(this.pendingAudioMessage);
-                    }
                     this.updateState();
+                    this.handlePendingMessages();
                 }
             }
 
             // Can send the supplied message?
             else if (msg) {
-                if (this.ensureWebSocket()) {
-                    logDebug("Sending a chat update");
-                    this.sendMessage(msg);
-                }
+                logDebug("Sending a chat update");
+                this.sendMessage(msg);
             }
 
-            // Can send the pending audio message
-            else if (this.pendingAudioMessage) {
-                if (this.ensureWebSocket()) {
-                    logDebug("Sending a pending audio message");
-                    this.sendMessage(this.pendingAudioMessage);
-                    this.pendingAudioMessage = undefined;
-                }
+            // Can send the pending messages
+            else {
+                this.handlePendingMessages();
+            }
+        }
+    }
+
+    private handlePendingMessages() {
+        while (this.pendingMessages.length > 0) {
+            const msg = this.pendingMessages.shift();
+            if (msg) {
+                this.sendMessage(msg);
             }
         }
     }
@@ -439,9 +444,6 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
                 logDebug("Received a chat update");
                 this.chat.update(amsg);
                 this.numErrors = 0;
-                if (isChatMessageError(amsg) && amsg.code !== "auth") {
-                    this.pendingAudioMessage = undefined;
-                }
                 this.chatEvent();
                 if (isChatMessageError(amsg) && amsg.code === "auth") {
                     if (this.ws.readyState !== WebSocket.CLOSED && this.ws.readyState !== WebSocket.CLOSING) {
