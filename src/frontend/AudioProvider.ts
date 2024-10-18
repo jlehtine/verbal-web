@@ -133,7 +133,7 @@ export class AudioProvider
 
                     // Initialize audio context and analyser
                     try {
-                        this.audioInContext = new AudioContext({ sampleRate: INPUT_SAMPLE_RATE });
+                        this.audioInContext = new AudioContext();
                         this.audioSource = this.audioInContext.createMediaStreamSource(stream);
                         this.analyser = this.audioInContext.createAnalyser();
                         this.analyser.fftSize = FFT_SIZE;
