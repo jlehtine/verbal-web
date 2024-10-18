@@ -3,6 +3,7 @@
         "conversationInProgress": "Puhekeskustelu on käynnissä. Lopeta painamalla napista.",
         "error": {
             "general": "Ääniominaisuuksien alustaminen epäonnistui.",
+            "noaudio": "Ääntä ei havaittu.",
             "notallowed": "Ääni ei ole sallittu. Tarkista selaimen asetukset ja verkkosivun käyttöoikeudet.",
             "notfound": "Yhteensopivaa äänilähdettä ei löytynyt.",
             "processing": "Äänen käsittely epäonnistui.",

@@ -24,7 +24,7 @@ export class AudioError extends VerbalWebError {
     }
 }
 
-export type AudioErrorCode = "general" | "notfound" | "notallowed" | "processing" | "realtime" | "warning";
+export type AudioErrorCode = "general" | "notfound" | "notallowed" | "processing" | "realtime" | "warning" | "noaudio";
 
 export type AudioParams = AudioSttParams | AudioRealtimeParams;
 
@@ -199,12 +199,8 @@ export class AudioProvider
                     }
 
                     // Start audio recording, for speech-to-text
-                    if (this.mediaRecorder) {
-                        this.mediaRecorder.start();
-                        this.mediaRecorder.pause();
-                        this.recording = true;
-                        this.stateChanged();
-                    }
+                    this.recording = true;
+                    this.stateChanged();
                 })
                 .catch((err: unknown) => {
                     this.handleError(err);
@@ -282,8 +278,13 @@ export class AudioProvider
             });
             this.audioOutContext = undefined;
         }
-        if (this.mediaRecorder !== undefined && this.mediaRecorder.state !== "inactive") {
-            this.mediaRecorder.stop();
+        if (this.mediaRecorder !== undefined) {
+            if (this.mediaRecorder.state !== "inactive") {
+                this.mediaRecorder.stop();
+            } else if (this.recording) {
+                this.error = "noaudio";
+                this.stateChanged();
+            }
         }
         if (this.mediaStream !== undefined) {
             this.mediaStream.getTracks().forEach((track) => {
@@ -383,7 +384,11 @@ export class AudioProvider
                 if (this.silenceDetected) {
                     logDebug("Sound detected");
                     if (this.mediaRecorder && this.recording) {
-                        this.mediaRecorder.resume();
+                        if (this.mediaRecorder.state === "inactive") {
+                            this.mediaRecorder.start();
+                        } else {
+                            this.mediaRecorder.resume();
+                        }
                     }
                 }
                 this.silenceStartedAt = undefined;

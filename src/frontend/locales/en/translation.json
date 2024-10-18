@@ -3,6 +3,7 @@
         "conversationInProgress": "Audio conversation is in progress. Stop by pressing the button.",
         "error": {
             "general": "Failed to initialize audio features.",
+            "noaudio": "No audio detected.",
             "notallowed": "Audio is not allowed. Please check browser settings and web page permissions.",
             "notfound": "No compatible audio input device was found.",
             "processing": "Failed to process audio.",

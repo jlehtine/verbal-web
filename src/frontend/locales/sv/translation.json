@@ -3,6 +3,7 @@
         "conversationInProgress": "Ljudkonversationen pågår. Sluta genom att trycka på knappen.",
         "error": {
             "general": "Det gick inte att initiera ljudfunktionerna.",
+            "noaudio": "Ingen ljud upptäckt.",
             "notallowed": "Ljud är inte tillåtet. Kontrollera webbläsarinställningar och webbplatsens behörigheter.",
             "notfound": "Ingen kompatibel ljudingångsenhet hittades.",
             "processing": "Det gick inte att bearbeta ljud.",
