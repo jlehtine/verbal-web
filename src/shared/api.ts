@@ -1,6 +1,6 @@
 import { isObject } from "./util";
 
-/** Shared configuration provided by the backend from `/chatconf` path */
+/** Shared configuration provided by the backend to the client from configuration endpoint */
 export interface SharedConfig {
     /** Authentication configuration, indicating that authentication is supported */
     auth?: AuthConfig;
@@ -31,6 +31,14 @@ export interface RealtimeConfig {
     /** Supported realtime audio output types */
     supportedOutputAudioTypes: string[];
 }
+
+/** Logging request from client to the backend logging endpoint */
+export interface LogRequest {
+    level: LogRequestLevel;
+    message: string;
+}
+
+export type LogRequestLevel = "error" | "warning";
 
 /** API chat messages */
 export type ApiChatMessage = ApiFrontendChatMessage | ApiBackendChatMessage;
@@ -166,6 +174,10 @@ export type ChatRealtimeAudio = BinaryMessage<"rtaud">;
 export type ChatRealtimeStarted = TypedMessage<"rtstarted">;
 
 export type ChatRealtimeStop = TypedMessage<"rtstop">;
+
+export function isLogRequest(v: unknown): v is LogRequest {
+    return isObject(v) && (v.level === "error" || v.level === "warning") && typeof v.message === "string";
+}
 
 function isTypedMessage(v: unknown): v is TypedMessage<string> {
     return isObject(v) && typeof v.type === "string";

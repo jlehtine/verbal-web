@@ -5,13 +5,14 @@ import {
     ChatMessageNew,
     ChatRealtimeAudio,
     ChatRealtimeStop,
+    LogRequestLevel,
     SharedConfig,
     isApiBackendChatMessage,
     isChatMessageError,
     isSharedConfig,
 } from "../shared/api";
 import { Chat, InitialChatState } from "../shared/chat";
-import { VerbalWebError } from "../shared/error";
+import { describeError, VerbalWebError } from "../shared/error";
 import { TypedEvent, TypedEventTarget } from "../shared/event";
 import { retryWithBackoff } from "../shared/retry";
 import { apiMessageToWsData, wsDataToApiMessage } from "../shared/wsdata";
@@ -221,6 +222,26 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
         }
         this.pendingMessages.push(message);
         this.updateState();
+    }
+
+    /**
+     * Sends an error log to the backend.
+     *
+     * @param message message
+     * @param err error, if available
+     */
+    submitLog(level: LogRequestLevel, message: string, err?: unknown) {
+        const msg = err != undefined ? describeError(err, true, message) : message;
+        const logRequest = { level: level, message: msg };
+        fetch(getHttpUrl(this.backendUrl, "vw/log"), {
+            method: "post",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(logRequest),
+        }).catch((err: unknown) => {
+            logThrownError("Failed to send an error log", err);
+        });
     }
 
     /**

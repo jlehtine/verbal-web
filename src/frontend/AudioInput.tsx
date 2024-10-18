@@ -87,12 +87,16 @@ export default function AudioInput(props: AudioInputProps) {
                 .catch((err: unknown) => {
                     logThrownError("Failed to process audio", err);
                     setError("processing");
+                    client.submitLog("error", "Failed to process audio", err);
                 });
         });
         audioProvider.addEventListener("analyser", (event) => {
             if (refAudioAnalyserEventFunc.current) {
                 refAudioAnalyserEventFunc.current(event);
             }
+        });
+        audioProvider.addEventListener("error", (event) => {
+            client.submitLog(event.level, `Audio error: ${event.errorCode}`, event.error);
         });
 
         const onChatEvent = () => {

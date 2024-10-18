@@ -17,7 +17,14 @@ export const SUPPORTED_REALTIME_INPUT_AUDIO_TYPE = "audio/PCMA";
 export const SUPPORTED_REALTIME_OUTPUT_AUDIO_TYPE =
     "audio/pcm;rate=24000;bits=16;encoding=signed-int;channels=1;big-endian=false";
 
-export type AudioErrorCode = "general" | "notfound" | "notallowed" | "processing" | "realtime";
+export class AudioError extends VerbalWebError {
+    constructor(msg: string, options?: ErrorOptions) {
+        super(msg, options);
+        this.name = "AudioError";
+    }
+}
+
+export type AudioErrorCode = "general" | "notfound" | "notallowed" | "processing" | "realtime" | "warning";
 
 export type AudioParams = AudioSttParams | AudioRealtimeParams;
 
@@ -137,7 +144,7 @@ export class AudioProvider
                         if (mode === "realtime") {
                             throw err;
                         } else {
-                            logThrownError("Audio context initialization failed", err);
+                            this.handleWarning("Audio context initialization failed", err);
                         }
                     }
 
@@ -210,8 +217,26 @@ export class AudioProvider
     private handleError(err: unknown) {
         logThrownError("Audio initialization failed", err);
         this.error = toAudioErrorCode(err);
+        this.dispatchEvent({
+            target: this,
+            type: "error",
+            level: "error",
+            errorCode: this.error,
+            error: err,
+        } as AudioProviderErrorEvent);
         this.stateChanged();
         this.close();
+    }
+
+    private handleWarning(msg: string, err: unknown) {
+        logThrownError(msg, err);
+        this.dispatchEvent({
+            target: this,
+            type: "error",
+            level: "warning",
+            errorCode: "warning",
+            error: err,
+        } as AudioProviderErrorEvent);
     }
 
     playAudio(audio: ArrayBuffer) {
@@ -242,7 +267,7 @@ export class AudioProvider
         }
         if (this.audioInContext !== undefined) {
             this.audioInContext.close().catch((err: unknown) => {
-                logThrownError("Input AudioContext close failed", err);
+                this.handleWarning("Input AudioContext close failed", err);
             });
             this.audioInContext = undefined;
         }
@@ -253,7 +278,7 @@ export class AudioProvider
         }
         if (this.audioOutContext !== undefined) {
             this.audioOutContext.close().catch((err: unknown) => {
-                logThrownError("Output AudioContext close failed", err);
+                this.handleWarning("Output AudioContext close failed", err);
             });
             this.audioOutContext = undefined;
         }
@@ -290,7 +315,7 @@ export class AudioProvider
                     });
                     return;
                 } catch (err: unknown) {
-                    logThrownError("requestAnimationFrame failed, falling back to setting timeouts", err);
+                    this.handleWarning("requestAnimationFrame failed, falling back to setting timeouts", err);
                     this.tryRequestAnimationFrame = false;
                 }
             }
@@ -422,6 +447,7 @@ interface AudioProviderEventMap extends AudioAnalyserEventMap<AudioProvider> {
     state: AudioProviderStateEvent;
     audio: AudioProviderAudioEvent;
     rtaudio: AudioProviderRealtimeAudioEvent;
+    error: AudioProviderErrorEvent;
 }
 
 export type AudioProviderStateEvent = TypedEvent<AudioProvider, "state">;
@@ -432,6 +458,12 @@ export interface AudioProviderAudioEvent extends TypedEvent<AudioProvider, "audi
 
 export interface AudioProviderRealtimeAudioEvent extends TypedEvent<AudioProvider, "rtaudio"> {
     buffer: ArrayBuffer;
+}
+
+export interface AudioProviderErrorEvent extends TypedEvent<AudioProvider, "error"> {
+    level: "error" | "warning";
+    error: unknown;
+    errorCode: AudioErrorCode;
 }
 
 function toAudioErrorCode(err: unknown): AudioErrorCode {

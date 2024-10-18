@@ -1,11 +1,11 @@
-import { SharedConfig } from "../shared/api";
+import { isLogRequest, SharedConfig } from "../shared/api";
 import { InitialChatStateOverrides } from "../shared/chat";
 import { ChatServer, ChatServerConfig } from "./ChatServer";
 import { Engine } from "./Engine";
 import { OpenAIEngine } from "./OpenAIEngine";
 import { contextFrom } from "./RequestContext";
 import { handleAuthCheck, handleAuthRequest } from "./auth";
-import { logFatal, logInfo, logThrownError, setLogLevel } from "./log";
+import { logError, logFatal, logInfo, logThrownError, setLogLevel } from "./log";
 import { httprnderr, pauseRandomErrors, setRandomErrorsEnabled } from "./randomErrors";
 import { Session, checkSession, endSession } from "./session";
 import cookieParser from "cookie-parser";
@@ -299,6 +299,12 @@ backend.ws(CHAT_PATH, (req, res) => {
         });
 });
 
+// Client error logging endpoint
+backend.use("/vw/log", express.json());
+backend.post("/vw/log", (req, res) => {
+    handleLogRequest(req, res);
+});
+
 // Serve frontend assets
 backend.use("/", express.static(path.resolve(__dirname, "assets")));
 
@@ -350,6 +356,23 @@ function handleConfRequest(req: Request, res: Response) {
             : {}),
     };
     res.json(clientConf);
+}
+
+/** Handles a logging request from the frontend */
+function handleLogRequest(req: Request, res: Response) {
+    const msg: unknown = req.body;
+    if (isLogRequest(msg)) {
+        (msg.level === "error" ? logError : logInfo)(
+            "Frontend %s: %s\nUser-Agent: %s",
+            contextFrom(req),
+            msg.level,
+            msg.message,
+            req.headers["user-agent"] ?? "unknown",
+        );
+        res.end();
+    } else {
+        res.sendStatus(400);
+    }
 }
 
 // Start listening for requests
