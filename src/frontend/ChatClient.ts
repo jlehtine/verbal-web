@@ -1,9 +1,8 @@
 import {
     ApiFrontendChatMessage,
-    ChatAudioMessageNew,
     ChatInit,
     ChatMessageNew,
-    ChatRealtimeAudio,
+    ChatAudio,
     ChatRealtimeStop,
     LogRequestLevel,
     SharedConfig,
@@ -160,18 +159,6 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
     }
 
     /**
-     * Submits a new audio message to the backend.
-     *
-     * @param blob audio data
-     */
-    async submitAudioMessage(blob: Blob): Promise<void> {
-        // Update chat model state
-        const binary = await blob.arrayBuffer();
-        const amsg: ChatAudioMessageNew = { type: "audnew", mimeType: blob.type, binary };
-        this.submitApiMessage(amsg);
-    }
-
-    /**
      * Start a realtime conversation.
      */
     startRealtime() {
@@ -185,11 +172,17 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
      *
      * @param buffer audio data
      */
-    submitRealtimeAudio(buffer: ArrayBuffer) {
-        if (this.realtime) {
-            const amsg: ChatRealtimeAudio = { type: "rtaud", binary: buffer };
-            this.submitApiMessage(amsg);
-        }
+    submitAudio(buffer: ArrayBuffer) {
+        const amsg: ChatAudio = { type: "audio", binary: buffer };
+        this.submitApiMessage(amsg);
+    }
+
+    /**
+     * Commit realtime audio data.
+     */
+    commitAudio() {
+        logDebug("Committing audio for transcription");
+        this.submitApiMessage({ type: "audiocommit" });
     }
 
     /**
@@ -201,8 +194,8 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
         this.realtime = false;
         this.realtimeStarted = false;
 
-        // Clear any pending realtime audio messages
-        this.pendingMessages = this.pendingMessages.filter((msg) => msg.type !== "rtaud");
+        // Clear any pending audio messages
+        this.pendingMessages = this.pendingMessages.filter((msg) => msg.type !== "audio");
 
         // Send a stop message, if connected to an initialized chat
         if (this.chatInitialized && this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -531,7 +524,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
                 }
 
                 // Handle realtime audio
-                else if (amsg.type === "rtaud") {
+                else if (amsg.type === "audio") {
                     if (this.realtime && this.realtimeStarted) {
                         const event: RealtimeAudioEvent = { target: this, type: "rtaudio", data: amsg.binary };
                         this.dispatchEvent(event);

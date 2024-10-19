@@ -1,16 +1,13 @@
 import {
     ApiBackendChatMessage,
     ApiFrontendChatMessage,
-    ChatAudioMessageNew,
     ChatAudioTranscription,
     ChatInitRealtime,
     ChatMessageError,
     ChatMessageErrorCode,
-    ChatMessageNew,
     ChatMessagePart,
-    ChatRealtimeAudio,
+    ChatAudio,
     isApiFrontendChatMessage,
-    isChatAudioMessageNew,
 } from "../shared/api";
 import { Chat, InitialChatStateOverrides } from "../shared/chat";
 import { VerbalWebError } from "../shared/error";
@@ -24,7 +21,10 @@ import { TextChunker, chunkText } from "./TextChunker";
 import { TranscriptionProvider, TranscriptionRequest } from "./TranscriptionProvider";
 import { logDebug, logError, logInfo, logInterfaceData, logThrownError } from "./log";
 import { continueRandomErrors, pauseRandomErrors } from "./randomErrors";
+import { alaw } from "alawmulaw";
 import { Request } from "express";
+import { Writable } from "stream";
+import { Writer as WavWriter } from "wav";
 import { WebSocket } from "ws";
 
 /** Inactivity timeout is one minute */
@@ -129,6 +129,8 @@ export class ChatServer {
 
     private inactivityTimer?: NodeJS.Timeout;
 
+    private bufferedAudio: ArrayBuffer[] = [];
+
     constructor(
         req: Request,
         ws: WebSocket,
@@ -210,10 +212,17 @@ export class ChatServer {
                 this.handleRealtimeInit(amsg);
             }
 
-            // Realtime audio
-            else if (amsg.type === "rtaud") {
+            // Input audio
+            else if (amsg.type === "audio") {
                 this.initWebSocketInactivityTimeout();
                 this.handleRealtimeAudio(amsg);
+            }
+
+            // Audio commit
+            else if (amsg.type === "audiocommit") {
+                this.info("Audio message received for transcription");
+                this.initWebSocketInactivityTimeout();
+                this.doTranscription();
             }
 
             // Stop realtime conversation
@@ -225,13 +234,8 @@ export class ChatServer {
             else if (this.chat.backendProcessing) {
                 continueRandomErrors();
                 this.clearInactivityTimer();
-                if (isChatAudioMessageNew(amsg)) {
-                    this.info("Audio message received");
-                    this.doTranscription(amsg);
-                } else {
-                    this.info("Chat completion requested");
-                    this.doChatCompletion();
-                }
+                this.info("Chat completion requested");
+                this.doChatCompletion();
             } else {
                 this.initWebSocketInactivityTimeout();
             }
@@ -278,7 +282,7 @@ export class ChatServer {
                     this.sendMessage({ type: "rtstarted" }, "realtime conversation started");
                     this.realtimeConversation = conversation;
                     conversation.addEventListener("audio", (event) => {
-                        const amsg: ChatRealtimeAudio = { type: "rtaud", binary: event.audio };
+                        const amsg: ChatAudio = { type: "audio", binary: event.audio };
                         this.sendMessage(amsg, "realtime audio");
                     });
                     conversation.addEventListener("error", (event) => {
@@ -303,11 +307,11 @@ export class ChatServer {
         }
     }
 
-    private handleRealtimeAudio(amsg: ChatRealtimeAudio) {
+    private handleRealtimeAudio(amsg: ChatAudio) {
         if (this.realtimeConversation) {
             this.realtimeConversation.appendAudio(amsg.binary);
         } else {
-            throw new RealtimeConversationError("Realtime conversation not in progress");
+            this.bufferedAudio.push(amsg.binary);
         }
     }
 
@@ -353,31 +357,67 @@ export class ChatServer {
     }
 
     /** Handles an audio transcription request */
-    private doTranscription(amsg: ChatAudioMessageNew) {
-        if (this.transcription !== undefined) {
-            const request: TranscriptionRequest = {
-                user: this.requestContext.session?.id,
-                audio: amsg.binary,
-                type: amsg.mimeType,
-            };
-            this.transcription
-                .transcribe(this.requestContext, request)
-                .then((transcription) => {
-                    if (transcription.length === 0) {
-                        throw new VerbalWebError("Empty transcription");
-                    }
-                    const msg: ChatMessageNew = { type: "msgnew", content: transcription };
-                    this.chat.update(msg);
-                    if (this.ws.readyState === WebSocket.OPEN) {
-                        const tmsg: ChatAudioTranscription = { type: "audtrsc", transcription };
-                        this.sendMessage(tmsg, "an audio transcription");
-                        this.info("Starting chat completion of the audio transcription");
-                        this.doChatCompletion();
-                    }
-                })
-                .catch((err: unknown) => {
-                    this.handleError(err);
-                });
+    private doTranscription() {
+        const transcription = this.transcription;
+        if (transcription !== undefined) {
+            // Collect buffered audio
+            const audioBytes = this.bufferedAudio.reduce((acc, a) => acc + a.byteLength, 0);
+            const audioData = new Uint8Array(audioBytes);
+            let offset = 0;
+            for (const ba of this.bufferedAudio) {
+                audioData.set(new Uint8Array(ba), offset);
+                offset += ba.byteLength;
+            }
+            this.bufferedAudio = [];
+
+            // Convert buffered audio from G.711 A-law to PCM 16-bit WAV
+            const pcm = alaw.decode(audioData);
+            const wavWriter = new WavWriter({ channels: 1, sampleRate: 8000, bitDepth: 16 });
+            const chunks: Buffer[] = [];
+            wavWriter.pipe(
+                new Writable({
+                    write(chunk, encoding, callback) {
+                        if (chunk instanceof Buffer) {
+                            chunks.push(chunk);
+                            callback();
+                        } else {
+                            throw new Error("Unsupported chunk type");
+                        }
+                    },
+                }),
+            );
+
+            wavWriter.addListener("end", () => {
+                const wav = Buffer.concat(chunks);
+                const req: TranscriptionRequest = {
+                    user: this.requestContext.session?.id,
+                    audio: wav,
+                    type: "audio/wav",
+                };
+                transcription
+                    .transcribe(this.requestContext, req)
+                    .then((transcription) => {
+                        if (transcription.length === 0) {
+                            throw new VerbalWebError("Empty transcription");
+                        }
+                        if (this.ws.readyState === WebSocket.OPEN) {
+                            const tmsg: ChatAudioTranscription = { type: "audtrsc", transcription };
+                            this.chat.update(tmsg);
+                            this.sendMessage(tmsg, "an audio transcription");
+                            this.info("Starting chat completion of the audio transcription");
+                            this.doChatCompletion();
+                        }
+                    })
+                    .catch((err: unknown) => {
+                        this.handleError(err);
+                    });
+            });
+
+            wavWriter.addListener("error", (err) => {
+                this.handleError(err);
+            });
+
+            wavWriter.end(Buffer.from(pcm.buffer));
         } else {
             this.handleError(new VerbalWebError("Audio transcription not available"));
         }

@@ -153,7 +153,7 @@ export class OpenAIEngine
     }
 
     supportedTranscriptionAudioTypes(): string[] {
-        return ["webm", "mp4", "mp3", "mpeg", "wav"].map((subtype) => "audio/" + subtype);
+        return ["audio/PCMA"];
     }
 
     transcribe(requestContext: RequestContext, request: TranscriptionRequest): Promise<string> {

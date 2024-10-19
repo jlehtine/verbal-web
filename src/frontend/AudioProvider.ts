@@ -49,7 +49,6 @@ export class AudioProvider
 {
     private readonly params: AudioParams;
     private started = false;
-    private stopped = false;
     private readonly rmsSamples = new Float32Array(RMS_AVERAGING_WINDOW);
     private rmsSampleHead = 0;
     private rmsSampleNum = 0;
@@ -58,12 +57,13 @@ export class AudioProvider
     private soundStartedAt: number | undefined;
     private silenceDetected = true;
     private soundDetected = false;
+    private audioRecorded = false;
     private tryRequestAnimationFrame = typeof requestAnimationFrame === "function";
 
-    recording = false;
     error: AudioErrorCode | undefined;
+    recording = false;
+    stopped = false;
 
-    private mediaRecorder: MediaRecorder | undefined;
     private mediaStream: MediaStream | undefined;
     private audioInContext: AudioContext | undefined;
     private audioOutContext: AudioContext | undefined;
@@ -111,73 +111,50 @@ export class AudioProvider
                     if (mode === "realtime") {
                         getRealtimeInputAudioType(this.params.supportedInputAudioTypes);
                         getRealtimeOutputAudioType(this.params.supportedOutputAudioTypes);
+                    } else {
+                        getRealtimeInputAudioType(this.params.supportedAudioTypes);
                     }
 
-                    // Initialize media recorder, for speech-to-text
-                    if (mode === "stt") {
-                        this.mediaRecorder = new MediaRecorder(stream, {
-                            mimeType: getMediaRecorderAudioType(this.params.supportedAudioTypes),
-                        });
-                        this.mediaRecorder.addEventListener("dataavailable", (event: BlobEvent) => {
-                            if (event.data.size > 0) {
-                                logDebug("Processing recorded audio");
-                                const audioEvent: AudioProviderAudioEvent = {
-                                    target: this,
-                                    type: "audio",
-                                    blob: event.data,
+                    // Initialize input audio context and analyser
+                    this.audioInContext = new AudioContext();
+                    this.audioSource = this.audioInContext.createMediaStreamSource(stream);
+                    this.analyser = this.audioInContext.createAnalyser();
+                    this.analyser.fftSize = FFT_SIZE;
+                    this.audioSource.connect(this.analyser);
+                    this.scheduleAnalyzeAudio();
+                    logDebug("Started audio analysis");
+
+                    // Initialize G711 A-law encoder for input
+                    logDebug("Initializing G711 A-law encoder");
+                    this.audioInContext.audioWorklet
+                        .addModule("G711AEncoder.js")
+                        .then(() => {
+                            if (!this.stopped && this.audioInContext && this.audioSource) {
+                                this.g711aEncoder = new AudioWorkletNode(this.audioInContext, "G711AEncoder");
+                                this.g711aEncoder.port.onmessage = (event) => {
+                                    const data: unknown = event.data;
+                                    if (!this.silenceDetected && data instanceof Uint8Array) {
+                                        const event: AudioProviderAudioEvent = {
+                                            target: this,
+                                            type: "audio",
+                                            buffer: data.buffer,
+                                        };
+                                        this.dispatchEvent(event);
+                                        this.audioRecorded = true;
+                                    }
                                 };
-                                this.dispatchEvent(audioEvent);
+                                this.audioSource.connect(this.g711aEncoder);
+                                this.recording = true;
+                                this.stateChanged();
+                                logDebug("G711 A-law encoder initialized");
                             }
+                        })
+                        .catch((err: unknown) => {
+                            this.handleError(err);
                         });
-                    }
 
-                    // Initialize audio context and analyser
-                    try {
-                        this.audioInContext = new AudioContext();
-                        this.audioSource = this.audioInContext.createMediaStreamSource(stream);
-                        this.analyser = this.audioInContext.createAnalyser();
-                        this.analyser.fftSize = FFT_SIZE;
-                        this.audioSource.connect(this.analyser);
-                        this.scheduleAnalyzeAudio();
-                        logDebug("Started audio analysis");
-                    } catch (err: unknown) {
-                        if (mode === "realtime") {
-                            throw err;
-                        } else {
-                            this.handleWarning("Audio context initialization failed", err);
-                        }
-                    }
-
-                    // Realtime audio processing
-                    if (mode === "realtime" && this.audioInContext && this.audioSource) {
-                        // Initialize G711 A-law encoder for input
-                        logDebug("Initializing G711 A-law encoder");
-                        this.audioInContext.audioWorklet
-                            .addModule("G711AEncoder.js")
-                            .then(() => {
-                                if (!this.stopped && this.audioInContext && this.audioSource) {
-                                    this.g711aEncoder = new AudioWorkletNode(this.audioInContext, "G711AEncoder");
-                                    this.g711aEncoder.port.onmessage = (event) => {
-                                        const data: unknown = event.data;
-                                        if (!this.silenceDetected && data instanceof Uint8Array) {
-                                            const audioEvent: AudioProviderRealtimeAudioEvent = {
-                                                target: this,
-                                                type: "rtaudio",
-                                                buffer: data.buffer,
-                                            };
-                                            this.dispatchEvent(audioEvent);
-                                        }
-                                    };
-                                    this.audioSource.connect(this.g711aEncoder);
-                                    this.recording = true;
-                                    this.stateChanged();
-                                    logDebug("G711 A-law encoder initialized");
-                                }
-                            })
-                            .catch((err: unknown) => {
-                                this.handleError(err);
-                            });
-
+                    // Realtime output audio processing
+                    if (mode === "realtime") {
                         // Initialize PCM 16-bit signed little-endian decoder for output
                         this.audioOutContext = new AudioContext({ sampleRate: OUTPUT_SAMPLE_RATE });
                         logDebug("Initializing PCM 16-bit signed little-endian decoder");
@@ -213,26 +190,28 @@ export class AudioProvider
     private handleError(err: unknown) {
         logThrownError("Audio initialization failed", err);
         this.error = toAudioErrorCode(err);
-        this.dispatchEvent({
+        const event: AudioProviderErrorEvent = {
             target: this,
             type: "error",
             level: "error",
             errorCode: this.error,
             error: err,
-        } as AudioProviderErrorEvent);
+        };
+        this.dispatchEvent(event);
         this.stateChanged();
         this.close();
     }
 
     private handleWarning(msg: string, err: unknown) {
         logThrownError(msg, err);
-        this.dispatchEvent({
+        const event: AudioProviderErrorEvent = {
             target: this,
             type: "error",
             level: "warning",
             errorCode: "warning",
             error: err,
-        } as AudioProviderErrorEvent);
+        };
+        this.dispatchEvent(event);
     }
 
     playAudio(audio: ArrayBuffer) {
@@ -244,11 +223,13 @@ export class AudioProvider
     /**
      * Stops recording.
      */
-    stop() {
-        if (!this.stopped) {
-            logDebug("Stop audio recording");
-        }
+    private stop() {
+        if (this.stopped) return;
+        logDebug("Stop audio recording");
         this.stopped = true;
+        if (!this.audioRecorded) {
+            this.error = "noaudio";
+        }
         if (this.analyser !== undefined) {
             this.analyser.disconnect();
             this.analyser = undefined;
@@ -278,20 +259,13 @@ export class AudioProvider
             });
             this.audioOutContext = undefined;
         }
-        if (this.mediaRecorder !== undefined) {
-            if (this.mediaRecorder.state !== "inactive") {
-                this.mediaRecorder.stop();
-            } else if (this.recording) {
-                this.error = "noaudio";
-                this.stateChanged();
-            }
-        }
         if (this.mediaStream !== undefined) {
             this.mediaStream.getTracks().forEach((track) => {
                 track.stop();
             });
             this.mediaStream = undefined;
         }
+        this.stateChanged();
     }
 
     /**
@@ -300,7 +274,6 @@ export class AudioProvider
     close() {
         this.clearListeners();
         this.stop();
-        this.mediaRecorder = undefined;
     }
 
     private stateChanged() {
@@ -366,9 +339,6 @@ export class AudioProvider
                 if (timestamp - this.silenceStartedAt > SILENCE_DURATION_MILLIS) {
                     if (!this.silenceDetected) {
                         logDebug("Silence detected");
-                        if (this.mediaRecorder && this.recording) {
-                            this.mediaRecorder.pause();
-                        }
                     }
                     this.silenceDetected = true;
                 }
@@ -383,13 +353,6 @@ export class AudioProvider
             } else {
                 if (this.silenceDetected) {
                     logDebug("Sound detected");
-                    if (this.mediaRecorder && this.recording) {
-                        if (this.mediaRecorder.state === "inactive") {
-                            this.mediaRecorder.start();
-                        } else {
-                            this.mediaRecorder.resume();
-                        }
-                    }
                 }
                 this.silenceStartedAt = undefined;
                 this.silenceDetected = false;
@@ -421,15 +384,6 @@ export class AudioProvider
     }
 }
 
-function getMediaRecorderAudioType(supportedAudioTypes: string[]) {
-    for (const audioType of supportedAudioTypes) {
-        if (MediaRecorder.isTypeSupported(audioType)) {
-            return audioType;
-        }
-    }
-    throw new VerbalWebError("No supported audio format available");
-}
-
 export function getRealtimeInputAudioType(supportedInputAudioTypes: string[]) {
     for (const audioType of supportedInputAudioTypes) {
         if (audioType === SUPPORTED_REALTIME_INPUT_AUDIO_TYPE) {
@@ -451,17 +405,12 @@ export function getRealtimeOutputAudioType(supportedOutputAudioTypes: string[]) 
 interface AudioProviderEventMap extends AudioAnalyserEventMap<AudioProvider> {
     state: AudioProviderStateEvent;
     audio: AudioProviderAudioEvent;
-    rtaudio: AudioProviderRealtimeAudioEvent;
     error: AudioProviderErrorEvent;
 }
 
 export type AudioProviderStateEvent = TypedEvent<AudioProvider, "state">;
 
 export interface AudioProviderAudioEvent extends TypedEvent<AudioProvider, "audio"> {
-    blob: Blob;
-}
-
-export interface AudioProviderRealtimeAudioEvent extends TypedEvent<AudioProvider, "rtaudio"> {
     buffer: ArrayBuffer;
 }
 

@@ -4,7 +4,6 @@ import { AudioMode } from "./AudioMode";
 import { AudioErrorCode, AudioProvider } from "./AudioProvider";
 import { AudioVisualization } from "./AudioVisualization";
 import { ChatClient, RealtimeAudioEvent } from "./ChatClient";
-import { logThrownError } from "./log";
 import CloseIcon from "@mui/icons-material/Close";
 import StopIcon from "@mui/icons-material/Stop";
 import { Alert, Box, IconButton, Stack, useTheme } from "@mui/material";
@@ -45,6 +44,7 @@ export default function AudioInput(props: AudioInputProps) {
 
     useEffect(() => {
         let realtimeStarted = false;
+        let committed = false;
         const audioProvider = new AudioProvider(
             mode === "stt"
                 ? {
@@ -62,34 +62,32 @@ export default function AudioInput(props: AudioInputProps) {
             if (audioProvider.error !== error) {
                 audioProvider.close();
                 setError(audioProvider.error);
-            }
-            if (audioProvider.recording && onStop === undefined) {
-                if (mode === "realtime") {
-                    if (!realtimeStarted) {
-                        setRealtimePending(true);
-                        client.startRealtime();
-                        realtimeStarted = true;
+            } else {
+                if (audioProvider.recording && onStop === undefined) {
+                    if (mode === "realtime") {
+                        if (!realtimeStarted) {
+                            setRealtimePending(true);
+                            client.startRealtime();
+                            realtimeStarted = true;
+                        }
+                    } else {
+                        setOnStop(() => () => {
+                            audioProvider.close();
+                        });
                     }
-                } else {
-                    // Prepare chat connectivity, for faster response
-                    client.prepareChat();
-                    setOnStop(() => () => {
-                        audioProvider.stop();
-                        setProcessing(true);
-                    });
+                }
+                if (mode === "stt" && audioProvider.stopped) {
+                    client.commitAudio();
+                    committed = true;
+                    setProcessing(true);
                 }
             }
         });
-        audioProvider.addEventListener("audio", (event) => {
-            client
-                .submitAudioMessage(event.blob)
-                .then(onClose)
-                .catch((err: unknown) => {
-                    logThrownError("Failed to process audio", err);
-                    setError("processing");
-                    client.submitLog("error", "Failed to process audio", err);
-                });
-        });
+        if (mode === "stt") {
+            audioProvider.addEventListener("audio", (event) => {
+                client.submitAudio(event.buffer);
+            });
+        }
         audioProvider.addEventListener("analyser", (event) => {
             if (refAudioAnalyserEventFunc.current) {
                 refAudioAnalyserEventFunc.current(event);
@@ -110,16 +108,19 @@ export default function AudioInput(props: AudioInputProps) {
                     }
                 }
             }
-            if (client.realtimeStarted && onStop === undefined) {
+            if (mode === "realtime" && client.realtimeStarted && onStop === undefined) {
                 setRealtimePending(false);
-                audioProvider.addEventListener("rtaudio", (event) => {
-                    client.submitRealtimeAudio(event.buffer);
+                audioProvider.addEventListener("audio", (event) => {
+                    client.submitAudio(event.buffer);
                 });
                 setOnStop(() => () => {
                     audioProvider.close();
                     client.stopRealtime();
                     onClose();
                 });
+            }
+            if (mode === "stt" && committed && (client.chat.backendProcessing || client.chat.error)) {
+                onClose();
             }
         };
 

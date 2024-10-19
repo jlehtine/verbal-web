@@ -20,6 +20,7 @@
         "@types/react": "^18.2.14",
         "@types/react-dom": "^18.2.6",
         "@types/uuid": "^10.0.0",
+        "@types/wav": "^1.0.4",
         "@types/ws": "^8.5.10",
         "babel-loader": "^9.1.2",
         "browserslist": "^4.23.0",
@@ -79,6 +80,7 @@
         "remark-gfm": "^4.0.0",
         "remark-math": "^6.0.0",
         "uuid": "^10.0.0",
+        "wav": "^1.0.2",
         "websocket-express": "^3.1.0",
         "ws": "^8.17.0"
     },
