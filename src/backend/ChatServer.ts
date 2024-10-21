@@ -129,7 +129,7 @@ export class ChatServer {
 
     private inactivityTimer?: NodeJS.Timeout;
 
-    private bufferedAudio: ArrayBuffer[] = [];
+    private bufferedAudio: Uint8Array[] = [];
 
     constructor(
         req: Request,
@@ -282,7 +282,7 @@ export class ChatServer {
                     this.sendMessage({ type: "rtstarted" }, "realtime conversation started");
                     this.realtimeConversation = conversation;
                     conversation.addEventListener("audio", (event) => {
-                        const amsg: ChatAudio = { type: "audio", binary: event.audio };
+                        const amsg: ChatAudio = { type: "audio", binary: [new Uint8Array(event.audio)] };
                         this.sendMessage(amsg, "realtime audio");
                     });
                     conversation.addEventListener("error", (event) => {
@@ -308,10 +308,13 @@ export class ChatServer {
     }
 
     private handleRealtimeAudio(amsg: ChatAudio) {
-        if (this.realtimeConversation) {
-            this.realtimeConversation.appendAudio(amsg.binary);
+        const rtc = this.realtimeConversation;
+        if (rtc) {
+            amsg.binary.forEach((audio) => {
+                rtc.appendAudio(audio);
+            });
         } else {
-            this.bufferedAudio.push(amsg.binary);
+            this.bufferedAudio.push(...amsg.binary);
         }
     }
 

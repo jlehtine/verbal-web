@@ -229,7 +229,7 @@ export class OpenAIRealtimeConversation
         });
     }
 
-    appendAudio(audio: ArrayBuffer): void {
+    appendAudio(audio: Uint8Array | ArrayBuffer): void {
         const msg: RealtimeInputAudioBufferAppendMessage = {
             type: "input_audio_buffer.append",
             audio: Buffer.from(audio).toString("base64"),

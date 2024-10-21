@@ -1,62 +1,46 @@
-const AUDIO_BUFFER_LENGTH = 131072;
-
 /**
  * Decode PCM 16-bit signed little-endian audio.
  */
 class PCM16SLEDecoder extends AudioWorkletProcessor {
     private closed = false;
-    private buffers: Int16Array[] = [new Int16Array(AUDIO_BUFFER_LENGTH)];
-    private view: DataView = new DataView(this.buffers[0].buffer);
-    private bufferHead = 0;
+    private buffers: Int16Array[] = [];
+    private bufferCount = 0;
     private bufferTail = 0;
-    private littleEndian;
+    private readonly littleEndian;
 
     constructor() {
         super();
+        this.littleEndian = new Int16Array(new Uint8Array([1, 0]).buffer)[0] === 1;
         this.port.onmessage = (event) => {
-            if (event.data instanceof ArrayBuffer) {
-                const data = new Int16Array(event.data);
-                const datalen = data.length;
-                let consumed = 0;
-                while (consumed < datalen) {
-                    const remaining = AUDIO_BUFFER_LENGTH - this.bufferHead;
-                    const toCopy = Math.min(remaining, datalen - consumed);
-                    const buffer = this.buffers[this.buffers.length - 1];
-                    buffer.set(data.subarray(consumed, consumed + toCopy), this.bufferHead);
-                    this.bufferHead += toCopy;
-                    consumed += toCopy;
-                    if (this.bufferHead >= AUDIO_BUFFER_LENGTH) {
-                        this.buffers.push(new Int16Array(AUDIO_BUFFER_LENGTH));
-                        this.bufferHead = 0;
-                    }
-                }
+            if (isInt16ArrayArray(event.data)) {
+                this.buffers.push(...event.data);
+                this.bufferCount += event.data.reduce((acc, buf) => acc + buf.length, 0);
             } else if (event.data === "close") {
                 this.closed = true;
             }
         };
-        this.littleEndian = new Int16Array(new Uint8Array([1, 0]).buffer)[0] === 1;
     }
 
     process(inputs: Float32Array[][], outputs: Float32Array[][]) {
-        // Convert buffered PCM 16-bit signed little-endian audio to Float32
+        // Convert buffered PCM 16-bit signed audio to Float32
         const output = outputs[0];
         const channum = output.length;
         if (this.closed || channum === 0) return false;
+
+        // Handle first channel
         const output0 = output[0];
         const outputlen = output0.length;
-        const buflen = (this.buffers.length - 1) * AUDIO_BUFFER_LENGTH + this.bufferHead - this.bufferTail;
-        let converted = Math.max(outputlen - buflen, 0);
-        while (converted < outputlen) {
-            const remaining =
-                this.buffers.length == 1 ? this.bufferHead - this.bufferTail : AUDIO_BUFFER_LENGTH - this.bufferTail;
+        let converted = Math.max(outputlen - this.bufferCount, 0);
+        while (converted < outputlen && this.buffers.length > 0) {
+            const buffer0 = this.buffers[0];
+            const remaining = buffer0.length - this.bufferTail;
             const toConvert = Math.min(remaining, outputlen - converted);
-            this.pcm16sleToFloat32(this.buffers[0], this.view, this.bufferTail, toConvert, output0, converted);
+            this.pcm16sleToFloat32(buffer0, this.bufferTail, toConvert, output0, converted);
             converted += toConvert;
             this.bufferTail += toConvert;
-            if (this.bufferTail >= AUDIO_BUFFER_LENGTH) {
+            if (this.bufferTail >= buffer0.length) {
                 this.buffers.shift();
                 this.bufferTail = 0;
-                this.view = new DataView(this.buffers[0].buffer);
             }
         }
 
@@ -70,7 +54,6 @@ class PCM16SLEDecoder extends AudioWorkletProcessor {
 
     private pcm16sleToFloat32(
         buffer: Int16Array,
-        view: DataView,
         offset: number,
         length: number,
         output: Float32Array,
@@ -82,10 +65,15 @@ class PCM16SLEDecoder extends AudioWorkletProcessor {
             }
         } else {
             for (let i = 0; i < length; i++) {
+                const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
                 output[outputOffset + i] = view.getInt16(offset + i * 2, true) / 32768;
             }
         }
     }
+}
+
+function isInt16ArrayArray(v: unknown): v is Int16Array[] {
+    return Array.isArray(v) && v.every((i) => i instanceof Int16Array);
 }
 
 // Register the processor

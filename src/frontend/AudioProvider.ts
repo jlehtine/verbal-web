@@ -5,7 +5,7 @@ import { logDebug, logThrownError } from "./log";
 
 const INPUT_SAMPLE_RATE = 8000;
 const INPUT_SAMPLE_SIZE = 16;
-const INPUT_BUFFER_SIZE = 4096;
+const INPUT_BUFFER_DISPATCH_SIZE = 4096;
 const FFT_SIZE = 1024;
 const SILENCE_THRESHOLD = 0.01;
 const SILENCE_DURATION_MILLIS = 500;
@@ -61,7 +61,7 @@ export class AudioProvider
     private soundDetected = false;
     private audioRecorded = false;
     private tryRequestAnimationFrame = typeof requestAnimationFrame === "function";
-    private inputBuffer = new Uint8Array(INPUT_BUFFER_SIZE);
+    private inputBuffers: Uint8Array[] = [];
     private inputBufferBytes = 0;
 
     error: AudioErrorCode | undefined;
@@ -133,14 +133,21 @@ export class AudioProvider
                     this.audioInContext.audioWorklet
                         .addModule("G711AEncoder.js")
                         .then(() => {
+                            // Push to input buffers array
+                            const pushInputBuffer = (data: Uint8Array) => {
+                                this.inputBuffers.push(data);
+                                this.inputBufferBytes += data.byteLength;
+                            };
+
                             // Dispatch audio data as event
-                            const dispatchData = (data: Uint8Array) => {
+                            const dispatchInputBuffers = () => {
                                 const event: AudioProviderAudioEvent = {
                                     target: this,
                                     type: "audio",
-                                    buffer: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength),
+                                    buffer: this.inputBuffers,
                                 };
                                 this.dispatchEvent(event);
+                                this.inputBuffers = [];
                                 this.inputBufferBytes = 0;
                                 this.audioRecorded = true;
                             };
@@ -151,54 +158,23 @@ export class AudioProvider
                                     const data: unknown = event.data;
                                     if (data instanceof Uint8Array) {
                                         const silent = this.silenceDetected && this.silenceDetectedPrev;
+                                        pushInputBuffer(data);
                                         if (silent) {
-                                            const toCopy = Math.min(data.length, INPUT_BUFFER_SIZE);
-                                            if (this.inputBufferBytes + toCopy > INPUT_BUFFER_SIZE) {
-                                                const keep = Math.max(
-                                                    Math.min(
-                                                        this.inputBufferBytes,
-                                                        INPUT_BUFFER_SIZE - toCopy,
-                                                        INPUT_BUFFER_SIZE / 2 - toCopy,
-                                                    ),
-                                                    0,
-                                                );
-                                                if (keep > 0 && keep < this.inputBufferBytes) {
-                                                    this.inputBuffer.set(
-                                                        this.inputBuffer.subarray(
-                                                            this.inputBufferBytes - keep,
-                                                            this.inputBufferBytes,
-                                                        ),
-                                                        0,
-                                                    );
-                                                }
-                                                this.inputBufferBytes = keep;
+                                            let skip = 0;
+                                            while (
+                                                skip < this.inputBuffers.length - 1 &&
+                                                this.inputBufferBytes > INPUT_BUFFER_DISPATCH_SIZE
+                                            ) {
+                                                this.inputBufferBytes -= this.inputBuffers[skip].byteLength;
+                                                skip++;
                                             }
-                                            this.inputBuffer.set(
-                                                data.subarray(data.length - toCopy),
-                                                this.inputBufferBytes,
-                                            );
-                                            this.inputBufferBytes += toCopy;
+                                            this.inputBuffers = this.inputBuffers.slice(skip);
                                         } else {
-                                            if (this.inputBufferBytes === 0 && data.length >= INPUT_BUFFER_SIZE) {
-                                                dispatchData(data);
-                                            } else {
-                                                let bytesConsumed = 0;
-                                                while (bytesConsumed < data.length) {
-                                                    const remaining = INPUT_BUFFER_SIZE - this.inputBufferBytes;
-                                                    const toCopy = Math.min(remaining, data.length - bytesConsumed);
-                                                    this.inputBuffer.set(
-                                                        data.subarray(bytesConsumed, bytesConsumed + toCopy),
-                                                        this.inputBufferBytes,
-                                                    );
-                                                    this.inputBufferBytes += toCopy;
-                                                    bytesConsumed += toCopy;
-                                                    if (this.inputBufferBytes === INPUT_BUFFER_SIZE) {
-                                                        dispatchData(this.inputBuffer);
-                                                    }
-                                                }
+                                            if (this.inputBufferBytes >= INPUT_BUFFER_DISPATCH_SIZE) {
+                                                dispatchInputBuffers();
                                             }
-                                            if (this.silenceDetected && this.inputBuffer.length > 0) {
-                                                dispatchData(this.inputBuffer);
+                                            if (this.silenceDetected && this.inputBufferBytes > 0) {
+                                                dispatchInputBuffers();
                                             }
                                         }
                                         this.silenceDetectedPrev = this.silenceDetected;
@@ -275,7 +251,7 @@ export class AudioProvider
         this.dispatchEvent(event);
     }
 
-    playAudio(audio: ArrayBuffer) {
+    playAudio(audio: Int16Array[]) {
         if (!this.stopped && this.pcm16sleDecoder !== undefined) {
             this.pcm16sleDecoder.port.postMessage(audio);
         }
@@ -472,7 +448,7 @@ interface AudioProviderEventMap extends AudioAnalyserEventMap<AudioProvider> {
 export type AudioProviderStateEvent = TypedEvent<AudioProvider, "state">;
 
 export interface AudioProviderAudioEvent extends TypedEvent<AudioProvider, "audio"> {
-    buffer: ArrayBuffer;
+    buffer: Uint8Array[];
 }
 
 export interface AudioProviderErrorEvent extends TypedEvent<AudioProvider, "error"> {

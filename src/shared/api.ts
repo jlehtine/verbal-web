@@ -63,7 +63,7 @@ export interface TypedMessage<T extends string> extends Record<string, unknown> 
 /** API message containing binary data */
 export interface BinaryMessage<T extends string> extends TypedMessage<T> {
     /** Binary data */
-    binary: ArrayBuffer;
+    binary: Uint8Array[];
 }
 
 /** Chat initialization by the frontend */
@@ -179,11 +179,11 @@ function isTypedMessageOfType<T extends string>(v: unknown, type: T): v is Typed
 }
 
 export function isBinaryMessage(v: unknown): v is BinaryMessage<string> {
-    return isTypedMessage(v) && typeof v.binary === "object" && v.binary instanceof ArrayBuffer;
+    return isTypedMessage(v) && Array.isArray(v.binary) && v.binary.every((i) => i instanceof Uint8Array);
 }
 
 function isBinaryMessageOfType<T extends string>(v: unknown, type: T): v is BinaryMessage<T> {
-    return isTypedMessageOfType(v, type) && typeof v.binary === "object" && v.binary instanceof ArrayBuffer;
+    return isTypedMessageOfType(v, type) && isBinaryMessage(v);
 }
 
 export function isApiFrontendChatMessage(v: unknown): v is ApiFrontendChatMessage {

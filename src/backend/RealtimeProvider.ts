@@ -39,7 +39,7 @@ export interface RealtimeConversation extends TypedEventTarget<RealtimeConversat
      *
      * @param audio PCM audio data
      */
-    appendAudio(audio: ArrayBuffer): void;
+    appendAudio(audio: Uint8Array | ArrayBuffer): void;
 
     /**
      * Commit buffered user audio data to a user message.
