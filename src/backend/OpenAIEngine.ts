@@ -153,7 +153,7 @@ export class OpenAIEngine
     }
 
     supportedTranscriptionAudioTypes(): string[] {
-        return ["audio/PCMA"];
+        return ["audio/PCMA;rate=8000;channels=1"];
     }
 
     transcribe(requestContext: RequestContext, request: TranscriptionRequest): Promise<string> {
@@ -184,13 +184,16 @@ export class OpenAIEngine
     }
 
     supportedRealtimeOutputAudioTypes(): string[] {
-        return this.supportedRealtimeAudioTypes();
+        const types = this.supportedRealtimeAudioTypes();
+        return [...types, "audio/PCMA;rate=24000;channels=1"];
     }
 
     private supportedRealtimeAudioTypes(): string[] {
-        return ["PCMA", "PCMU", "pcm;rate=24000;bits=16;encoding=signed-int;channels=1;big-endian=false"].map(
-            (subtype) => "audio/" + subtype,
-        );
+        return [
+            "PCMA;rate=8000;channels=1",
+            "PCMU;rate=8000;channels=1",
+            "pcm;rate=24000;bits=16;encoding=signed-int;channels=1;big-endian=false",
+        ].map((subtype) => "audio/" + subtype);
     }
 
     realtimeConversation(

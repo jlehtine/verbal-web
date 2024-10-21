@@ -16,7 +16,7 @@ export function wsDataToApiMessage<T extends ApiChatMessage>(data: unknown, type
     }
     if (isObject(amsg)) {
         if (binary !== undefined) {
-            amsg.binary = [binary];
+            amsg.binary = binary;
         }
         if (typeCheck(amsg)) {
             return amsg;
@@ -61,18 +61,13 @@ function toJsonBinaryParts(data: unknown): { json: string; binary?: Uint8Array }
  */
 export function apiMessageToWsData(amsg: ApiChatMessage): string | ArrayBuffer {
     const { binary, ...msgRest } = amsg;
-    if (isUint8ArrayArray(binary)) {
+    if (binary instanceof Uint8Array) {
         const json = JSON.stringify(msgRest);
         const jsonBytes = new TextEncoder().encode(json);
-        const binaryBytes = binary.reduce((acc, b) => acc + b.byteLength, 0);
-        const buffer = new Uint8Array(jsonBytes.length + 1 + binaryBytes);
+        const buffer = new Uint8Array(jsonBytes.length + 1 + binary.byteLength);
         buffer.set(jsonBytes);
         buffer[jsonBytes.length] = 0;
-        let offset = jsonBytes.length + 1;
-        for (const b of binary) {
-            buffer.set(b, offset);
-            offset += b.byteLength;
-        }
+        buffer.set(binary, jsonBytes.length + 1);
         return buffer.buffer;
     } else if (binary !== undefined) {
         console.error("Invalid API message binary data", binary);
@@ -80,8 +75,4 @@ export function apiMessageToWsData(amsg: ApiChatMessage): string | ArrayBuffer {
     } else {
         return JSON.stringify(amsg);
     }
-}
-
-function isUint8ArrayArray(v: unknown): v is Uint8Array[] {
-    return Array.isArray(v) && v.every((a) => a instanceof Uint8Array);
 }

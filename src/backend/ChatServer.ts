@@ -282,7 +282,7 @@ export class ChatServer {
                     this.sendMessage({ type: "rtstarted" }, "realtime conversation started");
                     this.realtimeConversation = conversation;
                     conversation.addEventListener("audio", (event) => {
-                        const amsg: ChatAudio = { type: "audio", binary: [new Uint8Array(event.audio)] };
+                        const amsg: ChatAudio = { type: "audio", binary: new Uint8Array(event.audio) };
                         this.sendMessage(amsg, "realtime audio");
                     });
                     conversation.addEventListener("error", (event) => {
@@ -310,11 +310,9 @@ export class ChatServer {
     private handleRealtimeAudio(amsg: ChatAudio) {
         const rtc = this.realtimeConversation;
         if (rtc) {
-            amsg.binary.forEach((audio) => {
-                rtc.appendAudio(audio);
-            });
+            rtc.appendAudio(amsg.binary);
         } else {
-            this.bufferedAudio.push(...amsg.binary);
+            this.bufferedAudio.push(amsg.binary);
         }
     }
 

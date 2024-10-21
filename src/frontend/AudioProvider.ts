@@ -1,5 +1,8 @@
+import { G711ADecoder } from "../shared/G711ADecoder";
+import { G711AEncoder } from "../shared/G711AEncoder";
 import { VerbalWebError } from "../shared/error";
 import { TypedEvent, TypedEventTarget } from "../shared/event";
+import { isFloat32Array3, isObject } from "../shared/util";
 import { AudioAnalyserEvent, AudioAnalyserEventMap, AudioAnalyserEventTarget } from "./AudioAnalyserEvent";
 import { logDebug, logThrownError } from "./log";
 
@@ -14,9 +17,8 @@ const SOUND_DURATION_MILLIS = 1000;
 const RMS_AVERAGING_WINDOW = 20;
 const OUTPUT_SAMPLE_RATE = 24000;
 
-export const SUPPORTED_REALTIME_INPUT_AUDIO_TYPE = "audio/PCMA";
-export const SUPPORTED_REALTIME_OUTPUT_AUDIO_TYPE =
-    "audio/pcm;rate=24000;bits=16;encoding=signed-int;channels=1;big-endian=false";
+export const SUPPORTED_REALTIME_INPUT_AUDIO_TYPE = "audio/PCMA;rate=8000;channels=1";
+export const SUPPORTED_REALTIME_OUTPUT_AUDIO_TYPE = "audio/PCMA;rate=24000;channels=1";
 
 export class AudioError extends VerbalWebError {
     constructor(msg: string, options?: ErrorOptions) {
@@ -61,8 +63,8 @@ export class AudioProvider
     private soundDetected = false;
     private audioRecorded = false;
     private tryRequestAnimationFrame = typeof requestAnimationFrame === "function";
-    private inputBuffers: Uint8Array[] = [];
-    private inputBufferBytes = 0;
+    private inputBuffers: Float32Array[][] = [];
+    private inputBufferCount = 0;
 
     error: AudioErrorCode | undefined;
     recording = false;
@@ -72,8 +74,11 @@ export class AudioProvider
     private audioInContext: AudioContext | undefined;
     private audioOutContext: AudioContext | undefined;
     private audioSource: MediaStreamAudioSourceNode | undefined;
-    private g711aEncoder: AudioWorkletNode | undefined;
-    private pcm16sleDecoder: AudioWorkletNode | undefined;
+    private audioInput: AudioWorkletNode | undefined;
+    private audioOutput: AudioWorkletNode | undefined;
+    private g711aEncoder: G711AEncoder | undefined;
+    private audioSampleRate: number | undefined;
+    private readonly g711aDecoder = new G711ADecoder();
     private analyser: AnalyserNode | undefined;
 
     constructor(params: AudioParams) {
@@ -128,62 +133,75 @@ export class AudioProvider
                     this.scheduleAnalyzeAudio();
                     logDebug("Started audio analysis");
 
-                    // Initialize G711 A-law encoder for input
-                    logDebug("Initializing G711 A-law encoder");
+                    // Initialize audio worklet for input
+                    logDebug("Initializing audio input worklet");
                     this.audioInContext.audioWorklet
-                        .addModule("G711AEncoder.js")
+                        .addModule("VerbalWebAudioInput.js")
                         .then(() => {
                             // Push to input buffers array
-                            const pushInputBuffer = (data: Uint8Array) => {
-                                this.inputBuffers.push(data);
-                                this.inputBufferBytes += data.byteLength;
+                            const pushInputBuffer = (buffer: Float32Array[]) => {
+                                this.inputBuffers.push(buffer);
+                                this.inputBufferCount += buffer[0].length;
                             };
 
                             // Dispatch audio data as event
                             const dispatchInputBuffers = () => {
-                                const event: AudioProviderAudioEvent = {
-                                    target: this,
-                                    type: "audio",
-                                    buffer: this.inputBuffers,
-                                };
-                                this.dispatchEvent(event);
-                                this.inputBuffers = [];
-                                this.inputBufferBytes = 0;
-                                this.audioRecorded = true;
+                                if (this.g711aEncoder) {
+                                    const event: AudioProviderAudioEvent = {
+                                        target: this,
+                                        type: "audio",
+                                        buffer: this.g711aEncoder.encodeFloat32(
+                                            this.inputBuffers,
+                                            this.audioSampleRate,
+                                        ),
+                                    };
+                                    this.dispatchEvent(event);
+                                    this.inputBuffers = [];
+                                    this.inputBufferCount = 0;
+                                    this.audioRecorded = true;
+                                }
                             };
 
                             if (!this.stopped && this.audioInContext && this.audioSource) {
-                                this.g711aEncoder = new AudioWorkletNode(this.audioInContext, "G711AEncoder");
-                                this.g711aEncoder.port.onmessage = (event) => {
+                                this.audioInput = new AudioWorkletNode(this.audioInContext, "VerbalWebAudioInput");
+                                this.audioInput.port.onmessage = (event) => {
                                     const data: unknown = event.data;
-                                    if (data instanceof Uint8Array) {
+                                    if (
+                                        isObject(data) &&
+                                        typeof data.sampleRate === "number" &&
+                                        isFloat32Array3(data.inputs)
+                                    ) {
+                                        if (this.g711aEncoder === undefined) {
+                                            this.g711aEncoder = new G711AEncoder(INPUT_SAMPLE_RATE);
+                                            this.audioSampleRate = data.sampleRate;
+                                        }
                                         const silent = this.silenceDetected && this.silenceDetectedPrev;
-                                        pushInputBuffer(data);
+                                        pushInputBuffer(data.inputs[0]);
                                         if (silent) {
                                             let skip = 0;
                                             while (
                                                 skip < this.inputBuffers.length - 1 &&
-                                                this.inputBufferBytes > INPUT_BUFFER_DISPATCH_SIZE
+                                                this.inputBufferCount > INPUT_BUFFER_DISPATCH_SIZE
                                             ) {
-                                                this.inputBufferBytes -= this.inputBuffers[skip].byteLength;
+                                                this.inputBufferCount -= this.inputBuffers[skip][0].length;
                                                 skip++;
                                             }
                                             this.inputBuffers = this.inputBuffers.slice(skip);
                                         } else {
-                                            if (this.inputBufferBytes >= INPUT_BUFFER_DISPATCH_SIZE) {
+                                            if (this.inputBufferCount >= INPUT_BUFFER_DISPATCH_SIZE) {
                                                 dispatchInputBuffers();
                                             }
-                                            if (this.silenceDetected && this.inputBufferBytes > 0) {
+                                            if (this.silenceDetected && this.inputBufferCount > 0) {
                                                 dispatchInputBuffers();
                                             }
                                         }
                                         this.silenceDetectedPrev = this.silenceDetected;
                                     }
                                 };
-                                this.audioSource.connect(this.g711aEncoder);
+                                this.audioSource.connect(this.audioInput);
                                 this.recording = true;
                                 this.stateChanged();
-                                logDebug("G711 A-law encoder initialized");
+                                logDebug("Audio input worklet initialized");
                             }
                         })
                         .catch((err: unknown) => {
@@ -194,17 +212,18 @@ export class AudioProvider
                     if (mode === "realtime") {
                         // Initialize PCM 16-bit signed little-endian decoder for output
                         this.audioOutContext = new AudioContext({ sampleRate: OUTPUT_SAMPLE_RATE });
-                        logDebug("Initializing PCM 16-bit signed little-endian decoder");
+                        logDebug("Initializing audio output worklet");
                         this.audioOutContext.audioWorklet
-                            .addModule("PCM16SLEDecoder.js")
+                            .addModule("VerbalWebAudioOutput.js")
                             .then(() => {
                                 if (!this.stopped && this.audioOutContext) {
-                                    this.pcm16sleDecoder = new AudioWorkletNode(
+                                    this.audioOutput = new AudioWorkletNode(
                                         this.audioOutContext,
-                                        "PCM16SLEDecoder",
+                                        "VerbalWebAudioOutput",
+                                        { outputChannelCount: [1] },
                                     );
-                                    this.pcm16sleDecoder.connect(this.audioOutContext.destination);
-                                    logDebug("PCM 16-bit signed little-endian decoder initialized");
+                                    this.audioOutput.connect(this.audioOutContext.destination);
+                                    logDebug("Audio output worklet initialized");
                                 }
                             })
                             .catch((err: unknown) => {
@@ -251,9 +270,9 @@ export class AudioProvider
         this.dispatchEvent(event);
     }
 
-    playAudio(audio: Int16Array[]) {
-        if (!this.stopped && this.pcm16sleDecoder !== undefined) {
-            this.pcm16sleDecoder.port.postMessage(audio);
+    playAudio(audio: Uint8Array) {
+        if (!this.stopped && this.audioOutput !== undefined) {
+            this.audioOutput.port.postMessage({ outputs: [[this.g711aDecoder.decodeToFloat32(audio)]] });
         }
     }
 
@@ -271,9 +290,9 @@ export class AudioProvider
             this.analyser.disconnect();
             this.analyser = undefined;
         }
-        if (this.g711aEncoder !== undefined) {
-            this.g711aEncoder.disconnect();
-            this.g711aEncoder = undefined;
+        if (this.audioInput !== undefined) {
+            this.audioInput.disconnect();
+            this.audioInput = undefined;
         }
         if (this.audioSource !== undefined) {
             this.audioSource.disconnect();
@@ -285,10 +304,10 @@ export class AudioProvider
             });
             this.audioInContext = undefined;
         }
-        if (this.pcm16sleDecoder !== undefined) {
-            this.pcm16sleDecoder.port.postMessage("close");
-            this.pcm16sleDecoder.disconnect();
-            this.pcm16sleDecoder = undefined;
+        if (this.audioOutput !== undefined) {
+            this.audioOutput.port.postMessage({ closed: true });
+            this.audioOutput.disconnect();
+            this.audioOutput = undefined;
         }
         if (this.audioOutContext !== undefined) {
             this.audioOutContext.close().catch((err: unknown) => {
@@ -448,7 +467,7 @@ interface AudioProviderEventMap extends AudioAnalyserEventMap<AudioProvider> {
 export type AudioProviderStateEvent = TypedEvent<AudioProvider, "state">;
 
 export interface AudioProviderAudioEvent extends TypedEvent<AudioProvider, "audio"> {
-    buffer: Uint8Array[];
+    buffer: Uint8Array;
 }
 
 export interface AudioProviderErrorEvent extends TypedEvent<AudioProvider, "error"> {

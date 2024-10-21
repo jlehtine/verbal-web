@@ -1,3 +1,4 @@
+import { G711AEncoder } from "../shared/G711AEncoder";
 import { VerbalWebError } from "../shared/error";
 import { TypedEventTarget } from "../shared/event";
 import {
@@ -26,6 +27,8 @@ const REALTIME_URL = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-pre
 
 const DEFAULT_INPUT_AUDIO_TRANSCRIPTION_MODEL = "whisper-1";
 
+const AUDIO_TYPE_24KHZ_PCMA = "audio/PCMA;rate=24000;channels=1";
+
 export class OpenAIRealtimeConversation
     extends TypedEventTarget<RealtimeConversation, RealtimeConversationEventMap>
     implements RealtimeConversation
@@ -33,6 +36,7 @@ export class OpenAIRealtimeConversation
     private readonly requestContext;
     private readonly request;
     private readonly ws: WebSocket;
+    private readonly g711AEncoder = new G711AEncoder();
     private connected = false;
     private error?: Error;
     private closed = false;
@@ -98,7 +102,10 @@ export class OpenAIRealtimeConversation
 
                     // audio data
                     else if (isRealtimeResponseAudioDeltaMessage(msg)) {
-                        const audioData = Buffer.from(msg.delta, "base64").buffer;
+                        let audioData = Buffer.from(msg.delta, "base64").buffer;
+                        if (this.request.outputAudioType === AUDIO_TYPE_24KHZ_PCMA) {
+                            audioData = this.g711AEncoder.encodeInt16le(audioData).buffer;
+                        }
                         const event: RealtimeConversionAudioEvent = { target: this, type: "audio", audio: audioData };
                         this.dispatchEvent(event);
                     }
@@ -255,11 +262,13 @@ export class OpenAIRealtimeConversation
 
 function toAudioFormat(type: string): RealtimeAudioFormat {
     switch (type) {
-        case "audio/PCMA":
+        case "audio/PCMA;rate=8000;channels=1":
             return "g711_alaw";
-        case "audio/PCMU":
+        case "audio/PCMU;rate=8000;channels=1":
             return "g711_ulaw";
         case "audio/pcm;rate=24000;bits=16;encoding=signed-int;channels=1;big-endian=false":
+            return "pcm16";
+        case AUDIO_TYPE_24KHZ_PCMA:
             return "pcm16";
         default:
             throw new VerbalWebError(`Unsupported realtime audio type: ${type}`);

@@ -80,8 +80,8 @@ module.exports = [
     {
         mode: "production",
         entry: {
-            G711AEncoder: path.resolve(__dirname, "src", "audioworklet", "G711AEncoder.ts"),
-            PCM16SLEDecoder: path.resolve(__dirname, "src", "audioworklet", "PCM16SLEDecoder.ts"),
+            VerbalWebAudioInput: path.resolve(__dirname, "src", "worker", "VerbalWebAudioInput.ts"),
+            VerbalWebAudioOutput: path.resolve(__dirname, "src", "worker", "VerbalWebAudioOutput.ts"),
         },
         output: {
             path: path.resolve(__dirname, "dist", "assets"),
@@ -91,7 +91,7 @@ module.exports = [
             rules: [
                 // Typescript code
                 {
-                    test: /src[/\\]audioworklet[/\\].*\.tsx?$/,
+                    test: /src[/\\](worker|shared)[/\\].*\.tsx?$/,
                     exclude: /node_modules/,
                     use: [
                         {

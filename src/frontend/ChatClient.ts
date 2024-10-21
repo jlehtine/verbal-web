@@ -172,7 +172,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
      *
      * @param buffer audio data
      */
-    submitAudio(buffer: Uint8Array[]) {
+    submitAudio(buffer: Uint8Array) {
         const amsg: ChatAudio = { type: "audio", binary: buffer };
         this.submitApiMessage(amsg);
     }
@@ -529,9 +529,7 @@ export class ChatClient extends TypedEventTarget<ChatClient, ChatClientEventMap>
                         const event: RealtimeAudioEvent = {
                             target: this,
                             type: "rtaudio",
-                            data: amsg.binary.map(
-                                (i) => new Int16Array(i.buffer.slice(i.byteOffset, i.byteOffset + i.byteLength)),
-                            ),
+                            data: amsg.binary,
                         };
                         this.dispatchEvent(event);
                     }
@@ -763,5 +761,5 @@ export type ChatEvent = TypedEvent<ChatClient, "chat">;
  */
 export interface RealtimeAudioEvent extends TypedEvent<ChatClient, "rtaudio"> {
     /** Realtime audio data */
-    data: Int16Array[];
+    data: Uint8Array;
 }
