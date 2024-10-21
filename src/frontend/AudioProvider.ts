@@ -5,6 +5,7 @@ import { logDebug, logThrownError } from "./log";
 
 const INPUT_SAMPLE_RATE = 8000;
 const INPUT_SAMPLE_SIZE = 16;
+const INPUT_BUFFER_SIZE = 4096;
 const FFT_SIZE = 1024;
 const SILENCE_THRESHOLD = 0.01;
 const SILENCE_DURATION_MILLIS = 500;
@@ -56,9 +57,12 @@ export class AudioProvider
     private silenceStartedAt: number | undefined;
     private soundStartedAt: number | undefined;
     private silenceDetected = true;
+    private silenceDetectedPrev = true;
     private soundDetected = false;
     private audioRecorded = false;
     private tryRequestAnimationFrame = typeof requestAnimationFrame === "function";
+    private inputBuffer = new Uint8Array(INPUT_BUFFER_SIZE);
+    private inputBufferBytes = 0;
 
     error: AudioErrorCode | undefined;
     recording = false;
@@ -129,18 +133,75 @@ export class AudioProvider
                     this.audioInContext.audioWorklet
                         .addModule("G711AEncoder.js")
                         .then(() => {
+                            // Dispatch audio data as event
+                            const dispatchData = (data: Uint8Array) => {
+                                const event: AudioProviderAudioEvent = {
+                                    target: this,
+                                    type: "audio",
+                                    buffer: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength),
+                                };
+                                this.dispatchEvent(event);
+                                this.inputBufferBytes = 0;
+                                this.audioRecorded = true;
+                            };
+
                             if (!this.stopped && this.audioInContext && this.audioSource) {
                                 this.g711aEncoder = new AudioWorkletNode(this.audioInContext, "G711AEncoder");
                                 this.g711aEncoder.port.onmessage = (event) => {
                                     const data: unknown = event.data;
-                                    if (!this.silenceDetected && data instanceof Uint8Array) {
-                                        const event: AudioProviderAudioEvent = {
-                                            target: this,
-                                            type: "audio",
-                                            buffer: data.buffer,
-                                        };
-                                        this.dispatchEvent(event);
-                                        this.audioRecorded = true;
+                                    if (data instanceof Uint8Array) {
+                                        const silent = this.silenceDetected && this.silenceDetectedPrev;
+                                        if (silent) {
+                                            const toCopy = Math.min(data.length, INPUT_BUFFER_SIZE);
+                                            if (this.inputBufferBytes + toCopy > INPUT_BUFFER_SIZE) {
+                                                const keep = Math.max(
+                                                    Math.min(
+                                                        this.inputBufferBytes,
+                                                        INPUT_BUFFER_SIZE - toCopy,
+                                                        INPUT_BUFFER_SIZE / 2 - toCopy,
+                                                    ),
+                                                    0,
+                                                );
+                                                if (keep > 0 && keep < this.inputBufferBytes) {
+                                                    this.inputBuffer.set(
+                                                        this.inputBuffer.subarray(
+                                                            this.inputBufferBytes - keep,
+                                                            this.inputBufferBytes,
+                                                        ),
+                                                        0,
+                                                    );
+                                                }
+                                                this.inputBufferBytes = keep;
+                                            }
+                                            this.inputBuffer.set(
+                                                data.subarray(data.length - toCopy),
+                                                this.inputBufferBytes,
+                                            );
+                                            this.inputBufferBytes += toCopy;
+                                        } else {
+                                            if (this.inputBufferBytes === 0 && data.length >= INPUT_BUFFER_SIZE) {
+                                                dispatchData(data);
+                                            } else {
+                                                let bytesConsumed = 0;
+                                                while (bytesConsumed < data.length) {
+                                                    const remaining = INPUT_BUFFER_SIZE - this.inputBufferBytes;
+                                                    const toCopy = Math.min(remaining, data.length - bytesConsumed);
+                                                    this.inputBuffer.set(
+                                                        data.subarray(bytesConsumed, bytesConsumed + toCopy),
+                                                        this.inputBufferBytes,
+                                                    );
+                                                    this.inputBufferBytes += toCopy;
+                                                    bytesConsumed += toCopy;
+                                                    if (this.inputBufferBytes === INPUT_BUFFER_SIZE) {
+                                                        dispatchData(this.inputBuffer);
+                                                    }
+                                                }
+                                            }
+                                            if (this.silenceDetected && this.inputBuffer.length > 0) {
+                                                dispatchData(this.inputBuffer);
+                                            }
+                                        }
+                                        this.silenceDetectedPrev = this.silenceDetected;
                                     }
                                 };
                                 this.audioSource.connect(this.g711aEncoder);

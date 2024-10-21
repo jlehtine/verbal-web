@@ -32,24 +32,10 @@ class G711AEncoder extends AudioWorkletProcessor {
         // Encode to G.711 A-law
         const pcma = alaw.encode(pcm16);
 
-        // Buffer and publish to main thread
-        if (this.bufferBytes == 0 && pcma.byteLength >= AUDIO_BUFFER_LENGTH) {
-            this.port.postMessage(pcma);
-        } else {
-            let bytesConsumed = 0;
-            while (bytesConsumed < pcma.length) {
-                const remaining = AUDIO_BUFFER_LENGTH - this.bufferBytes;
-                const toCopy = Math.min(remaining, pcma.length - bytesConsumed);
-                this.array.set(pcma.subarray(bytesConsumed, bytesConsumed + toCopy), this.bufferBytes);
-                this.bufferBytes += toCopy;
-                bytesConsumed += toCopy;
-                if (this.bufferBytes === AUDIO_BUFFER_LENGTH) {
-                    this.port.postMessage(this.array);
-                    this.bufferBytes = 0;
-                }
-            }
-        }
+        // Publish to main thread
+        this.port.postMessage(pcma);
 
+        // Continue while data available
         return true;
     }
 
