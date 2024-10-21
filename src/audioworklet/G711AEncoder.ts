@@ -9,7 +9,6 @@ const AUDIO_BUFFER_LENGTH = 1024;
 class G711AEncoder extends AudioWorkletProcessor {
     private offset = 0;
     private array = new Uint8Array(AUDIO_BUFFER_LENGTH);
-    private buffer = this.array.buffer;
     private bufferBytes = 0;
 
     process(inputs: Float32Array[][]) {
@@ -90,27 +89,29 @@ class G711AEncoder extends AudioWorkletProcessor {
         if (fromRate === toRate) return input;
 
         const buflen = input.length;
-        let resampled: Float32Array;
+        let resampled;
 
         // Optimized for multiples of target rate
         const ratio = fromRate / toRate;
-        if (fromRate > toRate && ratio % 1 === 0 && buflen % ratio === 0) {
-            const outlen = buflen / ratio;
+        if (fromRate > toRate && ratio % 1 === 0) {
+            let off = this.offset;
+            const outlen = Math.floor((buflen - off) / ratio);
             resampled = new Float32Array(outlen);
-            for (let i = 0, j = 0; i < outlen; i++, j += ratio) {
-                resampled[i] = input[j];
+            for (let i = 0; i < outlen; i++, off += ratio) {
+                resampled[i] = input[off];
             }
+            this.offset = off % ratio;
         }
 
         // Arbitrary sample rate, coarse resampling
         else {
             let off = this.offset;
-            const outlen = Math.ceil((buflen + off) / ratio);
+            const outlen = Math.floor((buflen - off) / ratio);
             resampled = new Float32Array(outlen);
-            for (let i = 0; i < outlen && off < buflen; i++, off += ratio) {
+            for (let i = 0; i < outlen; i++, off += ratio) {
                 resampled[i] = input[Math.floor(off)];
             }
-            this.offset = off - buflen;
+            this.offset = off % ratio;
         }
 
         return resampled;
