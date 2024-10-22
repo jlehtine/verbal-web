@@ -72,7 +72,7 @@ export default function AudioInput(props: AudioInputProps) {
                         }
                     } else {
                         setOnStop(() => () => {
-                            audioProvider.close();
+                            audioProvider.stop();
                         });
                     }
                 }

@@ -279,7 +279,7 @@ export class AudioProvider
     /**
      * Stops recording.
      */
-    private stop() {
+    stop() {
         if (this.stopped) return;
         logDebug("Stop audio recording");
         this.stopped = true;
