@@ -21,7 +21,7 @@ export class G711AEncoder {
         const pcm16 = new Int16Array(outlen);
         let outoff = 0;
         for (const buffer of buffers) {
-            const input = this.resample(this.mono(buffer), rateRatio);
+            const input = this.mono(this.resample(buffer, rateRatio));
             for (const i of input) {
                 pcm16[outoff++] = Math.round(i * 32767);
             }
@@ -87,31 +87,39 @@ export class G711AEncoder {
         return mono;
     }
 
-    private resample(input: Float32Array, rateRatio: number): Float32Array {
+    private resample(input: Float32Array[], rateRatio: number): Float32Array[] {
         // Check if input usable as is
         if (rateRatio === 1) return input;
 
-        // Allocate output buffer
+        // Handle each channel
+        const outputs = [];
         let off = this.offset;
-        const buflen = input.length;
+        const buflen = input[0].length;
         const outlen = Math.floor((buflen - off) / rateRatio);
-        const resampled = new Float32Array(outlen);
+        for (const channel of input) {
+            off = this.offset;
 
-        // Optimized for multiples of target rate
-        if (rateRatio > 1 && rateRatio % 1 === 0) {
-            for (let i = 0; i < outlen; i++, off += rateRatio) {
-                resampled[i] = input[off];
-            }
-        }
+            // Allocate output buffer
+            const resampled = new Float32Array(outlen);
 
-        // Arbitrary sample rate, coarse resampling
-        else {
-            for (let i = 0; i < outlen; i++, off += rateRatio) {
-                resampled[i] = input[Math.floor(off)];
+            // Optimized for multiples of target rate
+            if (rateRatio > 1 && rateRatio % 1 === 0) {
+                for (let i = 0; i < outlen; i++, off += rateRatio) {
+                    resampled[i] = channel[off];
+                }
             }
+
+            // Arbitrary sample rate, coarse resampling
+            else {
+                for (let i = 0; i < outlen; i++, off += rateRatio) {
+                    resampled[i] = channel[Math.floor(off)];
+                }
+            }
+
+            outputs.push(resampled);
         }
         this.offset = off % rateRatio;
 
-        return resampled;
+        return outputs;
     }
 }
