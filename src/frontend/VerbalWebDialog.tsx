@@ -34,7 +34,7 @@ export default function VerbalWebDialog({ conf, ...dialogProps }: VerbalWebDialo
             {...dialogProps}
             {...(fullScreen ? { fullScreen: true } : { fullWidth: true, maxWidth: "lg" })}
             className={VERBAL_WEB_CLASS_NAME}
-            PaperProps={fullScreen ? {} : { sx: { height: "90%" } }}
+            slotProps={{ paper: fullScreen ? {} : { sx: { height: "90%" } } }}
         >
             <VerbalWebDialogTitle onClose={dialogProps.onClose}>{t("dialog.title")}</VerbalWebDialogTitle>
             <DialogContent dividers ref={contentRef}>
