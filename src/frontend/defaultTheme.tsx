@@ -36,7 +36,7 @@ export interface DefaultThemedProps extends PropsWithChildren {
 export function DefaultThemed({ conf, children }: DefaultThemedProps) {
     const prefersDarkMode = useMediaQuery("(prefers-color-scheme: dark)");
     const autoColorScheme = prefersDarkMode ? "dark" : "light";
-    const colorScheme = conf.colorScheme ? conf.colorScheme : autoColorScheme;
+    const colorScheme = conf.colorScheme ?? autoColorScheme;
     const theme = React.useMemo(() => defaultTheme(colorScheme), [colorScheme]);
     return <ThemeProvider theme={theme}>{children}</ThemeProvider>;
 }
