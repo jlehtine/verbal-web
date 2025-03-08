@@ -41,7 +41,6 @@ export default function ChatView({ client, fullHeight }: ChatViewProps) {
     const chatRef = useRef<HTMLElement>();
     const tailRef = useRef<HTMLElement>();
     const overflowRef = useRef<HTMLElement>();
-    const msgsRef = useRef<HTMLElement>();
     const inputRef = useRef<HTMLTextAreaElement>();
     const theme = useTheme();
     const isSmallScreen = useMediaQuery(theme.breakpoints.down("sm"));
@@ -112,18 +111,64 @@ export default function ChatView({ client, fullHeight }: ChatViewProps) {
         }
     }
 
-    // Scroll to the bottom when the view is updated
-    const onViewUpdated = () => {
-        msgsRef.current?.scrollIntoView({ block: "end", behavior: "instant" });
-        tailRef.current?.scrollIntoView({ block: "end", behavior: "instant" });
+    // Scroll to the bottom when the scroll height is updated
+    const checkScrollIntervalMillis = 200;
+    const slowCheckScrollIntervalMillis = 2000;
+    let lastWindowInnerHeight: number | undefined;
+    let lastChatClientHeight: number | undefined;
+    let lastChatScrollHeight: number | undefined;
+    let checkScrollTimeout: number | undefined;
+    let lastUpdate = Date.now();
+    const checkScroll = () => {
+        if (!document.hidden) {
+            console.debug("Checking scroll");
+            const timeNow = Date.now();
+            checkScrollTimeout = setTimeout(
+                () => {
+                    checkScroll();
+                },
+                checkScrollTimeout !== undefined && timeNow - lastUpdate > slowCheckScrollIntervalMillis
+                    ? slowCheckScrollIntervalMillis
+                    : checkScrollIntervalMillis,
+            );
+            const windowInnerHeight = window.innerHeight;
+            const chatClientHeight = chatRef.current?.clientHeight;
+            const chatScrollHeight = chatRef.current?.scrollHeight;
+            if (
+                windowInnerHeight !== lastWindowInnerHeight ||
+                chatClientHeight !== lastChatClientHeight ||
+                chatScrollHeight !== lastChatScrollHeight
+            ) {
+                lastWindowInnerHeight = windowInnerHeight;
+                lastChatClientHeight = chatClientHeight;
+                lastChatScrollHeight = chatScrollHeight;
+                tailRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
+                lastUpdate = timeNow;
+            }
+        } else {
+            checkScrollTimeout = undefined;
+        }
     };
-    useEffect(onViewUpdated, [messages, errorMessage, waitingForResponse]);
+    const onVisibilityChange = () => {
+        if (!document.hidden) {
+            if (checkScrollTimeout !== undefined) {
+                clearTimeout(checkScrollTimeout);
+            }
+            checkScroll();
+        }
+    };
 
     // On mount and unmount
     useEffect(() => {
+        checkScroll();
+        document.addEventListener("visibilitychange", onVisibilityChange);
         client.addEventListener("chat", onChatChange);
         return () => {
             client.removeEventListener("chat", onChatChange);
+            document.removeEventListener("visibilitychange", onVisibilityChange);
+            if (checkScrollTimeout !== undefined) {
+                clearTimeout(checkScrollTimeout);
+            }
         };
     }, []);
 
@@ -163,9 +208,7 @@ export default function ChatView({ client, fullHeight }: ChatViewProps) {
                         <ChatMessageListView
                             messages={messages}
                             waitingForResponse={waitingForResponse}
-                            msgsRef={msgsRef}
                             isSmallScreen={isSmallScreen}
-                            onViewUpdated={onViewUpdated}
                         />
                     </Box>
                 </Suspense>
@@ -349,7 +392,7 @@ function ChatMessageListView({
     msgsRef?: React.Ref<unknown>;
     waitingForResponse: boolean;
     isSmallScreen: boolean;
-    onViewUpdated: () => void;
+    onViewUpdated?: () => void;
 }) {
     const MemoizedWelcomeView = memo(WelcomeView);
     return (
@@ -375,7 +418,7 @@ function ChatMessageView({
     completed,
     isSmallScreen,
     onViewUpdated,
-}: PropsWithChildren<{ msg: ChatMessage; completed: boolean; isSmallScreen: boolean; onViewUpdated: () => void }>) {
+}: PropsWithChildren<{ msg: ChatMessage; completed: boolean; isSmallScreen: boolean; onViewUpdated?: () => void }>) {
     const um = msg.role === "user";
     const MemoizedMarkdownContent = memo(MarkdownContent);
     return (
