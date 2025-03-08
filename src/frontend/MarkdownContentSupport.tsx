@@ -40,61 +40,97 @@ function getCssContent(module: unknown): string {
  * Loads and sets the highlighting styles.
  *
  * @param mode palette mode
+ * @param conf configuration
+ * @returns whether view was updated
  */
-function setHighlightPaletteMode(mode: PaletteMode, conf: VerbalWebConfiguration) {
+async function setHighlightPaletteMode(mode: PaletteMode, conf: VerbalWebConfiguration): Promise<boolean> {
     // Check if mode changed
     if (mode !== highlightMode) {
         // Set mode
         highlightMode = mode;
 
         // Load highlight styles, if necessary
-        (mode === "light"
-            ? load(
-                  "highligh.js/styles/light",
-                  conf,
-                  "extra",
-                  () => import("highlight.js/styles/stackoverflow-light.min.css"),
-              )
-            : load(
-                  "highligh.js/styles/dark",
-                  conf,
-                  "extra",
-                  () => import("highlight.js/styles/stackoverflow-dark.min.css"),
-              )
-        )
-            .then((module) => {
-                if (!highlightStyle) {
-                    highlightStyle = document.createElement("style");
-                    document.head.appendChild(highlightStyle);
-                }
-                if (mode === highlightMode) {
-                    highlightStyle.innerHTML = getCssContent(module);
-                }
-            })
-            .catch((err: unknown) => {
-                logThrownError("Failed to load syntax highlighting styles", err);
-            });
+        try {
+            const module: unknown =
+                mode === "light"
+                    ? await load(
+                          "highligh.js/styles/light",
+                          conf,
+                          "extra",
+                          () => import("highlight.js/styles/stackoverflow-light.min.css"),
+                      )
+                    : await load(
+                          "highligh.js/styles/dark",
+                          conf,
+                          "extra",
+                          () => import("highlight.js/styles/stackoverflow-dark.min.css"),
+                      );
+            if (!highlightStyle) {
+                const hs = document.createElement("style");
+                document.head.appendChild(hs);
+                highlightStyle = hs;
+            }
+            if (mode === highlightMode) {
+                highlightStyle.innerHTML = getCssContent(module);
+            }
+        } catch (err: unknown) {
+            logThrownError("Failed to load syntax highlighting styles", err);
+        }
+        return true;
+    } else {
+        return false;
     }
 }
 
-/** Loads KaTeX styles. */
-function loadKatexStyles(conf: VerbalWebConfiguration) {
-    load("katex.css", conf, "extra", () => import("katex/dist/katex.min.css"))
-        .then((module) => {
-            if (!katexStyle) {
-                katexStyle = document.createElement("style");
-                document.head.appendChild(katexStyle);
-                katexStyle.innerHTML = getCssContent(module);
-            }
-        })
-        .catch((err: unknown) => {
+/** Loads KaTeX styles.
+ *
+ * @param conf configuration
+ * @returns whether view was updated
+ */
+async function loadKatexStyles(conf: VerbalWebConfiguration): Promise<boolean> {
+    if (!katexStyle) {
+        try {
+            const module: unknown = await load("katex.css", conf, "extra", () => import("katex/dist/katex.min.css"));
+            const ks = document.createElement("style");
+            document.head.appendChild(ks);
+            ks.innerHTML = getCssContent(module);
+            katexStyle = ks;
+        } catch (err: unknown) {
             logThrownError("Failed to load KaTeX styles", err);
-        });
+        }
+        return true;
+    } else {
+        return false;
+    }
 }
 
+/**
+ * Context for markdown content processing.
+ */
 export interface MarkdownContentFuncs {
-    highlight: (elem: HTMLElement, completed: boolean) => void;
+    /**
+     * Asynchronously highlights the specified HTML element.
+     *
+     * @param elem element
+     * @param completed whether element content has been completed
+     * @returns whether view was updated
+     */
+    highlight: (elem: HTMLElement, completed: boolean) => Promise<boolean>;
+
+    /**
+     * Detects and converts math markup.
+     *
+     * @param content content with potential math markup
+     * @returns converted content or undefined if content did not change
+     */
     mathMarkup: (content: string) => string | undefined;
+
+    /**
+     * Asynchronously loads the math markup styling.
+     *
+     * @returns whether view was updated
+     */
+    mathMarkupStyling: () => Promise<boolean>;
 }
 
 const MarkdownContentContext = createContext<MarkdownContentFuncs | null>(null);
@@ -118,20 +154,17 @@ export default function MarkdownContentSupport({ children }: PropsWithChildren) 
         palette: { mode },
     } = useTheme();
 
-    /**
-     * Highlights the specified HTML element.
-     *
-     * @param elem element to be highlighted
-     * @param completed whether the content has been completed
-     */
-    function highlight(elem: HTMLElement, completed: boolean) {
+    /** @see {@link MarkdownContentFuncs#highlight} */
+    async function highlight(elem: HTMLElement, completed: boolean): Promise<boolean> {
         const selector = "pre code";
-        const nodes = elem.querySelectorAll(selector);
+        const nodes = elem.querySelectorAll(selector + ':not([data-highlighted="yes"]');
         if (nodes.length > 0) {
-            setHighlightPaletteMode(mode, conf);
-            load("highlight.js", conf, "extra", () => import("highlight.js"))
-                .then(({ default: hljs }) => {
-                    for (const n of elem.querySelectorAll(selector + ':not([data-highlighted="yes"]')) {
+            let updated = false;
+            try {
+                updated = await setHighlightPaletteMode(mode, conf);
+                const { default: hljs } = await load("highlight.js", conf, "extra", () => import("highlight.js"));
+                if (elem.isConnected) {
+                    for (const n of nodes) {
                         if (n instanceof HTMLElement) {
                             if (
                                 completed ||
@@ -139,36 +172,41 @@ export default function MarkdownContentSupport({ children }: PropsWithChildren) 
                                 n.parentElement?.nextElementSibling instanceof Element
                             ) {
                                 hljs.highlightElement(n);
+                                updated = true;
                             }
                         }
                     }
-                })
-                .catch((err: unknown) => {
-                    logThrownError("Syntax highlighting failed", err);
-                });
+                }
+            } catch (err: unknown) {
+                logThrownError("Syntax highlighting failed", err);
+            }
+            return updated;
+        } else {
+            return false;
         }
     }
 
-    /**
-     * Converts math markup.
-     *
-     * @param content content
-     * @returns returns converted content or undefined if content did not change
-     */
+    /** @see {@link MarkdownContentFuncs#mathMarkup} */
     function mathMarkup(content: string): string | undefined {
         let c = content;
         c = c.replace(/\\\[(.*?)\\\]/gms, (_, formula: string) => "$$$" + formula + "$$$");
         c = c.replace(/\\\((.*?)\\\)/gm, (_, formula: string) => "$$" + formula + "$$");
         if (c !== content) {
-            loadKatexStyles(conf);
             return c;
+        } else {
+            return undefined;
         }
+    }
+
+    /** @see {@link MarkdownContentFuncs#mathMarkupStyling} */
+    async function mathMarkupStyling(): Promise<boolean> {
+        return await loadKatexStyles(conf);
     }
 
     // Switch highlight palette on light/dark mode changes
     useEffect(() => {
         if (highlightMode !== undefined) {
-            setHighlightPaletteMode(mode, conf);
+            void setHighlightPaletteMode(mode, conf);
         }
     }, [mode]);
 
@@ -192,7 +230,7 @@ export default function MarkdownContentSupport({ children }: PropsWithChildren) 
                     },
                 }}
             />
-            <MarkdownContentContext.Provider value={{ highlight: highlight, mathMarkup: mathMarkup }}>
+            <MarkdownContentContext.Provider value={{ highlight, mathMarkup, mathMarkupStyling }}>
                 {children}
             </MarkdownContentContext.Provider>
         </>

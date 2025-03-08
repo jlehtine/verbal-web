@@ -112,11 +112,12 @@ export default function ChatView({ client, fullHeight }: ChatViewProps) {
         }
     }
 
-    // Scroll to the bottom when there is new content, unless user has scrolled up
-    useEffect(() => {
+    // Scroll to the bottom when the view is updated
+    const onViewUpdated = () => {
         msgsRef.current?.scrollIntoView({ block: "end", behavior: "instant" });
         tailRef.current?.scrollIntoView({ block: "end", behavior: "instant" });
-    }, [messages, errorMessage, waitingForResponse]);
+    };
+    useEffect(onViewUpdated, [messages, errorMessage, waitingForResponse]);
 
     // On mount and unmount
     useEffect(() => {
@@ -164,6 +165,7 @@ export default function ChatView({ client, fullHeight }: ChatViewProps) {
                             waitingForResponse={waitingForResponse}
                             msgsRef={msgsRef}
                             isSmallScreen={isSmallScreen}
+                            onViewUpdated={onViewUpdated}
                         />
                     </Box>
                 </Suspense>
@@ -341,11 +343,13 @@ function ChatMessageListView({
     msgsRef,
     waitingForResponse,
     isSmallScreen,
+    onViewUpdated,
 }: {
     messages: ChatMessage[];
     msgsRef?: React.Ref<unknown>;
     waitingForResponse: boolean;
     isSmallScreen: boolean;
+    onViewUpdated: () => void;
 }) {
     const MemoizedWelcomeView = memo(WelcomeView);
     return (
@@ -358,6 +362,7 @@ function ChatMessageListView({
                         msg={m}
                         completed={!waitingForResponse || idx < array.length - 1}
                         isSmallScreen={isSmallScreen}
+                        onViewUpdated={onViewUpdated}
                     />
                 ))}
             </Stack>
@@ -369,7 +374,8 @@ function ChatMessageView({
     msg,
     completed,
     isSmallScreen,
-}: PropsWithChildren<{ msg: ChatMessage; completed: boolean; isSmallScreen: boolean }>) {
+    onViewUpdated,
+}: PropsWithChildren<{ msg: ChatMessage; completed: boolean; isSmallScreen: boolean; onViewUpdated: () => void }>) {
     const um = msg.role === "user";
     const MemoizedMarkdownContent = memo(MarkdownContent);
     return (
@@ -383,7 +389,11 @@ function ChatMessageView({
                     </Box>
                 )}
                 <Paper sx={{ pl: 2, pr: 2 }}>
-                    <MemoizedMarkdownContent content={msg.content} completed={completed} />
+                    <MemoizedMarkdownContent
+                        content={msg.content}
+                        completed={completed}
+                        onViewUpdated={onViewUpdated}
+                    />
                 </Paper>
             </Stack>
         </Box>
