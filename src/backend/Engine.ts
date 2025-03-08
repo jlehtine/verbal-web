@@ -1,5 +1,6 @@
 import { ChatCompletionProvider } from "./ChatCompletionProvider";
 import { ModerationProvider } from "./ModerationProvider";
+import { RealtimeProvider } from "./RealtimeProvider";
 import { TranscriptionProvider } from "./TranscriptionProvider";
 
 /**
@@ -26,4 +27,11 @@ export interface Engine {
      * @returns the transcription provider or undefined if not available
      */
     transcriptionProvider(): TranscriptionProvider | undefined;
+
+    /**
+     * Returns the realtime provider if available.
+     *
+     * @returns the realtime provider or undefined if not available
+     */
+    realtimeProvider(): RealtimeProvider | undefined;
 }

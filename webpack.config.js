@@ -29,7 +29,7 @@ module.exports = [
             rules: [
                 // Typescript code
                 {
-                    test: /\.tsx?$/,
+                    test: /src[/\\](frontend|shared)[/\\].*\.tsx?$/,
                     exclude: /node_modules/,
                     use: [
                         {
@@ -50,7 +50,7 @@ module.exports = [
 
                 // Source map loader for output files
                 {
-                    test: /dist[/\\]*.js$/,
+                    test: /dist[/\\]frontend[/\\]*.js$/,
                     exclude: /node_modules/,
                     use: "source-map-loader",
                 },
@@ -79,6 +79,40 @@ module.exports = [
     },
     {
         mode: "production",
+        entry: {
+            VerbalWebAudioInput: path.resolve(__dirname, "src", "worker", "VerbalWebAudioInput.ts"),
+            VerbalWebAudioOutput: path.resolve(__dirname, "src", "worker", "VerbalWebAudioOutput.ts"),
+        },
+        output: {
+            path: path.resolve(__dirname, "dist", "assets"),
+            filename: "[name].js",
+        },
+        module: {
+            rules: [
+                // Typescript code
+                {
+                    test: /src[/\\](worker|shared)[/\\].*\.tsx?$/,
+                    exclude: /node_modules/,
+                    use: [
+                        {
+                            loader: "babel-loader",
+                            options: babelOptions,
+                        },
+                        {
+                            loader: "ts-loader",
+                        },
+                    ],
+                },
+            ],
+        },
+        resolve: {
+            extensions: [".ts", "..."],
+        },
+        devServer: false,
+        plugins: [new ESLintPlugin()],
+    },
+    {
+        mode: "production",
         target: "node",
         externals: [nodeExternals()],
         entry: {
@@ -92,7 +126,7 @@ module.exports = [
             rules: [
                 // Typescript code
                 {
-                    test: /\.ts$/,
+                    test: /src[/\\](backend|shared)[/\\].*\.ts$/,
                     exclude: /node_modules/,
                     use: [
                         {

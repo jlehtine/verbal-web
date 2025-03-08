@@ -22,30 +22,31 @@ export function wsDataToApiMessage<T extends ApiChatMessage>(data: unknown, type
             return amsg;
         }
     }
+    console.error("Invalid API message:", data);
     throw new VerbalWebError("Received WebSocket message is invalid", { cause });
 }
 
 /**
  * Parse WebSocket message data into JSON and binary parts.
  */
-function toJsonBinaryParts(data: unknown): { json: string; binary?: ArrayBuffer } {
+function toJsonBinaryParts(data: unknown): { json: string; binary?: Uint8Array } {
     // Handle string messages
     if (typeof data === "string") {
         return { json: data };
     }
 
     // Handle binary messages
-    else if (typeof data === "object" && data instanceof ArrayBuffer) {
+    else if (data instanceof ArrayBuffer) {
         // Find nil-terminated JSON string and rest is binary data
         const view = new Uint8Array(data);
-        let jsonLength = 0;
-        while (jsonLength < view.length && view[jsonLength] !== 0) {
-            jsonLength++;
+        let jsonLength = view.findIndex((v) => v === 0);
+        if (jsonLength === -1) {
+            jsonLength = view.length;
         }
 
         return {
-            json: new TextDecoder().decode(view.slice(0, jsonLength)),
-            binary: jsonLength < view.length ? view.slice(jsonLength + 1).buffer : undefined,
+            json: new TextDecoder().decode(view.subarray(0, jsonLength)),
+            binary: jsonLength + 1 < view.length ? view.subarray(jsonLength + 1) : undefined,
         };
     }
 
@@ -60,15 +61,17 @@ function toJsonBinaryParts(data: unknown): { json: string; binary?: ArrayBuffer 
  */
 export function apiMessageToWsData(amsg: ApiChatMessage): string | ArrayBuffer {
     const { binary, ...msgRest } = amsg;
-    if (typeof binary === "object" && binary instanceof ArrayBuffer) {
+    if (binary instanceof Uint8Array) {
         const json = JSON.stringify(msgRest);
         const jsonBytes = new TextEncoder().encode(json);
-        const buffer = new ArrayBuffer(jsonBytes.length + 1 + binary.byteLength);
-        const view = new Uint8Array(buffer);
-        view.set(jsonBytes);
-        view[json.length] = 0;
-        view.set(new Uint8Array(binary), json.length + 1);
-        return buffer;
+        const buffer = new Uint8Array(jsonBytes.length + 1 + binary.byteLength);
+        buffer.set(jsonBytes);
+        buffer[jsonBytes.length] = 0;
+        buffer.set(binary, jsonBytes.length + 1);
+        return buffer.buffer;
+    } else if (binary !== undefined) {
+        console.error("Invalid API message binary data", binary);
+        throw new VerbalWebError("API message binary data is not an Uint8Array[]");
     } else {
         return JSON.stringify(amsg);
     }

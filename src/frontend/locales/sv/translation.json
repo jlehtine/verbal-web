@@ -1,14 +1,19 @@
 {
     "audio": {
+        "conversationInProgress": "Ljudkonversationen pågår. Sluta genom att trycka på knappen.",
         "error": {
             "general": "Det gick inte att initiera ljudfunktionerna.",
+            "noaudio": "Ingen ljud upptäckt.",
             "notallowed": "Ljud är inte tillåtet. Kontrollera webbläsarinställningar och webbplatsens behörigheter.",
             "notfound": "Ingen kompatibel ljudingångsenhet hittades.",
-            "processing": "Det gick inte att bearbeta ljud."
+            "processing": "Det gick inte att bearbeta ljud.",
+            "realtime": "Ljudkonversationen misslyckades på grund av ett fel."
         },
-        "initializingRecording": "Initierar ljudinspelning. Vänligen tillåt ljudåtkomst för att använda röststyrning.",
-        "input": "Talkontroll",
+        "initializingRecording": "Initierar ljudinspelning. Vänligen tillåt ljudåtkomst för att använda taligenkänning.",
+        "input": "Taligenkänning",
         "processing": "Bearbetar ljud...",
+        "realtime": "Ljudkonversation",
+        "realtimePending": "Startar ljudkonversation...",
         "recording": "Jag lyssnar på ditt tal. Sluta genom att ta en paus eller trycka på knappen.",
         "stopRecording": "Sluta inspelning"
     },

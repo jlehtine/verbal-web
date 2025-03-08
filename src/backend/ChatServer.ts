@@ -1,14 +1,13 @@
 import {
     ApiBackendChatMessage,
     ApiFrontendChatMessage,
-    ChatAudioMessageNew,
     ChatAudioTranscription,
+    ChatInitRealtime,
     ChatMessageError,
     ChatMessageErrorCode,
-    ChatMessageNew,
     ChatMessagePart,
+    ChatAudio,
     isApiFrontendChatMessage,
-    isChatAudioMessageNew,
 } from "../shared/api";
 import { Chat, InitialChatStateOverrides } from "../shared/chat";
 import { VerbalWebError } from "../shared/error";
@@ -16,12 +15,16 @@ import { apiMessageToWsData, wsDataToApiMessage } from "../shared/wsdata";
 import { ChatCompletionMessage, ChatCompletionProvider, ChatCompletionRequest } from "./ChatCompletionProvider";
 import { ModerationCache } from "./ModerationCache";
 import { ModerationProvider, ModerationRejectedError } from "./ModerationProvider";
+import { RealtimeConversation, RealtimeConversationRequest, RealtimeProvider } from "./RealtimeProvider";
 import { RequestContext, contextFrom } from "./RequestContext";
 import { TextChunker, chunkText } from "./TextChunker";
 import { TranscriptionProvider, TranscriptionRequest } from "./TranscriptionProvider";
 import { logDebug, logError, logInfo, logInterfaceData, logThrownError } from "./log";
 import { continueRandomErrors, pauseRandomErrors } from "./randomErrors";
+import { alaw } from "alawmulaw";
 import { Request } from "express";
+import { Writable } from "stream";
+import { Writer as WavWriter } from "wav";
 import { WebSocket } from "ws";
 
 /** Inactivity timeout is one minute */
@@ -29,6 +32,13 @@ const INACTIVITY_TIMEOUT_MILLIS = 60 * 1000;
 
 /** Interval for sending checks */
 const SEND_INTERVAL_MILLIS = 200;
+
+export class RealtimeConversationError extends VerbalWebError {
+    constructor(msg: string, options?: ErrorOptions) {
+        super(msg, options);
+        this.name = "RealtimeConversationError";
+    }
+}
 
 /** Server configuration details */
 export interface ChatServerConfig {
@@ -110,7 +120,16 @@ export class ChatServer {
     /** Chat completion provider */
     private readonly chatCompletion;
 
+    /** Realtime provider */
+    private readonly realtime;
+
+    private realtimeConversationRequested = false;
+
+    private realtimeConversation?: RealtimeConversation;
+
     private inactivityTimer?: NodeJS.Timeout;
+
+    private bufferedAudio: Uint8Array[] = [];
 
     constructor(
         req: Request,
@@ -118,6 +137,7 @@ export class ChatServer {
         transcription: TranscriptionProvider | undefined,
         moderation: ModerationProvider,
         chatCompletion: ChatCompletionProvider,
+        realtime: RealtimeProvider | undefined,
         config?: ChatServerConfig,
         serverOverrides?: InitialChatStateOverrides,
     ) {
@@ -129,6 +149,7 @@ export class ChatServer {
         this.transcription = transcription;
         this.moderation = new ModerationCache(moderation);
         this.chatCompletion = chatCompletion;
+        this.realtime = realtime;
         this.initWebSocketInactivityTimeout();
 
         this.ws.on("message", (data) => {
@@ -184,16 +205,37 @@ export class ChatServer {
         if (this.checkAuthorized()) {
             this.debugData("Received a chat update", amsg);
             this.chat.update(amsg);
-            if (this.chat.backendProcessing) {
+
+            // Start realtime conversation
+            if (amsg.type === "init" && amsg.mode === "realtime") {
+                this.initWebSocketInactivityTimeout();
+                this.handleRealtimeInit(amsg);
+            }
+
+            // Input audio
+            else if (amsg.type === "audio") {
+                this.initWebSocketInactivityTimeout();
+                this.handleRealtimeAudio(amsg);
+            }
+
+            // Audio commit
+            else if (amsg.type === "audiocommit") {
+                this.info("Audio message received for transcription");
+                this.initWebSocketInactivityTimeout();
+                this.doTranscription();
+            }
+
+            // Stop realtime conversation
+            else if (amsg.type === "rtstop") {
+                this.resetRealtimeConversation();
+            }
+
+            // Chat completion
+            else if (this.chat.backendProcessing) {
                 continueRandomErrors();
                 this.clearInactivityTimer();
-                if (isChatAudioMessageNew(amsg)) {
-                    this.info("Audio message received");
-                    this.doTranscription(amsg);
-                } else {
-                    this.info("Chat completion requested");
-                    this.doChatCompletion();
-                }
+                this.info("Chat completion requested");
+                this.doChatCompletion();
             } else {
                 this.initWebSocketInactivityTimeout();
             }
@@ -204,7 +246,6 @@ export class ChatServer {
         if (this.config?.allowUsers === undefined || this.requestContext.session?.userEmail !== undefined) {
             return true;
         } else {
-            console.debug("session = " + JSON.stringify(this.requestContext.session));
             this.error("Unauthorized, requesting authentication");
             if (this.ws.readyState === WebSocket.OPEN) {
                 const errmsg: ChatMessageError = { type: "msgerror", code: "auth" };
@@ -216,16 +257,87 @@ export class ChatServer {
         }
     }
 
+    private handleRealtimeInit(amsg: ChatInitRealtime) {
+        if (this.realtime) {
+            this.info("Realtime conversation requested");
+            if (this.realtimeConversation) {
+                throw new RealtimeConversationError("Realtime conversation already in progress");
+            } else if (this.realtimeConversationRequested) {
+                throw new RealtimeConversationError("Realtime conversation request already being processed");
+            }
+            this.realtimeConversationRequested = true;
+            const req: RealtimeConversationRequest = {
+                inputAudioType: amsg.realtimeInputAudioType,
+                outputAudioType: amsg.realtimeOutputAudioType,
+            };
+            this.realtime
+                .realtimeConversation(this.requestContext, req)
+                .then((conversation) => {
+                    if (!this.realtimeConversationRequested) {
+                        this.debug("Realtime conversation request cancelled");
+                        conversation.close();
+                        return;
+                    }
+                    this.info("Realtime conversation started");
+                    this.sendMessage({ type: "rtstarted" }, "realtime conversation started");
+                    this.realtimeConversation = conversation;
+                    conversation.addEventListener("audio", (event) => {
+                        const amsg: ChatAudio = { type: "audio", binary: new Uint8Array(event.audio) };
+                        this.sendMessage(amsg, "realtime audio");
+                    });
+                    conversation.addEventListener("error", (event) => {
+                        this.resetRealtimeConversation();
+                        this.handleError(
+                            new RealtimeConversationError("Realtime conversation error", { cause: event.error }),
+                        );
+                    });
+                    conversation.addEventListener("state", () => {
+                        if (conversation.isClosed()) {
+                            this.resetRealtimeConversation();
+                        }
+                    });
+                })
+                .catch((err: unknown) => {
+                    this.handleError(
+                        new RealtimeConversationError("Failed to start realtime conversation", { cause: err }),
+                    );
+                });
+        } else {
+            throw new RealtimeConversationError("Realtime conversation not available");
+        }
+    }
+
+    private handleRealtimeAudio(amsg: ChatAudio) {
+        const rtc = this.realtimeConversation;
+        if (rtc) {
+            rtc.appendAudio(amsg.binary);
+        } else {
+            this.bufferedAudio.push(amsg.binary);
+        }
+    }
+
     // On web socket error
     private onWebSocketError(err: unknown) {
         this.thrownError("Web socket closed on error", err);
+        this.resetRealtimeConversation();
         this.clearInactivityTimer();
     }
 
     // On web socket close
     private onWebSocketClose() {
         this.debug("Web socket closed");
+        this.resetRealtimeConversation();
         this.clearInactivityTimer();
+    }
+
+    private resetRealtimeConversation() {
+        this.realtimeConversationRequested = false;
+        const rtc = this.realtimeConversation;
+        if (rtc) {
+            this.debug("Closing the realtime conversation");
+            this.realtimeConversation = undefined;
+            rtc.close();
+        }
     }
 
     private initWebSocketInactivityTimeout() {
@@ -233,6 +345,7 @@ export class ChatServer {
         this.inactivityTimer = setTimeout(() => {
             this.inactivityTimer = undefined;
             this.debug("Closing the connection due to inactivity timeout");
+            this.resetRealtimeConversation();
             this.ws.close();
         }, INACTIVITY_TIMEOUT_MILLIS);
     }
@@ -245,31 +358,67 @@ export class ChatServer {
     }
 
     /** Handles an audio transcription request */
-    private doTranscription(amsg: ChatAudioMessageNew) {
-        if (this.transcription !== undefined) {
-            const request: TranscriptionRequest = {
-                user: this.requestContext.session?.id,
-                audio: amsg.binary,
-                type: amsg.mimeType,
-            };
-            this.transcription
-                .transcribe(this.requestContext, request)
-                .then((transcription) => {
-                    if (transcription.length === 0) {
-                        throw new VerbalWebError("Empty transcription");
-                    }
-                    const msg: ChatMessageNew = { type: "msgnew", content: transcription };
-                    this.chat.update(msg);
-                    if (this.ws.readyState === WebSocket.OPEN) {
-                        const tmsg: ChatAudioTranscription = { type: "audtrsc", transcription };
-                        this.sendMessage(tmsg, "an audio transcription");
-                        this.info("Starting chat completion of the audio transcription");
-                        this.doChatCompletion();
-                    }
-                })
-                .catch((err: unknown) => {
-                    this.handleError(err);
-                });
+    private doTranscription() {
+        const transcription = this.transcription;
+        if (transcription !== undefined) {
+            // Collect buffered audio
+            const audioBytes = this.bufferedAudio.reduce((acc, a) => acc + a.byteLength, 0);
+            const audioData = new Uint8Array(audioBytes);
+            let offset = 0;
+            for (const ba of this.bufferedAudio) {
+                audioData.set(new Uint8Array(ba), offset);
+                offset += ba.byteLength;
+            }
+            this.bufferedAudio = [];
+
+            // Convert buffered audio from G.711 A-law to PCM 16-bit WAV
+            const pcm = alaw.decode(audioData);
+            const wavWriter = new WavWriter({ channels: 1, sampleRate: 8000, bitDepth: 16 });
+            const chunks: Buffer[] = [];
+            wavWriter.pipe(
+                new Writable({
+                    write(chunk, encoding, callback) {
+                        if (chunk instanceof Buffer) {
+                            chunks.push(chunk);
+                            callback();
+                        } else {
+                            throw new Error("Unsupported chunk type");
+                        }
+                    },
+                }),
+            );
+
+            wavWriter.addListener("end", () => {
+                const wav = Buffer.concat(chunks);
+                const req: TranscriptionRequest = {
+                    user: this.requestContext.session?.id,
+                    audio: wav,
+                    type: "audio/wav",
+                };
+                transcription
+                    .transcribe(this.requestContext, req)
+                    .then((transcription) => {
+                        if (transcription.length === 0) {
+                            throw new VerbalWebError("Empty transcription");
+                        }
+                        if (this.ws.readyState === WebSocket.OPEN) {
+                            const tmsg: ChatAudioTranscription = { type: "audtrsc", transcription };
+                            this.chat.update(tmsg);
+                            this.sendMessage(tmsg, "an audio transcription");
+                            this.info("Starting chat completion of the audio transcription");
+                            this.doChatCompletion();
+                        }
+                    })
+                    .catch((err: unknown) => {
+                        this.handleError(err);
+                    });
+            });
+
+            wavWriter.addListener("error", (err) => {
+                this.handleError(err);
+            });
+
+            wavWriter.end(Buffer.from(pcm.buffer));
         } else {
             this.handleError(new VerbalWebError("Audio transcription not available"));
         }
@@ -427,12 +576,18 @@ export class ChatServer {
     }
 
     private handleError(err: unknown) {
-        const errorCode: ChatMessageErrorCode = err instanceof ModerationRejectedError ? "moderation" : "chat";
+        const errorCode: ChatMessageErrorCode =
+            err instanceof ModerationRejectedError
+                ? "moderation"
+                : err instanceof RealtimeConversationError
+                  ? "realtime"
+                  : "chat";
         const errorMessage = (
             {
                 connection: "Assistant connection failed",
                 moderation: "Moderation flagged",
                 chat: "Chat completion failed",
+                realtime: "Realtime conversation failed",
                 limit: "Chat completion usage limit encountered",
             } as Record<ChatMessageErrorCode, string>
         )[errorCode];
@@ -441,6 +596,7 @@ export class ChatServer {
             const msg: ChatMessageError = { type: "msgerror", code: errorCode };
             this.chat.update(msg);
             this.sendMessage(msg, "a chat error");
+            this.resetRealtimeConversation();
             this.ws.close();
         }
         pauseRandomErrors();

@@ -1,14 +1,19 @@
 {
     "audio": {
+        "conversationInProgress": "Puhekeskustelu on käynnissä. Lopeta painamalla napista.",
         "error": {
             "general": "Ääniominaisuuksien alustaminen epäonnistui.",
+            "noaudio": "Ääntä ei havaittu.",
             "notallowed": "Ääni ei ole sallittu. Tarkista selaimen asetukset ja verkkosivun käyttöoikeudet.",
             "notfound": "Yhteensopivaa äänilähdettä ei löytynyt.",
-            "processing": "Äänen käsittely epäonnistui."
+            "processing": "Äänen käsittely epäonnistui.",
+            "realtime": "Puhekeskustelussa tapahtui virhe."
         },
-        "initializingRecording": "Puheohjausta valmistellaan. Sallithan äänen tallennuksen käyttääksesi puheohjausta.",
-        "input": "Puheohjaus",
+        "initializingRecording": "Äänen tallennusta valmistellaan. Sallithan äänen tallennuksen käyttääksesi puheentunnistusta.",
+        "input": "Puheentunnistus",
         "processing": "Käsitellään ääntä...",
+        "realtime": "Puhekeskustelu",
+        "realtimePending": "Puhekeskustelua käynnistetään...",
         "recording": "Kuuntelen puhettasi. Lopeta pitämällä tauko tai painamalla napista.",
         "stopRecording": "Lopeta tallennus"
     },

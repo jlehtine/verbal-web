@@ -3,7 +3,7 @@ import {
     ChatMessage,
     ChatMessageErrorCode,
     ChatState,
-    isChatAudioMessageNew,
+    isChatAudioCommit,
     isChatAudioTranscription,
     isChatInit,
     isChatMessageError,
@@ -11,7 +11,6 @@ import {
     isChatMessagePart,
 } from "./api";
 import { lastOf } from "./array";
-import { VerbalWebError } from "./error";
 
 /**
  * A model of a chat state and how it changes in response to API messages.
@@ -44,23 +43,27 @@ export class Chat {
 
     /**
      * Updates chat state according to the specified API message.
+     * Returns whether chat state was updated.
      *
      * @param amsg API message
      */
-    update(amsg: ApiChatMessage): void {
+    update(amsg: ApiChatMessage): boolean {
+        let updated = true;
         if (isChatInit(amsg)) {
-            this.state = { ...amsg, ...this.serverOverrides };
+            this.state = { ...amsg.state, ...this.serverOverrides };
             this.error = undefined;
             this.backendProcessing = lastOf(this.state.messages)?.role === "user";
-        } else if (isChatMessageNew(amsg) || isChatAudioMessageNew(amsg)) {
-            if (typeof amsg.content === "string") {
-                this.state.messages.push({ role: "user", content: amsg.content });
-            }
+        } else if (isChatMessageNew(amsg)) {
+            this.state.messages.push({ role: "user", content: amsg.content });
             this.backendProcessing = true;
             this.failedUserInput = "";
         } else if (isChatAudioTranscription(amsg)) {
             this.state.messages.push({ role: "user", content: amsg.transcription });
             this.backendProcessing = true;
+            this.failedUserInput = "";
+        } else if (isChatAudioCommit(amsg)) {
+            this.backendProcessing = false;
+            this.failedUserInput = "";
         } else if (isChatMessagePart(amsg)) {
             const lastMsg = lastOf(this.state.messages);
             if (lastMsg?.role === "assistant") {
@@ -86,9 +89,14 @@ export class Chat {
                     this.backendProcessing = true;
                 }
             }
-        } else {
-            throw new VerbalWebError("Unexpected API message");
         }
+
+        // Ignore other messages
+        else {
+            updated = false;
+        }
+
+        return updated;
     }
 }
 

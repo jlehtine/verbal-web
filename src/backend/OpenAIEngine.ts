@@ -3,6 +3,8 @@ import { retryWithBackoff } from "../shared/retry";
 import { ChatCompletionProvider, ChatCompletionRequest } from "./ChatCompletionProvider";
 import { Engine } from "./Engine";
 import { ModerationProvider, ModerationRequest, ModerationResult } from "./ModerationProvider";
+import { OpenAIRealtimeConversation } from "./OpenAIRealtimeConversation";
+import { RealtimeConversation, RealtimeConversationRequest, RealtimeProvider } from "./RealtimeProvider";
 import { RequestContext } from "./RequestContext";
 import { TranscriptionProvider, TranscriptionRequest } from "./TranscriptionProvider";
 import { logFatal, logInfo, logInterfaceData, logThrownError } from "./log";
@@ -21,7 +23,9 @@ const AUDIO_TYPE_SUFFIX_REGEXP = /\/(\w+)/;
 /**
  * AI engine based on Open AI services.
  */
-export class OpenAIEngine implements Engine, ChatCompletionProvider, ModerationProvider, TranscriptionProvider {
+export class OpenAIEngine
+    implements Engine, ChatCompletionProvider, ModerationProvider, TranscriptionProvider, RealtimeProvider
+{
     readonly textChunkerParams = {
         maxChunkSize: 2000,
         minChunkSize: 500,
@@ -30,6 +34,7 @@ export class OpenAIEngine implements Engine, ChatCompletionProvider, ModerationP
     };
 
     private readonly openai;
+    private readonly apiKey;
 
     constructor() {
         logInfo("Initializing OpenAI API");
@@ -40,6 +45,7 @@ export class OpenAIEngine implements Engine, ChatCompletionProvider, ModerationP
         this.openai = new OpenAI({
             apiKey: apiKey,
         });
+        this.apiKey = apiKey;
     }
 
     moderationProvider(): ModerationProvider {
@@ -51,6 +57,10 @@ export class OpenAIEngine implements Engine, ChatCompletionProvider, ModerationP
     }
 
     transcriptionProvider(): TranscriptionProvider {
+        return this;
+    }
+
+    realtimeProvider(): RealtimeProvider {
         return this;
     }
 
@@ -143,7 +153,7 @@ export class OpenAIEngine implements Engine, ChatCompletionProvider, ModerationP
     }
 
     supportedTranscriptionAudioTypes(): string[] {
-        return ["webm", "mp4", "mp3", "mpeg", "wav"].map((subtype) => "audio/" + subtype);
+        return ["audio/PCMA;rate=8000;channels=1"];
     }
 
     transcribe(requestContext: RequestContext, request: TranscriptionRequest): Promise<string> {
@@ -167,5 +177,30 @@ export class OpenAIEngine implements Engine, ChatCompletionProvider, ModerationP
             },
             BACKOFF_MAX_ATTEMPTS,
         );
+    }
+
+    supportedRealtimeInputAudioTypes(): string[] {
+        return this.supportedRealtimeAudioTypes();
+    }
+
+    supportedRealtimeOutputAudioTypes(): string[] {
+        const types = this.supportedRealtimeAudioTypes();
+        return [...types, "audio/PCMA;rate=24000;channels=1"];
+    }
+
+    private supportedRealtimeAudioTypes(): string[] {
+        return [
+            "PCMA;rate=8000;channels=1",
+            "PCMU;rate=8000;channels=1",
+            "pcm;rate=24000;bits=16;encoding=signed-int;channels=1;big-endian=false",
+        ].map((subtype) => "audio/" + subtype);
+    }
+
+    realtimeConversation(
+        requestContext: RequestContext,
+        request: RealtimeConversationRequest,
+    ): Promise<RealtimeConversation> {
+        const conversation = new OpenAIRealtimeConversation(requestContext, request, this.apiKey);
+        return conversation.init().then(() => conversation);
     }
 }

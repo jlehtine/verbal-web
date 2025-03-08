@@ -26,7 +26,10 @@ export function describeError(err: unknown, includeStack = false, baseMsg?: stri
     let details;
     if (err instanceof Error) {
         details =
-            err.name + (err.message ? ": " + err.message : "") + (includeStack && err.stack ? `\n${err.stack}` : "");
+            err.name +
+            (err.message ? ": " + err.message : "") +
+            (includeStack && err.stack ? `\n${err.stack}` : "") +
+            describeErrorCause(err.cause, includeStack);
     } else if (typeof err === "string") {
         details = err;
     } else if (typeof err === "object" && err !== null) {
@@ -35,4 +38,12 @@ export function describeError(err: unknown, includeStack = false, baseMsg?: stri
         return "Unrecognized error";
     }
     return (baseMsg !== undefined ? baseMsg + ": " : "") + details;
+}
+
+function describeErrorCause(cause: unknown, includeStack = false): string {
+    let causeMsg = "";
+    if (cause !== undefined) {
+        causeMsg = "\ncaused by " + describeError(cause, includeStack);
+    }
+    return causeMsg;
 }

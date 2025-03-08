@@ -1,5 +1,6 @@
 import { ChatMessage } from "../shared/api";
 import AudioInput from "./AudioInput";
+import { AudioMode } from "./AudioMode";
 import { ChatClient, ChatConnectionState } from "./ChatClient";
 import LoadingIndicator from "./LoadingIndicator";
 import MarkdownContent from "./MarkdownContent";
@@ -7,6 +8,7 @@ import WelcomeView from "./WelcomeView";
 import { useConfiguration } from "./context";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import AssistantIcon from "@mui/icons-material/Assistant";
+import HeadsetMicIcon from "@mui/icons-material/HeadsetMic";
 import MicIcon from "@mui/icons-material/Mic";
 import {
     Alert,
@@ -51,16 +53,19 @@ export default function ChatView({ client, fullHeight }: ChatViewProps) {
     // true when waiting for response from backend, used to disable submit-button and display progress circle
     const [waitingForResponse, setWaitingForResponse] = useState(false);
     const [inputEmpty, setInputEmpty] = useState(true);
-    const [audioInput, setAudioInput] = useState<number>();
+    const [audioKey, setAudioKey] = useState<number>();
+    const [audioMode, setAudioMode] = useState<AudioMode>();
 
     // Open audio input
-    function openAudioInput() {
-        setAudioInput(Date.now());
+    function openAudioInput(mode: AudioMode) {
+        setAudioKey(Date.now());
+        setAudioMode(mode);
     }
 
     // Close audio input
     function closeAudioInput() {
-        setAudioInput(undefined);
+        setAudioMode(undefined);
+        setAudioKey(undefined);
     }
 
     // Set user input
@@ -122,6 +127,13 @@ export default function ChatView({ client, fullHeight }: ChatViewProps) {
     }, []);
 
     const poweredByHtml = t("poweredByHtml");
+    const audioInputCommonProps = {
+        key: audioKey,
+        onClose: () => {
+            closeAudioInput();
+        },
+        client,
+    };
     return (
         <>
             <Box
@@ -163,14 +175,17 @@ export default function ChatView({ client, fullHeight }: ChatViewProps) {
                             </Alert>
                         </Box>
                     )}
-                    {audioInput !== undefined && client.sharedConfig?.speechToText ? (
+                    {audioMode === "stt" && client.sharedConfig?.speechToText ? (
                         <AudioInput
-                            key={audioInput}
-                            onClose={() => {
-                                closeAudioInput();
-                            }}
+                            mode={audioMode}
+                            {...audioInputCommonProps}
                             sttConf={client.sharedConfig.speechToText}
-                            client={client}
+                        />
+                    ) : audioMode === "realtime" && client.sharedConfig?.realtime ? (
+                        <AudioInput
+                            mode={audioMode}
+                            {...audioInputCommonProps}
+                            realtimeConf={client.sharedConfig.realtime}
                         />
                     ) : !waitingForResponse ? (
                         <Box
@@ -189,8 +204,8 @@ export default function ChatView({ client, fullHeight }: ChatViewProps) {
                                     inputEmpty={inputEmpty}
                                     setInputEmpty={setInputEmpty}
                                     inputRef={inputRef}
-                                    useAudioInput={() => {
-                                        openAudioInput();
+                                    useAudioInput={(mode) => {
+                                        openAudioInput(mode);
                                     }}
                                 />
                             </Box>
@@ -219,7 +234,7 @@ interface ChatInputProps extends StandardTextFieldProps {
     inputEmpty: boolean;
     setInputEmpty: React.Dispatch<React.SetStateAction<boolean>>;
     submitInput: (input: string) => void;
-    useAudioInput: () => void;
+    useAudioInput: (mode: AudioMode) => void;
 }
 
 function ChatInput({
@@ -236,6 +251,7 @@ function ChatInput({
     const audioSupported =
         typeof navigator.mediaDevices === "object" && typeof navigator.mediaDevices.getUserMedia === "function";
     const speechToTextSupported = audioSupported && client.sharedConfig?.speechToText !== undefined;
+    const realtimeSupported = audioSupported && client.sharedConfig?.realtime !== undefined;
 
     const doSubmit = () => {
         const userInput = (inputRef.current?.value ?? "").trim();
@@ -281,20 +297,36 @@ function ChatInput({
                     onKeyDown: onInputKeyDown,
                     endAdornment: (
                         <InputAdornment position="end">
-                            {speechToTextSupported && inputEmpty ? (
+                            {speechToTextSupported && inputEmpty && (
                                 <Tooltip title={t("audio.input")}>
-                                    <IconButton color="primary" onClick={useAudioInput}>
+                                    <IconButton
+                                        color="primary"
+                                        onClick={() => {
+                                            useAudioInput("stt");
+                                        }}
+                                    >
                                         <MicIcon />
                                     </IconButton>
                                 </Tooltip>
-                            ) : (
-                                !inputEmpty && (
-                                    <Tooltip title={t("input.submit")}>
-                                        <IconButton color="primary" onClick={doSubmit}>
-                                            <AssistantIcon />
-                                        </IconButton>
-                                    </Tooltip>
-                                )
+                            )}
+                            {realtimeSupported && inputEmpty && (
+                                <Tooltip title={t("audio.realtime")}>
+                                    <IconButton
+                                        color="primary"
+                                        onClick={() => {
+                                            useAudioInput("realtime");
+                                        }}
+                                    >
+                                        <HeadsetMicIcon />
+                                    </IconButton>
+                                </Tooltip>
+                            )}
+                            {!inputEmpty && (
+                                <Tooltip title={t("input.submit")}>
+                                    <IconButton color="primary" onClick={doSubmit}>
+                                        <AssistantIcon />
+                                    </IconButton>
+                                </Tooltip>
                             )}
                         </InputAdornment>
                     ),

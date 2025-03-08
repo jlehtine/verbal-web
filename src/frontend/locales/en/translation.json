@@ -1,14 +1,19 @@
 {
     "audio": {
+        "conversationInProgress": "Audio conversation is in progress. Stop by pressing the button.",
         "error": {
             "general": "Failed to initialize audio features.",
+            "noaudio": "No audio detected.",
             "notallowed": "Audio is not allowed. Please check browser settings and web page permissions.",
             "notfound": "No compatible audio input device was found.",
-            "processing": "Failed to process audio."
+            "processing": "Failed to process audio.",
+            "realtime": "Audio conversation failed on an error."
         },
-        "initializingRecording": "Initializing audio recording. Please permit audio access to use speech control.",
-        "input": "Speech control",
+        "initializingRecording": "Initializing audio recording. Please permit audio access to use speech recognition.",
+        "input": "Speech recognition",
         "processing": "Processing audio...",
+        "realtime": "Audio conversation",
+        "realtimePending": "Starting audio conversation...",
         "recording": "I'm listening to your speech. Stop by taking a break or by pressing the button.",
         "stopRecording": "Stop recording"
     },
