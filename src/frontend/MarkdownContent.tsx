@@ -39,11 +39,9 @@ export default function MarkdownContent({ content, completed }: { content: strin
     const MarkdownComponent = MarkdownMathContent ?? Markdown;
 
     return (
-        <Box ref={selfRef}>
+        <Box ref={selfRef} className="vw-markdown-message">
             <Suspense fallback={<LoadingIndicator conf={conf} />}>
-                <MarkdownComponent className="vw-markdown-message" remarkPlugins={[remarkGfm]}>
-                    {content}
-                </MarkdownComponent>
+                <MarkdownComponent remarkPlugins={[remarkGfm]}>{content}</MarkdownComponent>
             </Suspense>
         </Box>
     );
