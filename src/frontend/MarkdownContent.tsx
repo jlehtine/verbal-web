@@ -41,7 +41,7 @@ export default function MarkdownContent({ content, completed, onViewUpdated }: R
 
     // Handle math markup, if not disabled
     let MarkdownMathContent;
-    if (conf.mathMarkup !== false) {
+    if (conf.mathMarkup !== false && completed) {
         const tc = mathMarkup(content);
         if (tc !== undefined) {
             content = tc;
