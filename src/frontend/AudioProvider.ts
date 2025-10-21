@@ -389,9 +389,7 @@ export class AudioProvider
             let silence;
             const stopOnSilence = this.params.mode === "stt" && this.params.stopOnSilence;
             if (rms < SILENCE_THRESHOLD) {
-                if (this.silenceStartedAt === undefined) {
-                    this.silenceStartedAt = timestamp;
-                }
+                this.silenceStartedAt ??= timestamp;
                 if (timestamp - this.silenceStartedAt > SILENCE_DURATION_MILLIS) {
                     if (!this.silenceDetected) {
                         logDebug("Silence detected");
@@ -415,9 +413,7 @@ export class AudioProvider
                 silence = false;
             }
             if (!this.soundDetected && rms > SILENCE_THRESHOLD) {
-                if (this.soundStartedAt === undefined) {
-                    this.soundStartedAt = timestamp;
-                }
+                this.soundStartedAt ??= timestamp;
                 if (timestamp - this.soundStartedAt > SOUND_DURATION_MILLIS) {
                     this.soundDetected = true;
                 }

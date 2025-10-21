@@ -155,9 +155,7 @@ export async function checkSession(req: Request, res?: Response): Promise<Sessio
     let session = await getSession(req);
 
     // Create an unauthenticated session, if necessary
-    if (session === undefined) {
-        session = await startSession(req, res);
-    }
+    session ??= await startSession(req, res);
 
     return session;
 }

@@ -70,9 +70,7 @@ class PoissonErrorDistribution {
     }
 
     pause(now: number): void {
-        if (this.pausedAt === undefined) {
-            this.pausedAt = now;
-        }
+        this.pausedAt ??= now;
     }
 
     continue(now: number): void {
