@@ -8,7 +8,7 @@ const babelOptions = {
             "@babel/preset-env",
             {
                 useBuiltIns: "usage",
-                corejs: "3.41.0",
+                corejs: "3.46.0",
             },
         ],
         "@babel/preset-react",
