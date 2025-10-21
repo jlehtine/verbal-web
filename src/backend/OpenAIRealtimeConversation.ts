@@ -23,7 +23,7 @@ import { logDebug, logInterfaceData, logThrownError } from "./log";
 import WebSocket from "ws";
 
 /** Realtime API URL */
-const REALTIME_URL = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01";
+const REALTIME_URL = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview";
 
 const DEFAULT_INPUT_AUDIO_TRANSCRIPTION_MODEL = "whisper-1";
 
