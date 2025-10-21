@@ -102,7 +102,7 @@ export class OpenAIRealtimeConversation
 
                     // audio data
                     else if (isRealtimeResponseAudioDeltaMessage(msg)) {
-                        let audioData = Buffer.from(msg.delta, "base64").buffer;
+                        let audioData: ArrayBufferLike = Buffer.from(msg.delta, "base64").buffer;
                         if (this.request.outputAudioType === AUDIO_TYPE_24KHZ_PCMA) {
                             audioData = this.g711AEncoder.encodeInt16le(audioData).buffer;
                         }
@@ -236,10 +236,13 @@ export class OpenAIRealtimeConversation
         });
     }
 
-    appendAudio(audio: Uint8Array | ArrayBuffer): void {
+    appendAudio(audio: Uint8Array | ArrayBufferLike): void {
         const msg: RealtimeInputAudioBufferAppendMessage = {
             type: "input_audio_buffer.append",
-            audio: Buffer.from(audio).toString("base64"),
+            audio: (audio instanceof ArrayBuffer || audio instanceof SharedArrayBuffer
+                ? Buffer.from(audio)
+                : Buffer.copyBytesFrom(audio)
+            ).toString("base64"),
         };
         this.sendMessage(msg);
     }

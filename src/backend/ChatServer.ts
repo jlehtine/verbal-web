@@ -85,8 +85,11 @@ interface ChatCompletionState {
     moderationChunker: TextChunker;
 }
 
-function toStandardWebSocketData(data: unknown): string | ArrayBuffer {
-    if (typeof data === "string" || (typeof data === "object" && data instanceof ArrayBuffer)) {
+function toStandardWebSocketData(data: unknown): string | ArrayBufferLike {
+    if (
+        typeof data === "string" ||
+        (typeof data === "object" && (data instanceof ArrayBuffer || data instanceof SharedArrayBuffer))
+    ) {
         return data;
     } else if (Buffer.isBuffer(data)) {
         return data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
@@ -392,7 +395,7 @@ export class ChatServer {
                 const wav = Buffer.concat(chunks);
                 const req: TranscriptionRequest = {
                     user: this.requestContext.session?.id,
-                    audio: wav,
+                    audio: wav.buffer,
                     type: "audio/wav",
                 };
                 transcription

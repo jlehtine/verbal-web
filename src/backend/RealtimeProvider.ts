@@ -106,5 +106,5 @@ export interface RealtimeConversionErrorEvent extends TypedEvent<RealtimeConvers
 /** Realtime conversation audio event */
 export interface RealtimeConversionAudioEvent extends TypedEvent<RealtimeConversation, "audio"> {
     /** Audio data */
-    audio: ArrayBuffer;
+    audio: ArrayBufferLike;
 }
