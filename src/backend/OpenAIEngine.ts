@@ -67,7 +67,10 @@ export class OpenAIEngine
     moderation(requestContext: RequestContext, request: ModerationRequest): Promise<ModerationResult[]> {
         return Promise.all(
             request.content.map((c) => {
-                const req: OpenAI.ModerationCreateParams = { model: request.model, input: c };
+                const req: OpenAI.ModerationCreateParams = {
+                    model: request.model ?? "omni-moderation-latest",
+                    input: c,
+                };
                 logInterfaceData("Sending moderation request", requestContext, req);
                 return retryWithBackoff(
                     () =>
