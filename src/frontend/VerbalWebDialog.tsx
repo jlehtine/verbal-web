@@ -27,7 +27,7 @@ export default function VerbalWebDialog({ conf, ...dialogProps }: VerbalWebDialo
     const { t } = useTranslation();
     const theme = useTheme();
     const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
-    const contentRef = useRef<HTMLElement>();
+    const contentRef = useRef<HTMLElement>(undefined);
 
     return (
         <Dialog

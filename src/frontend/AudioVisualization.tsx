@@ -11,7 +11,7 @@ const UPDATE_INTERVAL_MILLIS = 100;
 
 export interface AudioVisualizationProps {
     size: number;
-    refAudioAnalyserEventFunc: React.MutableRefObject<AudioAnalyserEventFunc<unknown> | undefined>;
+    refAudioAnalyserEventFunc: React.RefObject<AudioAnalyserEventFunc<unknown> | undefined>;
 }
 
 export function AudioVisualization({ size, refAudioAnalyserEventFunc }: AudioVisualizationProps) {

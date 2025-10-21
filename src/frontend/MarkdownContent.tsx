@@ -25,7 +25,7 @@ interface MarkdownContentProps {
 export default function MarkdownContent({ content, completed, onViewUpdated }: Readonly<MarkdownContentProps>) {
     const conf = useConfiguration();
     const { highlight, mathMarkup, mathMarkupStyling } = useMarkdownContent();
-    const selfRef = useRef<HTMLElement>();
+    const selfRef = useRef<HTMLElement>(undefined);
 
     // Highlight, if highlighting not disabled
     useEffect(() => {

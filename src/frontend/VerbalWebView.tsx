@@ -8,7 +8,7 @@ import { VerbalWebConfigurationProvider } from "./context";
 import { VERBAL_WEB_CLASS_NAME, extract } from "./extract";
 import load from "./load";
 import { Box } from "@mui/material";
-import React, { MutableRefObject, PropsWithChildren, Suspense, lazy, useEffect, useState } from "react";
+import React, { RefObject, PropsWithChildren, Suspense, lazy, useEffect, useState } from "react";
 
 export interface VerbalWebViewProps {
     /** Verbal Web configuration */
@@ -18,7 +18,7 @@ export interface VerbalWebViewProps {
     fullHeight?: boolean;
 
     /** Reference to the containing scrolling element, defaults to window scrolling */
-    scrollRef?: MutableRefObject<HTMLElement | undefined>;
+    scrollRef?: RefObject<HTMLElement | undefined>;
 }
 
 /**

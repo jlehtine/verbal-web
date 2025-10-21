@@ -35,7 +35,7 @@ export default function AudioInput(props: AudioInputProps) {
 
     const { t } = useTranslation();
     const theme = useTheme();
-    const refAudioAnalyserEventFunc = React.useRef<AudioAnalyserEventFunc<unknown>>();
+    const refAudioAnalyserEventFunc = React.useRef<AudioAnalyserEventFunc<unknown>>(undefined);
 
     const [error, setError] = useState<AudioErrorCode>();
     const [processing, setProcessing] = useState(false);

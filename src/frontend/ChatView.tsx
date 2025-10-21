@@ -26,22 +26,22 @@ import {
     useMediaQuery,
     useTheme,
 } from "@mui/material";
-import React, { memo, MutableRefObject, PropsWithChildren, Suspense, useEffect, useRef, useState } from "react";
+import React, { memo, RefObject, PropsWithChildren, Suspense, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 export interface ChatViewProps {
     client: ChatClient;
     fullHeight?: boolean;
-    scrollRef?: MutableRefObject<HTMLElement | undefined>;
+    scrollRef?: RefObject<HTMLElement | undefined>;
 }
 
 export default function ChatView({ client, fullHeight }: ChatViewProps) {
     const { t } = useTranslation();
     const conf = useConfiguration();
-    const chatRef = useRef<HTMLElement>();
-    const tailRef = useRef<HTMLElement>();
-    const overflowRef = useRef<HTMLElement>();
-    const inputRef = useRef<HTMLTextAreaElement>();
+    const chatRef = useRef<HTMLElement>(undefined);
+    const tailRef = useRef<HTMLElement>(undefined);
+    const overflowRef = useRef<HTMLElement>(undefined);
+    const inputRef = useRef<HTMLTextAreaElement>(undefined);
     const theme = useTheme();
     const isSmallScreen = useMediaQuery(theme.breakpoints.down("sm"));
 
@@ -275,7 +275,7 @@ export default function ChatView({ client, fullHeight }: ChatViewProps) {
 
 interface ChatInputProps extends StandardTextFieldProps {
     client: ChatClient;
-    inputRef: React.MutableRefObject<HTMLTextAreaElement | undefined>;
+    inputRef: React.RefObject<HTMLTextAreaElement | undefined>;
     inputEmpty: boolean;
     setInputEmpty: React.Dispatch<React.SetStateAction<boolean>>;
     submitInput: (input: string) => void;
