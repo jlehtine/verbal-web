@@ -23,7 +23,9 @@ import { logDebug, logInterfaceData, logThrownError } from "./log";
 import WebSocket from "ws";
 
 /** Realtime API URL */
-const REALTIME_URL = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview";
+const REALTIME_URL = "wss://api.openai.com/v1/realtime";
+
+const DEFAULT_REALTIME_MODEL = "gpt-realtime";
 
 const DEFAULT_INPUT_AUDIO_TRANSCRIPTION_MODEL = "whisper-1";
 
@@ -47,7 +49,9 @@ export class OpenAIRealtimeConversation
         logDebug("Opening a WebSocket connection for OpenAI realtime session", requestContext);
         this.requestContext = requestContext;
         this.request = request;
-        this.ws = new WebSocket(REALTIME_URL, {
+        const realtimeModel = request.model ?? DEFAULT_REALTIME_MODEL;
+        const realtimeUrl = REALTIME_URL + "?model=" + encodeURIComponent(realtimeModel);
+        this.ws = new WebSocket(realtimeUrl, {
             headers: {
                 Authorization: `Bearer ${apiKey}`,
                 "OpenAI-Beta": "realtime=v1",
