@@ -23,6 +23,7 @@
         "@types/wav": "^1.0.4",
         "@types/ws": "^8.18.1",
         "babel-loader": "^10.0.0",
+        "baseline-browser-mapping": "^2.9.12",
         "browserslist": "^4.23.0",
         "copy-webpack-plugin": "^13.0.1",
         "css-loader": "^7.1.2",
