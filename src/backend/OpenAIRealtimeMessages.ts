@@ -58,8 +58,7 @@ export interface RealtimeInputAudioBufferAppendMessage extends RealtimeMessage<"
 export type RealtimeInputAudioBufferCommitMessage = RealtimeMessage<"input_audio_buffer.commit">;
 
 export interface RealtimeConversationItemCreateMessage
-    extends RealtimeMessage<"conversation.item.create">,
-        RealtimeConversationItemInfo {}
+    extends RealtimeMessage<"conversation.item.create">, RealtimeConversationItemInfo {}
 
 // Server messages
 
@@ -81,36 +80,34 @@ export interface RealtimeConversation {
 }
 
 export interface RealtimeConversationItemCreatedMessage
-    extends RealtimeEventIdMessage<"conversation.item.created">,
-        RealtimeConversationItemInfo {}
+    extends RealtimeEventIdMessage<"conversation.item.created">, RealtimeConversationItemInfo {}
 
 export interface RealtimeConversationItemInputAudioTranscriptionCompletedMessage
-    extends RealtimeEventIdMessage<"conversation.item.input_audio_transcription.completed">,
+    extends
+        RealtimeEventIdMessage<"conversation.item.input_audio_transcription.completed">,
         RealtimeConversationItemContentIdentity {
     transcript: string;
 }
 
 export interface RealtimeConversationItemInputAudioTranscriptionFailedMessage
-    extends RealtimeEventIdMessage<"conversation.item.input_audio_transcription.failed">,
+    extends
+        RealtimeEventIdMessage<"conversation.item.input_audio_transcription.failed">,
         RealtimeConversationItemContentIdentity {
     error: RealtimeErrorInfo;
 }
 
 export interface RealtimeResponseTextDeltaMessage
-    extends RealtimeEventIdMessage<"response.text.delta">,
-        RealtimeResponseContentPartIdentity {
+    extends RealtimeEventIdMessage<"response.text.delta">, RealtimeResponseContentPartIdentity {
     delta: string;
 }
 
 export interface RealtimeResponseAudioTranscriptDoneMessage
-    extends RealtimeEventIdMessage<"response.audio_transcript.done">,
-        RealtimeResponseContentPartIdentity {
+    extends RealtimeEventIdMessage<"response.audio_transcript.done">, RealtimeResponseContentPartIdentity {
     transcript: string;
 }
 
 export interface RealtimeResponseAudioDeltaMessage
-    extends RealtimeEventIdMessage<"response.audio.delta">,
-        RealtimeResponseContentPartIdentity {
+    extends RealtimeEventIdMessage<"response.audio.delta">, RealtimeResponseContentPartIdentity {
     delta: string;
 }
 
